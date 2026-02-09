@@ -7,6 +7,7 @@ import { ToastProvider } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { AddFeedDialog } from './components/AddFeedDialog';
 import { SearchPanel } from './components/SearchPanel';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -17,6 +18,7 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
@@ -37,6 +39,12 @@ export function App() {
       if (e.key === '/') {
         e.preventDefault();
         setSearchOpen(true);
+      }
+
+      // ? 键: 快捷键帮助
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsHelpOpen((prev) => !prev);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -143,6 +151,11 @@ export function App() {
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           onSelectArticle={handleSearchSelect}
+        />
+
+        <KeyboardShortcutsHelp
+          open={shortcutsHelpOpen}
+          onClose={() => setShortcutsHelpOpen(false)}
         />
       </div>
     </ToastProvider>
