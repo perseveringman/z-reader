@@ -40,6 +40,13 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: '面板',
+    items: [
+      { keys: ['['], description: '收折/展开左侧目录 (阅读视图)' },
+      { keys: [']'], description: '收折/展开右侧详情面板' },
+    ],
+  },
+  {
     title: '全局',
     items: [
       { keys: ['⌘K'], description: '命令面板' },
@@ -62,6 +69,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         onClose();
       }
     };

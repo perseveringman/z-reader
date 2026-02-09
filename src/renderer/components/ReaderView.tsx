@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Settings2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP } from './ReaderSettings';
@@ -60,6 +60,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [readerSettings, setReaderSettings] = useState<ReaderSettingsValues>(loadReaderSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
+  const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
+  const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
   const contentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -232,17 +234,42 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA';
+
       if (e.key === 'Escape') {
         if (toolbarPos) {
           setToolbarPos(null);
+          return;
+        }
+        if (inInput) {
+          (e.target as HTMLElement).blur();
           return;
         }
         onClose();
         return;
       }
 
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === '[') {
+        e.preventDefault();
+        setTocCollapsed((prev) => {
+          const next = !prev;
+          localStorage.setItem('reader-toc-collapsed', String(next));
+          return next;
+        });
+        return;
+      }
+      if (e.key === ']') {
+        e.preventDefault();
+        setDetailCollapsed((prev) => {
+          const next = !prev;
+          localStorage.setItem('reader-detail-collapsed', String(next));
+          return next;
+        });
+        return;
+      }
+
+      if (inInput) return;
 
       if (!contentRef.current) return;
       const total = contentRef.current.querySelectorAll('p').length;
@@ -284,7 +311,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   return (
     <div className={`flex flex-1 h-full overflow-hidden ${themeClass}`}>
       {/* Left Sidebar - Contents */}
-      <div className="w-[220px] shrink-0 flex flex-col border-r border-[#262626] bg-[#141414]">
+      <div className={`shrink-0 flex flex-col border-r border-[#262626] bg-[#141414] transition-all duration-200 overflow-hidden ${tocCollapsed ? 'w-0 border-r-0' : 'w-[220px]'}`}>
         <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-[#262626]">
           <button
             onClick={onClose}
@@ -325,6 +352,17 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       <div ref={scrollContainerRef} className="relative flex-1 flex flex-col overflow-hidden">
         <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626]">
           <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
+            <button
+              onClick={() => setTocCollapsed((prev) => {
+                const next = !prev;
+                localStorage.setItem('reader-toc-collapsed', String(next));
+                return next;
+              })}
+              className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white shrink-0"
+              title={tocCollapsed ? '展开目录' : '收起目录'}
+            >
+              {tocCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
             {feedName && (
               <>
                 <span className="text-gray-500 truncate">{feedName}</span>
@@ -333,13 +371,26 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
             )}
             <span className="text-gray-400 truncate">{article?.title ?? '加载中…'}</span>
           </div>
-          <button
-            onClick={() => setSettingsOpen(!settingsOpen)}
-            className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
-            title="排版设置"
-          >
-            <Settings2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+              title="排版设置"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setDetailCollapsed((prev) => {
+                const next = !prev;
+                localStorage.setItem('reader-detail-collapsed', String(next));
+                return next;
+              })}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+              title={detailCollapsed ? '展开详情' : '收起详情'}
+            >
+              {detailCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         <ReaderSettings
@@ -417,7 +468,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       </div>
 
       {/* Right Sidebar - Info/Notebook/Chat */}
-      <ReaderDetailPanel articleId={articleId} />
+      <div className={`shrink-0 transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
+        <ReaderDetailPanel articleId={articleId} />
+      </div>
     </div>
   );
 }

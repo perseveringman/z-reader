@@ -25,6 +25,7 @@ export function App() {
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [managingFeed, setManagingFeed] = useState<Feed | null>(null);
+  const [detailPanelCollapsed, setDetailPanelCollapsed] = useState(() => localStorage.getItem('detail-panel-collapsed') === 'true');
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,10 +50,20 @@ export function App() {
         e.preventDefault();
         setShortcutsHelpOpen((prev) => !prev);
       }
+
+      // ] 键: 收折/展开右侧详情面板（列表视图）
+      if (e.key === ']' && !readerMode) {
+        e.preventDefault();
+        setDetailPanelCollapsed((prev) => {
+          const next = !prev;
+          localStorage.setItem('detail-panel-collapsed', String(next));
+          return next;
+        });
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [readerMode]);
 
   const handleCommandExecute = useCallback(
     (commandId: string) => {
@@ -166,7 +177,9 @@ export function App() {
               activeView={activeView}
               tagId={activeView === 'tags' ? selectedTagId : undefined}
             />
-            <DetailPanel articleId={selectedArticleId} />
+            {!detailPanelCollapsed && (
+              <DetailPanel articleId={selectedArticleId} />
+            )}
           </>
         ) : (
           <ReaderView

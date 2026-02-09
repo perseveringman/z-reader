@@ -5,8 +5,8 @@ import type { Article } from '../../shared/types';
 interface ArticleCardProps {
   article: Article;
   isSelected: boolean;
-  onSelect: (id: string) => void;
-  onDoubleClick: (id: string) => void;
+  onHover: (id: string) => void;
+  onClick: (id: string) => void;
   onStatusChange: (id: string, status: 'inbox' | 'later' | 'archive') => void;
   onToggleShortlist?: (id: string, current: boolean) => void;
   trashMode?: boolean;
@@ -43,7 +43,7 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onHover, onClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
@@ -73,15 +73,17 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
         if (multiSelect || e.metaKey || e.ctrlKey || e.shiftKey) {
           onToggleCheck?.(article.id, e);
         } else {
-          onSelect(article.id);
+          onClick(article.id);
         }
       }}
-      onDoubleClick={() => onDoubleClick(article.id)}
       onContextMenu={(e) => {
         e.preventDefault();
         onCtxMenu?.(article.id, e.clientX, e.clientY);
       }}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => {
+        setHovered(true);
+        onHover(article.id);
+      }}
       onMouseLeave={() => setHovered(false)}
       className={`
         relative flex gap-3 px-4 ${compact ? 'py-2' : 'py-3'} cursor-pointer transition-colors

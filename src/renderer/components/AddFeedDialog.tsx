@@ -32,6 +32,7 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         onClose();
       }
     };

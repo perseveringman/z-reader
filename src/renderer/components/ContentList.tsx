@@ -354,34 +354,42 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           break;
         }
         case 'Enter': {
-          if (selectedArticleId) onOpenReader(selectedArticleId);
+          if (selectedArticleId) {
+            e.preventDefault();
+            onOpenReader(selectedArticleId);
+          }
           break;
         }
-        case '1': { setActiveTab('inbox'); break; }
-        case '2': { setActiveTab('later'); break; }
-        case '3': { setActiveTab('archive'); break; }
+        case '1': { e.preventDefault(); setActiveTab('inbox'); break; }
+        case '2': { e.preventDefault(); setActiveTab('later'); break; }
+        case '3': { e.preventDefault(); setActiveTab('archive'); break; }
         case 'e':
         case 'E': {
+          e.preventDefault();
           if (selectedArticleId) handleStatusChange(selectedArticleId, 'archive');
           break;
         }
         case 'l':
         case 'L': {
+          e.preventDefault();
           if (selectedArticleId) handleStatusChange(selectedArticleId, 'later');
           break;
         }
         case 'd':
         case 'D': {
+          e.preventDefault();
           if (selectedArticleId) handleDelete(selectedArticleId);
           break;
         }
         case 'z':
         case 'Z': {
+          e.preventDefault();
           if (undoStack.canUndo) undoStack.undo();
           break;
         }
         case 's':
         case 'S': {
+          e.preventDefault();
           if (selectedArticleId) handleToggleShortlist(selectedArticleId);
           break;
         }
@@ -514,8 +522,8 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                 <ArticleCard
                   article={article}
                   isSelected={article.id === selectedArticleId}
-                  onSelect={(id) => onSelectArticle(id)}
-                  onDoubleClick={onOpenReader}
+                  onHover={(id) => onSelectArticle(id)}
+                  onClick={onOpenReader}
                   onStatusChange={handleStatusChange}
                   onToggleShortlist={(id, current) => handleToggleShortlist(id)}
                   trashMode={isTrash}
