@@ -14,7 +14,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import type { Feed } from '../../shared/types';
+import type { Feed, Tag as TagType } from '../../shared/types';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -25,6 +25,8 @@ interface SidebarProps {
   onSearch: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
+  selectedTagId?: string | null;
+  onTagSelect?: (tagId: string | null) => void;
 }
 
 interface NavItemProps {
@@ -89,7 +91,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -97,6 +99,8 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
     pinned: true,
   });
   const [feedCategories, setFeedCategories] = useState<Record<string, Feed[]>>({});
+  const [tags, setTags] = useState<TagType[]>([]);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   // 加载 Feed 列表
   useEffect(() => {
@@ -120,6 +124,19 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
     };
     loadFeeds();
   }, []);
+
+  // 加载 Tags
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tagList = await window.electronAPI.tagList();
+        setTags(tagList);
+      } catch (err) {
+        console.error('Failed to load tags:', err);
+      }
+    };
+    loadTags();
+  }, [activeView]);
 
   const toggleSection = (key: keyof typeof sections) => {
     setSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -175,10 +192,40 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
             <NavItem
               icon={<Tag size={iconSize} />}
               label="Tags"
-              active={activeView === 'tags'}
+              active={activeView === 'tags' && !selectedTagId}
               collapsed={collapsed}
-              onClick={() => onViewChange('tags')}
+              onClick={() => {
+                setTagsExpanded(!tagsExpanded);
+                onViewChange('tags');
+                onTagSelect?.(null);
+              }}
             />
+            {/* Tags 子列表 */}
+            {!collapsed && tagsExpanded && tags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => {
+                  onTagSelect?.(tag.id);
+                  onViewChange('tags');
+                }}
+                className={`
+                  relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
+                  transition-colors duration-150 cursor-pointer ml-3
+                  ${selectedTagId === tag.id
+                    ? 'text-white bg-white/[0.08]'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                  }
+                `}
+              >
+                {selectedTagId === tag.id && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-500" />
+                )}
+                <span className="flex-1 text-left truncate">{tag.name}</span>
+                {tag.articleCount !== undefined && (
+                  <span className="text-[10px] text-gray-600">{tag.articleCount}</span>
+                )}
+              </button>
+            ))}
           </>
         )}
 

@@ -105,6 +105,7 @@ export interface Tag {
   parentId: string | null;
   createdAt: string;
   updatedAt: string;
+  articleCount?: number;
 }
 
 // ==================== IPC Channel 定义 ====================
@@ -140,4 +141,6 @@ export interface ElectronAPI {
   tagDelete: (id: string) => Promise<void>;
   articleTagAdd: (articleId: string, tagId: string) => Promise<void>;
   articleTagRemove: (articleId: string, tagId: string) => Promise<void>;
+  articleListByTag: (tagId: string) => Promise<Article[]>;
+  articleTagsForArticle: (articleId: string) => Promise<Tag[]>;
 }

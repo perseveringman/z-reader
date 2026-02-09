@@ -17,6 +17,7 @@ interface ContentListProps {
   feedId?: string | null;
   isShortlisted?: boolean;
   activeView?: string;
+  tagId?: string | null;
 }
 
 const TABS: { key: ReadStatus; label: string }[] = [
@@ -30,7 +31,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -46,6 +47,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       if (isTrash) {
         const result = await window.electronAPI.articleListDeleted();
+        setArticles(result);
+      } else if (tagId) {
+        const result = await window.electronAPI.articleListByTag(tagId);
         setArticles(result);
       } else {
         const query: ArticleListQuery = {
@@ -70,7 +74,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId]);
 
   useEffect(() => {
     fetchArticles();
@@ -235,7 +239,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">
-            {isTrash ? 'Trash' : isShortlisted ? 'Shortlist' : 'Articles'}
+            {isTrash ? 'Trash' : isShortlisted ? 'Shortlist' : tagId ? 'Tag' : 'Articles'}
           </h2>
           <div className="flex items-center gap-1">
             <button
@@ -255,7 +259,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           </div>
         </div>
 
-        {!isShortlisted && !isTrash && (
+        {!isShortlisted && !isTrash && !tagId && (
           <div className="flex px-4 gap-4 border-b border-[#262626]">
             {TABS.map((tab) => (
               <button
@@ -274,7 +278,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             ))}
           </div>
         )}
-        {(isShortlisted || isTrash) && <div className="border-b border-[#262626]" />}
+        {(isShortlisted || isTrash || tagId) && <div className="border-b border-[#262626]" />}
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto">

@@ -30,4 +30,6 @@ export const IPC_CHANNELS = {
   TAG_DELETE: 'tag:delete',
   ARTICLE_TAG_ADD: 'articleTag:add',
   ARTICLE_TAG_REMOVE: 'articleTag:remove',
+  ARTICLE_LIST_BY_TAG: 'article:listByTag',
+  ARTICLE_TAGS_FOR_ARTICLE: 'article:tagsForArticle',
 } as const;

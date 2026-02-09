@@ -19,6 +19,7 @@ export function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -98,6 +99,11 @@ export function App() {
             setSelectedFeedId(feedId);
             setActiveView('feeds');
           }}
+          selectedTagId={selectedTagId}
+          onTagSelect={(tagId) => {
+            setSelectedTagId(tagId);
+            if (tagId) setActiveView('tags');
+          }}
         />
 
         {!readerMode ? (
@@ -110,6 +116,7 @@ export function App() {
               feedId={activeView === 'feeds' ? selectedFeedId : undefined}
               isShortlisted={activeView === 'shortlist'}
               activeView={activeView}
+              tagId={activeView === 'tags' ? selectedTagId : undefined}
             />
             <DetailPanel articleId={selectedArticleId} />
           </>

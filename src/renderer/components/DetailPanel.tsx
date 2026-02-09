@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
+import { TagPicker } from './TagPicker';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -173,6 +174,15 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
                         </span>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Tags */}
+                  <div className="mt-6">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Tag className="w-3.5 h-3.5 text-gray-500" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Tags</span>
+                    </div>
+                    <TagPicker articleId={article.id} />
                   </div>
                 </div>
 

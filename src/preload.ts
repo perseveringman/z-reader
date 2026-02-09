@@ -34,6 +34,8 @@ const electronAPI: ElectronAPI = {
   tagDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.TAG_DELETE, id),
   articleTagAdd: (articleId, tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAG_ADD, articleId, tagId),
   articleTagRemove: (articleId, tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAG_REMOVE, articleId, tagId),
+  articleListByTag: (tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_LIST_BY_TAG, tagId),
+  articleTagsForArticle: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAGS_FOR_ARTICLE, articleId),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
