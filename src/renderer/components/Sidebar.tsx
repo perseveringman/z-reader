@@ -11,6 +11,7 @@ import {
   User,
   ChevronRight,
   ChevronDown,
+  Plus,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -18,6 +19,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   activeView: string;
   onViewChange: (view: string) => void;
+  onAddFeed: () => void;
 }
 
 interface NavItemProps {
@@ -82,7 +84,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -107,12 +109,21 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange 
         {!collapsed && (
           <span className="text-xs font-medium text-gray-500 tracking-tight pl-16">Z-Reader</span>
         )}
-        <button
-          onClick={onToggleCollapse}
-          className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors no-drag cursor-pointer"
-        >
-          {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+        <div className="flex items-center gap-1 no-drag">
+          <button
+            onClick={onAddFeed}
+            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title="添加 RSS 订阅"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+          >
+            {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+          </button>
+        </div>
       </div>
 
       {/* 导航区域 */}

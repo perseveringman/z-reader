@@ -13,6 +13,7 @@ interface ContentListProps {
   selectedArticleId: string | null;
   onSelectArticle: (id: string) => void;
   onOpenReader: (id: string) => void;
+  refreshTrigger?: number;
 }
 
 const TABS: { key: ReadStatus; label: string }[] = [
@@ -26,7 +27,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -55,7 +56,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader }
 
   useEffect(() => {
     fetchArticles();
-  }, [fetchArticles]);
+  }, [fetchArticles, refreshTrigger]);
 
   const STATUS_TOAST: Record<ReadStatus, string> = {
     archive: '已归档',

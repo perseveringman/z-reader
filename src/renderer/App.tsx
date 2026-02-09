@@ -5,6 +5,7 @@ import { DetailPanel } from './components/DetailPanel';
 import { ReaderView } from './components/ReaderView';
 import { ToastProvider } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
+import { AddFeedDialog } from './components/AddFeedDialog';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -12,6 +13,8 @@ export function App() {
   const [activeView, setActiveView] = useState<string>('articles');
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,6 +48,11 @@ export function App() {
     []
   );
 
+  const handleFeedAdded = useCallback(() => {
+    // 刷新文章列表
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
   return (
     <ToastProvider>
       <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
@@ -53,12 +61,14 @@ export function App() {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           activeView={activeView}
           onViewChange={setActiveView}
+          onAddFeed={() => setAddFeedDialogOpen(true)}
         />
 
         <ContentList
           selectedArticleId={selectedArticleId}
           onSelectArticle={setSelectedArticleId}
           onOpenReader={setReaderArticleId}
+          refreshTrigger={refreshTrigger}
         />
 
         <DetailPanel articleId={selectedArticleId} />
@@ -74,6 +84,12 @@ export function App() {
           open={commandPaletteOpen}
           onClose={() => setCommandPaletteOpen(false)}
           onExecute={handleCommandExecute}
+        />
+
+        <AddFeedDialog
+          open={addFeedDialogOpen}
+          onClose={() => setAddFeedDialogOpen(false)}
+          onFeedAdded={handleFeedAdded}
         />
       </div>
     </ToastProvider>
