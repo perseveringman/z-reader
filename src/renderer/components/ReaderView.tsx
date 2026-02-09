@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
+import { ReaderDetailPanel } from './ReaderDetailPanel';
 
 interface ReaderViewProps {
   articleId: string;
@@ -253,93 +254,105 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const isLoading = loading || parsing;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0f0f0f] text-gray-200">
-      <div className="shrink-0 sticky top-0 z-10 flex items-center justify-between px-4 h-12 border-b border-white/5 bg-[#0f0f0f]/95 backdrop-blur-sm">
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="flex flex-1 h-full bg-[#0f0f0f] text-gray-200 overflow-hidden">
+      {/* Left Sidebar - Contents */}
+      <div className="w-[220px] shrink-0 flex flex-col border-r border-[#262626] bg-[#141414]">
+        <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-[#262626]">
           <button
             onClick={onClose}
             className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+            title="返回列表"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="flex items-center gap-1.5 text-[13px] min-w-0 truncate">
+          <h2 className="text-[13px] font-semibold text-white tracking-wide">Contents</h2>
+          <div className="w-6" />
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <p className="text-[12px] text-gray-500 leading-relaxed">
+            文章目录功能开发中…
+          </p>
+        </div>
+      </div>
+
+      {/* Center - Article Content */}
+      <div ref={scrollContainerRef} className="relative flex-1 flex flex-col overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626] bg-[#0f0f0f]">
+          <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
             {feedName && (
               <>
                 <span className="text-gray-500 truncate">{feedName}</span>
                 <span className="text-gray-600">&gt;</span>
               </>
             )}
-            <span className="text-gray-300 truncate">{article?.title ?? '加载中…'}</span>
+            <span className="text-gray-400 truncate">{article?.title ?? '加载中…'}</span>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
 
-      <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
-            <span className="text-sm text-gray-500">
-              {parsing ? '正在解析文章内容…' : '加载中…'}
-            </span>
-          </div>
-        ) : !article ? (
-          <div className="flex items-center justify-center h-full text-sm text-gray-500">
-            文章不存在
-          </div>
-        ) : (
-          <div className="mx-auto max-w-[720px] px-6 py-10">
-            <h1 className="text-[28px] font-bold leading-tight text-white">
-              {article.title}
-            </h1>
-
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-gray-500">
-              {article.author && <span>{article.author}</span>}
-              {article.domain && <span>{article.domain}</span>}
-              {article.publishedAt && <span>{formatDate(article.publishedAt)}</span>}
-              {article.readingTime && <span>{article.readingTime} min read</span>}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+              <span className="text-sm text-gray-500">
+                {parsing ? '正在解析文章内容…' : '加载中…'}
+              </span>
             </div>
+          ) : !article ? (
+            <div className="flex items-center justify-center h-full text-sm text-gray-500">
+              文章不存在
+            </div>
+          ) : (
+            <div className="mx-auto max-w-[680px] px-8 py-10">
+              <h1 className="text-[28px] font-bold leading-tight text-white">
+                {article.title}
+              </h1>
 
-            {article.content ? (
-              <div
-                ref={contentRef}
-                className="article-content mt-8"
-                dangerouslySetInnerHTML={{ __html: article.content }}
-                onMouseUp={handleMouseUp}
-              />
-            ) : (
-              <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>
-            )}
-          </div>
-        )}
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-gray-500">
+                {article.author && <span>{article.author}</span>}
+                {article.domain && <span>{article.domain}</span>}
+                {article.publishedAt && <span>{formatDate(article.publishedAt)}</span>}
+                {article.readingTime && <span>{article.readingTime} min read</span>}
+              </div>
 
-        {toolbarPos && (
-          <div
-            ref={toolbarRef}
-            className="absolute z-50 flex items-center gap-1.5 px-2 py-1.5 bg-[#252525] rounded-lg shadow-xl border border-white/10"
-            style={{
-              left: toolbarPos.x,
-              top: toolbarPos.y,
-              transform: 'translate(-50%, -100%)',
-            }}
-          >
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.name}
-                onClick={() => handleCreateHighlight(c.name)}
-                className="w-5 h-5 rounded-full transition-transform hover:scale-125 cursor-pointer"
-                style={{ backgroundColor: c.value }}
-                title={c.name}
-              />
-            ))}
-          </div>
-        )}
+              {article.content ? (
+                <div
+                  ref={contentRef}
+                  className="article-content mt-8"
+                  dangerouslySetInnerHTML={{ __html: article.content }}
+                  onMouseUp={handleMouseUp}
+                />
+              ) : (
+                <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>
+              )}
+            </div>
+          )}
+
+          {toolbarPos && (
+            <div
+              ref={toolbarRef}
+              className="absolute z-50 flex items-center gap-1.5 px-2 py-1.5 bg-[#252525] rounded-lg shadow-xl border border-white/10"
+              style={{
+                left: toolbarPos.x,
+                top: toolbarPos.y,
+                transform: 'translate(-50%, -100%)',
+              }}
+            >
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.name}
+                  onClick={() => handleCreateHighlight(c.name)}
+                  className="w-5 h-5 rounded-full transition-transform hover:scale-125 cursor-pointer"
+                  style={{ backgroundColor: c.value }}
+                  title={c.name}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Right Sidebar - Info/Notebook/Chat */}
+      <ReaderDetailPanel articleId={articleId} />
     </div>
   );
 }

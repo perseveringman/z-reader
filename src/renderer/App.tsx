@@ -12,6 +12,7 @@ export function App() {
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<string>('articles');
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
+  const [readerMode, setReaderMode] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -53,6 +54,16 @@ export function App() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  const handleOpenReader = useCallback((articleId: string) => {
+    setReaderArticleId(articleId);
+    setReaderMode(true);
+  }, []);
+
+  const handleCloseReader = useCallback(() => {
+    setReaderMode(false);
+    setReaderArticleId(null);
+  }, []);
+
   return (
     <ToastProvider>
       <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
@@ -64,19 +75,20 @@ export function App() {
           onAddFeed={() => setAddFeedDialogOpen(true)}
         />
 
-        <ContentList
-          selectedArticleId={selectedArticleId}
-          onSelectArticle={setSelectedArticleId}
-          onOpenReader={setReaderArticleId}
-          refreshTrigger={refreshTrigger}
-        />
-
-        <DetailPanel articleId={selectedArticleId} />
-
-        {readerArticleId && (
+        {!readerMode ? (
+          <>
+            <ContentList
+              selectedArticleId={selectedArticleId}
+              onSelectArticle={setSelectedArticleId}
+              onOpenReader={handleOpenReader}
+              refreshTrigger={refreshTrigger}
+            />
+            <DetailPanel articleId={selectedArticleId} />
+          </>
+        ) : (
           <ReaderView
-            articleId={readerArticleId}
-            onClose={() => setReaderArticleId(null)}
+            articleId={readerArticleId!}
+            onClose={handleCloseReader}
           />
         )}
 
