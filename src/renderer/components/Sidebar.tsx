@@ -6,6 +6,7 @@ import {
   Star,
   Search,
   Settings,
+  Settings2,
   PanelLeftClose,
   PanelLeft,
   User,
@@ -25,6 +26,7 @@ interface SidebarProps {
   onSearch: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
+  onManageFeed?: (feed: Feed) => void;
   selectedTagId?: string | null;
   onTagSelect?: (tagId: string | null) => void;
 }
@@ -91,7 +93,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect, onManageFeed, selectedTagId, onTagSelect }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -268,7 +270,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                       key={feed.id}
                       onClick={() => onFeedSelect(feed.id)}
                       className={`
-                        relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
+                        group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
                         transition-colors duration-150 cursor-pointer
                         ${selectedFeedId === feed.id
                           ? 'text-white bg-white/[0.08]'
@@ -282,6 +284,18 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                       )}
                       <span className="shrink-0">{displayIcon}</span>
                       <span className="flex-1 text-left truncate">{feed.title || feed.url}</span>
+                      {onManageFeed && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onManageFeed(feed);
+                          }}
+                          className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-all cursor-pointer"
+                          title="管理 Feed"
+                        >
+                          <Settings2 size={12} />
+                        </span>
+                      )}
                     </button>
                   );
                 })}

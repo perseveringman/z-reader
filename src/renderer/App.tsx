@@ -8,6 +8,8 @@ import { CommandPalette } from './components/CommandPalette';
 import { AddFeedDialog } from './components/AddFeedDialog';
 import { SearchPanel } from './components/SearchPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { FeedManageDialog } from './components/FeedManageDialog';
+import type { Feed } from '../shared/types';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -22,6 +24,7 @@ export function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [managingFeed, setManagingFeed] = useState<Feed | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -92,6 +95,42 @@ export function App() {
     setActiveView('articles');
   }, []);
 
+  const handleSaveFeed = useCallback(async (feed: Feed) => {
+    try {
+      await window.electronAPI.feedUpdate({
+        id: feed.id,
+        title: feed.title ?? undefined,
+        category: feed.category ?? undefined,
+        fetchInterval: feed.fetchInterval,
+      });
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error('Failed to update feed:', err);
+    }
+  }, []);
+
+  const handleDeleteFeed = useCallback(async (feedId: string) => {
+    try {
+      await window.electronAPI.feedDelete(feedId);
+      setRefreshTrigger((prev) => prev + 1);
+      if (selectedFeedId === feedId) {
+        setSelectedFeedId(null);
+        setActiveView('articles');
+      }
+    } catch (err) {
+      console.error('Failed to delete feed:', err);
+    }
+  }, [selectedFeedId]);
+
+  const handleFetchFeed = useCallback(async (feedId: string) => {
+    try {
+      await window.electronAPI.feedFetch(feedId);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error('Failed to fetch feed:', err);
+    }
+  }, []);
+
   return (
     <ToastProvider>
       <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
@@ -107,6 +146,7 @@ export function App() {
             setSelectedFeedId(feedId);
             setActiveView('feeds');
           }}
+          onManageFeed={setManagingFeed}
           selectedTagId={selectedTagId}
           onTagSelect={(tagId) => {
             setSelectedTagId(tagId);
@@ -157,6 +197,16 @@ export function App() {
           open={shortcutsHelpOpen}
           onClose={() => setShortcutsHelpOpen(false)}
         />
+
+        {managingFeed && (
+          <FeedManageDialog
+            feed={managingFeed}
+            onClose={() => setManagingFeed(null)}
+            onSave={handleSaveFeed}
+            onDelete={handleDeleteFeed}
+            onFetch={handleFetchFeed}
+          />
+        )}
       </div>
     </ToastProvider>
   );
