@@ -14,6 +14,7 @@ interface ContentListProps {
   onSelectArticle: (id: string) => void;
   onOpenReader: (id: string) => void;
   refreshTrigger?: number;
+  feedId?: string | null;
 }
 
 const TABS: { key: ReadStatus; label: string }[] = [
@@ -27,7 +28,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -45,6 +46,10 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         sortOrder,
         limit: 100,
       };
+      // 如果有 feedId，添加到查询参数
+      if (feedId) {
+        query.feedId = feedId;
+      }
       const result = await window.electronAPI.articleList(query);
       setArticles(result);
     } catch (err) {
@@ -52,7 +57,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder]);
+  }, [activeTab, sortBy, sortOrder, feedId]);
 
   useEffect(() => {
     fetchArticles();

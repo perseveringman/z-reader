@@ -18,6 +18,7 @@ export function App() {
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -92,6 +93,11 @@ export function App() {
           onViewChange={setActiveView}
           onAddFeed={() => setAddFeedDialogOpen(true)}
           onSearch={() => setSearchOpen(true)}
+          selectedFeedId={selectedFeedId}
+          onFeedSelect={(feedId) => {
+            setSelectedFeedId(feedId);
+            setActiveView('feeds');
+          }}
         />
 
         {!readerMode ? (
@@ -101,6 +107,7 @@ export function App() {
               onSelectArticle={setSelectedArticleId}
               onOpenReader={handleOpenReader}
               refreshTrigger={refreshTrigger}
+              feedId={activeView === 'feeds' ? selectedFeedId : undefined}
             />
             <DetailPanel articleId={selectedArticleId} />
           </>

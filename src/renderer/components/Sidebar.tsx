@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Tag,
@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Plus,
 } from 'lucide-react';
+import type { Feed } from '../../shared/types';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -21,6 +22,8 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
   onAddFeed: () => void;
   onSearch: () => void;
+  selectedFeedId: string | null;
+  onFeedSelect: (feedId: string | null) => void;
 }
 
 interface NavItemProps {
@@ -85,13 +88,37 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
     feed: true,
     pinned: true,
   });
+  const [feedCategories, setFeedCategories] = useState<Record<string, Feed[]>>({});
+
+  // 加载 Feed 列表
+  useEffect(() => {
+    const loadFeeds = async () => {
+      try {
+        const feedList = await window.electronAPI.feedList();
+
+        // 按 category 分组
+        const grouped: Record<string, Feed[]> = {};
+        feedList.forEach((feed) => {
+          const category = feed.category || 'uncategorized';
+          if (!grouped[category]) {
+            grouped[category] = [];
+          }
+          grouped[category].push(feed);
+        });
+        setFeedCategories(grouped);
+      } catch (err) {
+        console.error('Failed to load feeds:', err);
+      }
+    };
+    loadFeeds();
+  }, []);
 
   const toggleSection = (key: keyof typeof sections) => {
     setSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -161,13 +188,58 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           onToggle={() => toggleSection('feed')}
         />
         {(collapsed || sections.feed) && (
-          <NavItem
-            icon={<Rss size={iconSize} />}
-            label="All Feeds"
-            active={activeView === 'feeds'}
-            collapsed={collapsed}
-            onClick={() => onViewChange('feeds')}
-          />
+          <>
+            <NavItem
+              icon={<Rss size={iconSize} />}
+              label="All Feeds"
+              active={activeView === 'feeds' && selectedFeedId === null}
+              collapsed={collapsed}
+              onClick={() => {
+                onViewChange('feeds');
+                onFeedSelect(null);
+              }}
+            />
+            {/* Feed 列表 - 按分类展示 */}
+            {!collapsed && Object.keys(feedCategories).map((category) => (
+              <div key={category} className="mt-2">
+                <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600">
+                  {category}
+                </div>
+                {feedCategories[category].map((feed) => {
+                  // 获取 favicon 或首字母
+                  const displayIcon = feed.favicon ? (
+                    <img src={feed.favicon} alt="" className="w-4 h-4 rounded" />
+                  ) : (
+                    <div className="w-4 h-4 rounded bg-gray-700 flex items-center justify-center text-[10px] text-gray-400">
+                      {feed.title?.charAt(0).toUpperCase() || 'F'}
+                    </div>
+                  );
+
+                  return (
+                    <button
+                      key={feed.id}
+                      onClick={() => onFeedSelect(feed.id)}
+                      className={`
+                        relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
+                        transition-colors duration-150 cursor-pointer
+                        ${selectedFeedId === feed.id
+                          ? 'text-white bg-white/[0.08]'
+                          : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                        }
+                      `}
+                      title={feed.title || feed.url}
+                    >
+                      {selectedFeedId === feed.id && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-500" />
+                      )}
+                      <span className="shrink-0">{displayIcon}</span>
+                      <span className="flex-1 text-left truncate">{feed.title || feed.url}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </>
         )}
 
         <SectionLabel
