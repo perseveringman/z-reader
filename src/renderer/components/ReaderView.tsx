@@ -42,6 +42,12 @@ interface ToolbarPosition {
   y: number;
 }
 
+interface TocItem {
+  id: string;
+  text: string;
+  level: number;
+}
+
 export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [feedName, setFeedName] = useState<string | null>(null);
@@ -53,6 +59,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [selectedText, setSelectedText] = useState('');
   const [readerSettings, setReaderSettings] = useState<ReaderSettingsValues>(loadReaderSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tocItems, setTocItems] = useState<TocItem[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -144,6 +151,21 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   useEffect(() => {
     if (!loading && article?.content) {
       requestAnimationFrame(applyHighlightsToContent);
+
+      // Extract TOC from headings
+      if (contentRef.current) {
+        const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const items: TocItem[] = Array.from(headings).map((h, i) => {
+          const id = `heading-${i}`;
+          h.id = id;
+          return {
+            id,
+            text: h.textContent?.trim() ?? '',
+            level: parseInt(h.tagName.charAt(1)),
+          };
+        });
+        setTocItems(items);
+      }
     }
   }, [loading, article?.content, applyHighlightsToContent]);
 
@@ -275,9 +297,27 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           <div className="w-6" />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="text-[12px] text-gray-500 leading-relaxed">
-            文章目录功能开发中…
-          </p>
+          {tocItems.length > 0 ? (
+            <ul className="space-y-1">
+              {tocItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => {
+                      document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                    className="text-[12px] text-gray-400 hover:text-white text-left truncate w-full transition-colors"
+                    style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
+                  >
+                    {item.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[12px] text-gray-500">
+              {isLoading ? '加载中…' : '此文章没有章节标题'}
+            </p>
+          )}
         </div>
       </div>
 
