@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, List, LayoutGrid } from 'lucide-react';
 import type { Article, ArticleListQuery } from '../../shared/types';
 import { ArticleCard } from './ArticleCard';
 import { useToast } from './Toast';
@@ -8,6 +8,7 @@ import { useUndoStack } from '../hooks/useUndoStack';
 type ReadStatus = 'inbox' | 'later' | 'archive';
 type SortBy = 'saved_at' | 'published_at';
 type SortOrder = 'asc' | 'desc';
+type ViewMode = 'default' | 'compact';
 
 interface ContentListProps {
   selectedArticleId: string | null;
@@ -35,6 +36,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('z-reader-view-mode') as ViewMode) || 'default';
+  });
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
@@ -160,6 +164,14 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
   };
 
+  const toggleViewMode = () => {
+    setViewMode((prev) => {
+      const next = prev === 'default' ? 'compact' : 'default';
+      localStorage.setItem('z-reader-view-mode', next);
+      return next;
+    });
+  };
+
   const cycleSortBy = () => {
     setSortBy((prev) => (prev === 'saved_at' ? 'published_at' : 'saved_at'));
   };
@@ -256,6 +268,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             >
               {sortOrder === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
             </button>
+            <button
+              onClick={toggleViewMode}
+              className="p-1 rounded text-[#666] hover:text-[#999] hover:bg-white/5 transition-colors cursor-pointer"
+              title={viewMode === 'default' ? '紧凑视图' : '默认视图'}
+            >
+              {viewMode === 'default' ? <List size={12} /> : <LayoutGrid size={12} />}
+            </button>
           </div>
         </div>
 
@@ -304,6 +323,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   trashMode={isTrash}
                   onRestore={handleRestore}
                   onPermanentDelete={handlePermanentDelete}
+                  compact={viewMode === 'compact'}
                 />
               </div>
             ))}

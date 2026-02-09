@@ -12,6 +12,7 @@ interface ArticleCardProps {
   trashMode?: boolean;
   onRestore?: (id: string) => void;
   onPermanentDelete?: (id: string) => void;
+  compact?: boolean;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -38,7 +39,7 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
@@ -69,7 +70,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`
-        relative flex gap-3 px-4 py-3 cursor-pointer transition-colors
+        relative flex gap-3 px-4 ${compact ? 'py-2' : 'py-3'} cursor-pointer transition-colors
         ${isSelected
           ? 'border-l-2 border-blue-500 bg-white/[0.04]'
           : 'border-l-2 border-transparent hover:bg-white/[0.03]'
@@ -78,19 +79,21 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
       `}
     >
       {/* 缩略图 / 域名首字母 */}
-      <div className="shrink-0">
-        {article.thumbnail ? (
-          <img
-            src={article.thumbnail}
-            alt=""
-            className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
-          />
-        ) : (
-          <div className={`w-14 h-14 rounded-md bg-white/[0.06] flex items-center justify-center text-base font-semibold ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
-            {domainInitial}
-          </div>
-        )}
-      </div>
+      {!compact && (
+        <div className="shrink-0">
+          {article.thumbnail ? (
+            <img
+              src={article.thumbnail}
+              alt=""
+              className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
+            />
+          ) : (
+            <div className={`w-14 h-14 rounded-md bg-white/[0.06] flex items-center justify-center text-base font-semibold ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
+              {domainInitial}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 内容区 */}
       <div className="flex-1 min-w-0">
@@ -107,7 +110,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
         </div>
 
         {/* 摘要 */}
-        {article.summary && (
+        {!compact && article.summary && (
           <p className={`mt-0.5 text-[13px] leading-snug line-clamp-2 ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
             {article.summary}
           </p>
