@@ -16,6 +16,7 @@ interface ArticleCardProps {
   multiSelect?: boolean;
   isChecked?: boolean;
   onToggleCheck?: (id: string, e: React.MouseEvent) => void;
+  onContextMenu?: (id: string, x: number, y: number) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -42,7 +43,7 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
@@ -76,6 +77,10 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
         }
       }}
       onDoubleClick={() => onDoubleClick(article.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onCtxMenu?.(article.id, e.clientX, e.clientY);
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`

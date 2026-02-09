@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X } from 'lucide-react';
+import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X, Star, BookOpen, ExternalLink, Inbox } from 'lucide-react';
 import type { Article, ArticleListQuery } from '../../shared/types';
 import { ArticleCard } from './ArticleCard';
 import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
+import { ContextMenu, type ContextMenuEntry } from './ContextMenu';
 
 type ReadStatus = 'inbox' | 'later' | 'archive';
 type SortBy = 'saved_at' | 'published_at';
@@ -43,6 +44,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ articleId: string; x: number; y: number } | null>(null);
   const { showToast } = useToast();
   const undoStack = useUndoStack();
 
@@ -259,6 +261,61 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     }
   };
 
+  const handleArticleContextMenu = (articleId: string, x: number, y: number) => {
+    onSelectArticle(articleId);
+    setCtxMenu({ articleId, x, y });
+  };
+
+  const getContextMenuItems = (): ContextMenuEntry[] => {
+    if (!ctxMenu) return [];
+    const article = articles.find((a) => a.id === ctxMenu.articleId);
+    if (!article) return [];
+
+    if (isTrash) {
+      return [
+        { label: '恢复', icon: Inbox, onClick: () => handleRestore(article.id) },
+        { separator: true },
+        { label: '永久删除', icon: Trash2, onClick: () => handlePermanentDelete(article.id), danger: true },
+      ];
+    }
+
+    const items: ContextMenuEntry[] = [
+      { label: '打开阅读视图', icon: BookOpen, onClick: () => onOpenReader(article.id) },
+      { separator: true },
+    ];
+
+    if (article.readStatus !== 'inbox') {
+      items.push({ label: '移入 Inbox', icon: Inbox, onClick: () => handleStatusChange(article.id, 'inbox') });
+    }
+    if (article.readStatus !== 'later') {
+      items.push({ label: '稍后阅读', icon: Clock, onClick: () => handleStatusChange(article.id, 'later') });
+    }
+    if (article.readStatus !== 'archive') {
+      items.push({ label: '归档', icon: Archive, onClick: () => handleStatusChange(article.id, 'archive') });
+    }
+
+    const isShortlistedNow = article.isShortlisted === 1;
+    items.push({
+      label: isShortlistedNow ? '取消收藏' : '收藏',
+      icon: Star,
+      onClick: () => handleToggleShortlist(article.id),
+    });
+
+    items.push({ separator: true });
+    items.push({ label: '删除', icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
+
+    if (article.url) {
+      items.push({ separator: true });
+      items.push({
+        label: '在浏览器中打开',
+        icon: ExternalLink,
+        onClick: () => window.open(article.url!, '_blank'),
+      });
+    }
+
+    return items;
+  };
+
   const cycleSortBy = () => {
     setSortBy((prev) => (prev === 'saved_at' ? 'published_at' : 'saved_at'));
   };
@@ -468,6 +525,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   multiSelect={multiSelect}
                   isChecked={selectedIds.has(article.id)}
                   onToggleCheck={handleToggleCheck}
+                  onContextMenu={handleArticleContextMenu}
                 />
               </div>
             ))}
@@ -478,6 +536,16 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       <div className="shrink-0 px-4 py-1.5 border-t border-[#262626] text-[11px] text-[#555]">
         {articles.length} {articles.length === 1 ? 'article' : 'articles'}
       </div>
+
+      {/* 右键上下文菜单 */}
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={getContextMenuItems()}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
     </div>
   );
 }
