@@ -20,6 +20,7 @@ interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
   onAddFeed: () => void;
+  onSearch: () => void;
 }
 
 interface NavItemProps {
@@ -84,7 +85,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -192,6 +193,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           icon={<Search size={iconSize} />}
           label="Search"
           collapsed={collapsed}
+          onClick={onSearch}
         />
         <NavItem
           icon={<Settings size={iconSize} />}

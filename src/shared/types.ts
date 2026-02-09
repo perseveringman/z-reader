@@ -62,6 +62,11 @@ export interface ArticleListQuery {
   offset?: number;
 }
 
+export interface ArticleSearchQuery {
+  query: string;
+  limit?: number;
+}
+
 export interface UpdateArticleInput {
   id: string;
   readStatus?: 'inbox' | 'later' | 'archive';
@@ -119,6 +124,7 @@ export interface ElectronAPI {
   articleUpdate: (input: UpdateArticleInput) => Promise<Article>;
   articleDelete: (id: string) => Promise<void>;
   articleParseContent: (id: string) => Promise<Article | null>;
+  articleSearch: (query: ArticleSearchQuery) => Promise<Article[]>;
 
   // Highlight 操作
   highlightList: (articleId: string) => Promise<Highlight[]>;

@@ -6,6 +6,7 @@ import { ReaderView } from './components/ReaderView';
 import { ToastProvider } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { AddFeedDialog } from './components/AddFeedDialog';
+import { SearchPanel } from './components/SearchPanel';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -15,13 +16,25 @@ export function App() {
   const [readerMode, setReaderMode] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 不在输入框中才响应快捷键
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Cmd/Ctrl + K: 命令面板
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+      }
+
+      // / 键: 搜索
+      if (e.key === '/') {
+        e.preventDefault();
+        setSearchOpen(true);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -64,6 +77,11 @@ export function App() {
     setReaderArticleId(null);
   }, []);
 
+  const handleSearchSelect = useCallback((articleId: string) => {
+    setSelectedArticleId(articleId);
+    setActiveView('articles');
+  }, []);
+
   return (
     <ToastProvider>
       <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
@@ -73,6 +91,7 @@ export function App() {
           activeView={activeView}
           onViewChange={setActiveView}
           onAddFeed={() => setAddFeedDialogOpen(true)}
+          onSearch={() => setSearchOpen(true)}
         />
 
         {!readerMode ? (
@@ -102,6 +121,12 @@ export function App() {
           open={addFeedDialogOpen}
           onClose={() => setAddFeedDialogOpen(false)}
           onFeedAdded={handleFeedAdded}
+        />
+
+        <SearchPanel
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelectArticle={handleSearchSelect}
         />
       </div>
     </ToastProvider>

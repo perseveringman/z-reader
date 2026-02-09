@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { getDatabase, schema } from '../db';
+import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
-import type { ArticleListQuery, UpdateArticleInput } from '../../shared/types';
+import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery } from '../../shared/types';
 
 export function registerArticleHandlers() {
-  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT } = IPC_CHANNELS;
+  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH } = IPC_CHANNELS;
 
   ipcMain.handle(ARTICLE_LIST, async (_event, query: ArticleListQuery) => {
     const db = getDatabase();
@@ -82,5 +82,25 @@ export function registerArticleHandlers() {
     await db.update(schema.articles).set(updates).where(eq(schema.articles.id, id));
     const [updated] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return updated ?? null;
+  });
+
+  // 全文搜索 handler
+  ipcMain.handle(ARTICLE_SEARCH, async (_event, query: ArticleSearchQuery) => {
+    const sqlite = getSqlite();
+    if (!sqlite) return [];
+
+    const searchTerm = query.query.trim();
+    if (!searchTerm) return [];
+
+    // 使用 FTS5 进行全文搜索
+    const stmt = sqlite.prepare(`
+      SELECT a.* FROM articles a
+      INNER JOIN articles_fts fts ON a.rowid = fts.rowid
+      WHERE articles_fts MATCH ? AND a.deleted_flg = 0
+      ORDER BY rank
+      LIMIT ?
+    `);
+
+    return stmt.all(searchTerm + '*', query.limit ?? 20);
   });
 }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import * as schema from './schema';
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let sqliteInstance: Database.Database | null = null;
 
 export function getDatabase() {
   if (db) return db;
@@ -19,12 +20,17 @@ export function getDatabase() {
   // 开启外键约束
   sqlite.pragma('foreign_keys = ON');
 
+  sqliteInstance = sqlite;
   db = drizzle(sqlite, { schema });
 
   // 初始化表结构
   initTables(sqlite);
 
   return db;
+}
+
+export function getSqlite() {
+  return sqliteInstance;
 }
 
 function initTables(sqlite: Database.Database) {
@@ -127,6 +133,26 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_articles_deleted_flg ON articles(deleted_flg);
     CREATE INDEX IF NOT EXISTS idx_feeds_deleted_flg ON feeds(deleted_flg);
     CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
+
+    -- FTS5 同步触发器：插入
+    CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
+      INSERT INTO articles_fts(rowid, title, content_text, author)
+      VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author);
+    END;
+
+    -- FTS5 同步触发器：删除
+    CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
+      INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author)
+      VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author);
+    END;
+
+    -- FTS5 同步触发器：更新
+    CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
+      INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author)
+      VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author);
+      INSERT INTO articles_fts(rowid, title, content_text, author)
+      VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author);
+    END;
   `);
 }
 
