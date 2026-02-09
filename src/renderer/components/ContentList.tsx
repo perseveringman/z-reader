@@ -15,6 +15,8 @@ interface ContentListProps {
   onOpenReader: (id: string) => void;
   refreshTrigger?: number;
   feedId?: string | null;
+  isShortlisted?: boolean;
+  activeView?: string;
 }
 
 const TABS: { key: ReadStatus; label: string }[] = [
@@ -28,7 +30,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -41,7 +43,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     setLoading(true);
     try {
       const query: ArticleListQuery = {
-        readStatus: activeTab,
+        readStatus: isShortlisted ? undefined : activeTab,
         sortBy,
         sortOrder,
         limit: 100,
@@ -50,6 +52,10 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       if (feedId) {
         query.feedId = feedId;
       }
+      // Shortlist 模式
+      if (isShortlisted) {
+        query.isShortlisted = true;
+      }
       const result = await window.electronAPI.articleList(query);
       setArticles(result);
     } catch (err) {
@@ -57,7 +63,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted]);
 
   useEffect(() => {
     fetchArticles();
@@ -86,6 +92,18 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       });
     } catch (err) {
       console.error('Failed to update article status:', err);
+    }
+  };
+
+  const handleToggleShortlist = async (id: string) => {
+    try {
+      const article = articles.find((a) => a.id === id);
+      const current = article?.isShortlisted === 1;
+      await window.electronAPI.articleUpdate({ id, isShortlisted: !current });
+      await fetchArticles();
+      showToast(current ? '已取消收藏' : '已加入 Shortlist', 'success');
+    } catch (err) {
+      console.error('Failed to toggle shortlist:', err);
     }
   };
 
@@ -165,6 +183,11 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           if (undoStack.canUndo) undoStack.undo();
           break;
         }
+        case 's':
+        case 'S': {
+          if (selectedArticleId) handleToggleShortlist(selectedArticleId);
+          break;
+        }
       }
     };
 
@@ -182,7 +205,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     <div className="flex flex-col w-[380px] min-w-[300px] border-r border-[#262626] bg-[#141414] h-full">
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-white tracking-wide">Articles</h2>
+          <h2 className="text-[13px] font-semibold text-white tracking-wide">
+            {isShortlisted ? 'Shortlist' : 'Articles'}
+          </h2>
           <div className="flex items-center gap-1">
             <button
               onClick={cycleSortBy}
@@ -201,23 +226,26 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           </div>
         </div>
 
-        <div className="flex px-4 gap-4 border-b border-[#262626]">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`
-                pb-2 text-[11px] font-medium tracking-[0.08em] transition-colors cursor-pointer
-                ${activeTab === tab.key
-                  ? 'text-white border-b-2 border-blue-500'
-                  : 'text-[#555] hover:text-[#888] border-b-2 border-transparent'
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {!isShortlisted && (
+          <div className="flex px-4 gap-4 border-b border-[#262626]">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`
+                  pb-2 text-[11px] font-medium tracking-[0.08em] transition-colors cursor-pointer
+                  ${activeTab === tab.key
+                    ? 'text-white border-b-2 border-blue-500'
+                    : 'text-[#555] hover:text-[#888] border-b-2 border-transparent'
+                  }
+                `}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {isShortlisted && <div className="border-b border-[#262626]" />}
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto">
@@ -239,6 +267,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   onSelect={onSelectArticle}
                   onDoubleClick={onOpenReader}
                   onStatusChange={handleStatusChange}
+                  onToggleShortlist={(id, current) => handleToggleShortlist(id)}
                 />
               </div>
             ))}

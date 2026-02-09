@@ -108,6 +108,8 @@ export function App() {
               onOpenReader={handleOpenReader}
               refreshTrigger={refreshTrigger}
               feedId={activeView === 'feeds' ? selectedFeedId : undefined}
+              isShortlisted={activeView === 'shortlist'}
+              activeView={activeView}
             />
             <DetailPanel articleId={selectedArticleId} />
           </>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Clock, MoreHorizontal } from 'lucide-react';
+import { Archive, Clock, MoreHorizontal, Star } from 'lucide-react';
 import type { Article } from '../../shared/types';
 
 interface ArticleCardProps {
@@ -8,6 +8,7 @@ interface ArticleCardProps {
   onSelect: (id: string) => void;
   onDoubleClick: (id: string) => void;
   onStatusChange: (id: string, status: 'inbox' | 'later' | 'archive') => void;
+  onToggleShortlist?: (id: string, current: boolean) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -34,12 +35,17 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
     e.stopPropagation();
     onStatusChange(article.id, status);
+  };
+
+  const handleToggleShortlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleShortlist?.(article.id, article.isShortlisted === 1);
   };
 
   const domainInitial = getDomainInitial(article.domain);
@@ -121,6 +127,15 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
       {/* Hover 快捷操作浮层 */}
       {hovered && (
         <div className="absolute right-3 top-2.5 flex items-center gap-0.5 bg-[#1e1e1e] border border-white/10 rounded-md px-0.5 py-0.5 shadow-lg">
+          <button
+            onClick={handleToggleShortlist}
+            className={`p-1 rounded hover:bg-white/10 transition-colors ${
+              article.isShortlisted === 1 ? 'text-yellow-400' : 'text-gray-400 hover:text-white'
+            }`}
+            title={article.isShortlisted === 1 ? 'Remove from Shortlist' : 'Add to Shortlist'}
+          >
+            <Star size={14} fill={article.isShortlisted === 1 ? 'currentColor' : 'none'} />
+          </button>
           {article.readStatus !== 'archive' && (
             <button
               onClick={(e) => handleQuickAction(e, 'archive')}
