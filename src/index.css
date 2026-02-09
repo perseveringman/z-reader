@@ -27,6 +27,82 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* ReaderView 主题 */
+.reader-theme-dark {
+  background: #0f0f0f;
+  color: #d1d5db;
+}
+
+.reader-theme-light {
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.reader-theme-light .article-content {
+  color: #1a1a1a;
+}
+
+.reader-theme-light .article-content h1,
+.reader-theme-light .article-content h2,
+.reader-theme-light .article-content h3,
+.reader-theme-light .article-content h4,
+.reader-theme-light .article-content h5,
+.reader-theme-light .article-content h6 {
+  color: #111;
+}
+
+.reader-theme-light .article-content a {
+  color: #2563eb;
+}
+
+.reader-theme-light .article-content blockquote {
+  border-left-color: rgba(0, 0, 0, 0.15);
+  color: #4b5563;
+}
+
+.reader-theme-light .article-content code {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.reader-theme-light .article-content pre {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.reader-theme-sepia {
+  background: #f4ecd8;
+  color: #5b4636;
+}
+
+.reader-theme-sepia .article-content {
+  color: #5b4636;
+}
+
+.reader-theme-sepia .article-content h1,
+.reader-theme-sepia .article-content h2,
+.reader-theme-sepia .article-content h3,
+.reader-theme-sepia .article-content h4,
+.reader-theme-sepia .article-content h5,
+.reader-theme-sepia .article-content h6 {
+  color: #3d2b1f;
+}
+
+.reader-theme-sepia .article-content a {
+  color: #8b5e3c;
+}
+
+.reader-theme-sepia .article-content blockquote {
+  border-left-color: rgba(91, 70, 54, 0.25);
+  color: #7c6353;
+}
+
+.reader-theme-sepia .article-content code {
+  background: rgba(91, 70, 54, 0.1);
+}
+
+.reader-theme-sepia .article-content pre {
+  background: rgba(91, 70, 54, 0.08);
+}
+
 /* ReaderView 文章正文排版 */
 .article-content {
   font-size: 16px;

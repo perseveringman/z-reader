@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings2 } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
+import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP } from './ReaderSettings';
+import type { ReaderSettingsValues } from './ReaderSettings';
 
 interface ReaderViewProps {
   articleId: string;
@@ -49,6 +51,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [toolbarPos, setToolbarPos] = useState<ToolbarPosition | null>(null);
   const [selectedText, setSelectedText] = useState('');
+  const [readerSettings, setReaderSettings] = useState<ReaderSettingsValues>(loadReaderSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -253,8 +257,10 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
   const isLoading = loading || parsing;
 
+  const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
+
   return (
-    <div className="flex flex-1 h-full bg-[#0f0f0f] text-gray-200 overflow-hidden">
+    <div className={`flex flex-1 h-full overflow-hidden ${themeClass}`}>
       {/* Left Sidebar - Contents */}
       <div className="w-[220px] shrink-0 flex flex-col border-r border-[#262626] bg-[#141414]">
         <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-[#262626]">
@@ -277,7 +283,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
       {/* Center - Article Content */}
       <div ref={scrollContainerRef} className="relative flex-1 flex flex-col overflow-hidden">
-        <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626] bg-[#0f0f0f]">
+        <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626]">
           <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
             {feedName && (
               <>
@@ -287,7 +293,21 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
             )}
             <span className="text-gray-400 truncate">{article?.title ?? '加载中…'}</span>
           </div>
+          <button
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+            title="排版设置"
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
         </div>
+
+        <ReaderSettings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          settings={readerSettings}
+          onSettingsChange={setReaderSettings}
+        />
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
@@ -318,6 +338,11 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                 <div
                   ref={contentRef}
                   className="article-content mt-8"
+                  style={{
+                    fontFamily: FONT_FAMILY_MAP[readerSettings.font],
+                    fontSize: `${readerSettings.fontSize}px`,
+                    lineHeight: readerSettings.lineHeight,
+                  }}
                   dangerouslySetInnerHTML={{ __html: article.content }}
                   onMouseUp={handleMouseUp}
                 />
