@@ -20,6 +20,7 @@ interface ContentListProps {
   isShortlisted?: boolean;
   activeView?: string;
   tagId?: string | null;
+  expanded?: boolean;
 }
 
 const TABS: { key: ReadStatus; label: string }[] = [
@@ -33,7 +34,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -407,7 +408,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   }, [selectedArticleId]);
 
   return (
-    <div className="flex flex-col w-[380px] min-w-[300px] border-r border-[#262626] bg-[#141414] h-full">
+    <div className={`flex flex-col min-w-[300px] border-r border-[#262626] bg-[#141414] h-full ${expanded ? 'flex-1' : 'w-[380px]'}`}>
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">

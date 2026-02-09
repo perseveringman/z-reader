@@ -176,6 +176,7 @@ export function App() {
               isShortlisted={activeView === 'shortlist'}
               activeView={activeView}
               tagId={activeView === 'tags' ? selectedTagId : undefined}
+              expanded={detailPanelCollapsed}
             />
             {!detailPanelCollapsed && (
               <DetailPanel articleId={selectedArticleId} />
