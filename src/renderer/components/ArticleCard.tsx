@@ -50,6 +50,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
 
   const domainInitial = getDomainInitial(article.domain);
   const timestamp = formatRelativeTime(article.savedAt || article.publishedAt);
+  const isRead = article.readProgress >= 0.9 || article.readStatus === 'archive';
 
   const metaParts: string[] = [];
   if (article.domain) metaParts.push(article.domain.replace(/^www\./, ''));
@@ -70,6 +71,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
           ? 'border-l-2 border-blue-500 bg-white/[0.04]'
           : 'border-l-2 border-transparent hover:bg-white/[0.03]'
         }
+        ${isRead ? 'opacity-70' : ''}
       `}
     >
       {/* 缩略图 / 域名首字母 */}
@@ -78,10 +80,10 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
           <img
             src={article.thumbnail}
             alt=""
-            className="w-14 h-14 rounded-md object-cover"
+            className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
           />
         ) : (
-          <div className="w-14 h-14 rounded-md bg-white/[0.06] flex items-center justify-center text-base font-semibold text-gray-500">
+          <div className={`w-14 h-14 rounded-md bg-white/[0.06] flex items-center justify-center text-base font-semibold ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
             {domainInitial}
           </div>
         )}
@@ -91,7 +93,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
       <div className="flex-1 min-w-0">
         {/* 标题行 + 时间戳 */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[14px] font-medium text-gray-100 truncate leading-snug">
+          <h3 className={`text-[14px] font-medium truncate leading-snug ${isRead ? 'text-gray-500' : 'text-gray-100'}`}>
             {article.title || 'Untitled'}
           </h3>
           {!hovered && timestamp && (
@@ -103,7 +105,7 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
 
         {/* 摘要 */}
         {article.summary && (
-          <p className="mt-0.5 text-[13px] leading-snug text-gray-500 line-clamp-2">
+          <p className={`mt-0.5 text-[13px] leading-snug line-clamp-2 ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
             {article.summary}
           </p>
         )}
