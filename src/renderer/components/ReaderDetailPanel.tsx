@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Download, Copy } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
@@ -94,6 +94,13 @@ export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
     setEditingNoteId(null);
   }, []);
 
+  const handleExport = useCallback(async (mode: 'clipboard' | 'file') => {
+    const result = await window.electronAPI.highlightExport(articleId, mode);
+    if (result === 'clipboard') {
+      // Could show toast but this panel doesn't have access to showToast
+    }
+  }, [articleId]);
+
   const metaRows: MetaRow[] = article
     ? [
         { label: 'Type', value: 'Article', icon: <FileText className="w-3.5 h-3.5" /> },
@@ -184,9 +191,27 @@ export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                      {highlights.length} {highlights.length === 1 ? 'highlight' : 'highlights'}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                        {highlights.length} {highlights.length === 1 ? 'highlight' : 'highlights'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleExport('clipboard')}
+                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          title="复制到剪贴板"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleExport('file')}
+                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          title="保存为文件"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                     {highlights.map((hl) => (
                       <div
                         key={hl.id}

@@ -143,6 +143,7 @@ export interface ElectronAPI {
   highlightCreate: (input: CreateHighlightInput) => Promise<Highlight>;
   highlightDelete: (id: string) => Promise<void>;
   highlightUpdate: (input: UpdateHighlightInput) => Promise<Highlight>;
+  highlightExport: (articleId: string, mode: 'clipboard' | 'file') => Promise<string>;
 
   // Tag 操作
   tagList: () => Promise<Tag[]>;

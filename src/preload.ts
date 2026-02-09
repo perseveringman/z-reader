@@ -30,6 +30,7 @@ const electronAPI: ElectronAPI = {
   highlightCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_CREATE, input),
   highlightDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_DELETE, id),
   highlightUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_UPDATE, input),
+  highlightExport: (articleId, mode) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_EXPORT, articleId, mode),
 
   // Tag
   tagList: () => ipcRenderer.invoke(IPC_CHANNELS.TAG_LIST),
