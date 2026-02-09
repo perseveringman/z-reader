@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray } from 'drizzle-orm';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery } from '../../shared/types';
 
 export function registerArticleHandlers() {
-  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED } = IPC_CHANNELS;
+  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED, ARTICLE_BATCH_UPDATE, ARTICLE_BATCH_DELETE } = IPC_CHANNELS;
 
   ipcMain.handle(ARTICLE_LIST, async (_event, query: ArticleListQuery) => {
     const db = getDatabase();
@@ -125,5 +125,23 @@ export function registerArticleHandlers() {
     return db.select().from(schema.articles)
       .where(eq(schema.articles.deletedFlg, 1))
       .orderBy(desc(schema.articles.updatedAt));
+  });
+
+  // 批量更新文章
+  ipcMain.handle(ARTICLE_BATCH_UPDATE, async (_event, ids: string[], input: Record<string, unknown>) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { updatedAt: now };
+    if (input.readStatus !== undefined) updates.readStatus = input.readStatus;
+    if (input.readProgress !== undefined) updates.readProgress = input.readProgress;
+    if (input.isShortlisted !== undefined) updates.isShortlisted = input.isShortlisted ? 1 : 0;
+    await db.update(schema.articles).set(updates).where(inArray(schema.articles.id, ids));
+  });
+
+  // 批量删除文章（软删除）
+  ipcMain.handle(ARTICLE_BATCH_DELETE, async (_event, ids: string[]) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    await db.update(schema.articles).set({ deletedFlg: 1, updatedAt: now }).where(inArray(schema.articles.id, ids));
   });
 }

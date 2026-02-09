@@ -135,6 +135,8 @@ export interface ElectronAPI {
   articleRestore: (id: string) => Promise<Article>;
   articlePermanentDelete: (id: string) => Promise<void>;
   articleListDeleted: () => Promise<Article[]>;
+  articleBatchUpdate: (ids: string[], input: Partial<Omit<UpdateArticleInput, 'id'>>) => Promise<void>;
+  articleBatchDelete: (ids: string[]) => Promise<void>;
 
   // Highlight 操作
   highlightList: (articleId: string) => Promise<Highlight[]>;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2, Check } from 'lucide-react';
 import type { Article } from '../../shared/types';
 
 interface ArticleCardProps {
@@ -13,6 +13,9 @@ interface ArticleCardProps {
   onRestore?: (id: string) => void;
   onPermanentDelete?: (id: string) => void;
   compact?: boolean;
+  multiSelect?: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: (id: string, e: React.MouseEvent) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -39,7 +42,7 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
@@ -65,7 +68,13 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
 
   return (
     <div
-      onClick={() => onSelect(article.id)}
+      onClick={(e) => {
+        if (multiSelect || e.metaKey || e.ctrlKey || e.shiftKey) {
+          onToggleCheck?.(article.id, e);
+        } else {
+          onSelect(article.id);
+        }
+      }}
       onDoubleClick={() => onDoubleClick(article.id)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -78,6 +87,21 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
         ${isRead ? 'opacity-70' : ''}
       `}
     >
+      {/* Checkbox 多选 */}
+      {multiSelect && (
+        <div className="shrink-0 flex items-center">
+          <div
+            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+              isChecked
+                ? 'bg-blue-500 border-blue-500'
+                : 'border-white/20 hover:border-white/40'
+            }`}
+          >
+            {isChecked && <Check size={12} className="text-white" />}
+          </div>
+        </div>
+      )}
+
       {/* 缩略图 / 域名首字母 */}
       {!compact && (
         <div className="shrink-0">
