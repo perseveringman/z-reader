@@ -58,6 +58,8 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
 
   useEffect(() => {
     if (!articleId) {
@@ -91,6 +93,12 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
   const handleDeleteHighlight = useCallback(async (id: string) => {
     await window.electronAPI.highlightDelete(id);
     setHighlights((prev) => prev.filter((h) => h.id !== id));
+  }, []);
+
+  const handleSaveNote = useCallback(async (hlId: string, note: string) => {
+    const updated = await window.electronAPI.highlightUpdate({ id: hlId, note });
+    setHighlights((prev) => prev.map((h) => h.id === hlId ? updated : h));
+    setEditingNoteId(null);
   }, []);
 
   const metaRows: MetaRow[] = article
@@ -239,8 +247,33 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
                           <p className="text-[13px] leading-[1.6] text-gray-300 italic">
                             &ldquo;{hl.text}&rdquo;
                           </p>
-                          {hl.note && (
-                            <p className="mt-1.5 text-[12px] text-gray-400">{hl.note}</p>
+                          {editingNoteId === hl.id ? (
+                            <textarea
+                              autoFocus
+                              value={editingNoteText}
+                              onChange={(e) => setEditingNoteText(e.target.value)}
+                              onBlur={() => handleSaveNote(hl.id, editingNoteText)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleSaveNote(hl.id, editingNoteText);
+                                }
+                                if (e.key === 'Escape') setEditingNoteId(null);
+                              }}
+                              className="mt-1.5 w-full text-[12px] text-gray-300 bg-white/5 border border-white/10 rounded px-2 py-1.5 resize-none outline-none focus:border-blue-500/50"
+                              rows={2}
+                              placeholder="添加笔记…"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingNoteId(hl.id);
+                                setEditingNoteText(hl.note || '');
+                              }}
+                              className="mt-1.5 block text-left text-[12px] text-gray-400 hover:text-gray-300 transition-colors w-full"
+                            >
+                              {hl.note || '添加笔记…'}
+                            </button>
                           )}
                           <span className="mt-2 block text-[11px] text-gray-600">
                             {formatRelativeTime(hl.createdAt)}

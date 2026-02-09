@@ -98,6 +98,12 @@ export interface CreateHighlightInput {
   paragraphIndex?: number;
 }
 
+export interface UpdateHighlightInput {
+  id: string;
+  note?: string;
+  color?: string;
+}
+
 // ==================== Tag 相关类型 ====================
 export interface Tag {
   id: string;
@@ -134,6 +140,7 @@ export interface ElectronAPI {
   highlightList: (articleId: string) => Promise<Highlight[]>;
   highlightCreate: (input: CreateHighlightInput) => Promise<Highlight>;
   highlightDelete: (id: string) => Promise<void>;
+  highlightUpdate: (input: UpdateHighlightInput) => Promise<Highlight>;
 
   // Tag 操作
   tagList: () => Promise<Tag[]>;

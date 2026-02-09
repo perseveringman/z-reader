@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   HIGHLIGHT_LIST: 'highlight:list',
   HIGHLIGHT_CREATE: 'highlight:create',
   HIGHLIGHT_DELETE: 'highlight:delete',
+  HIGHLIGHT_UPDATE: 'highlight:update',
 
   // Tag
   TAG_LIST: 'tag:list',
