@@ -145,28 +145,27 @@ export function App() {
   return (
     <ToastProvider>
       <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeView={activeView}
-          onViewChange={setActiveView}
-          onAddFeed={() => setAddFeedDialogOpen(true)}
-          onSearch={() => setSearchOpen(true)}
-          selectedFeedId={selectedFeedId}
-          onFeedSelect={(feedId) => {
-            setSelectedFeedId(feedId);
-            setActiveView('feeds');
-          }}
-          onManageFeed={setManagingFeed}
-          selectedTagId={selectedTagId}
-          onTagSelect={(tagId) => {
-            setSelectedTagId(tagId);
-            if (tagId) setActiveView('tags');
-          }}
-        />
-
         {!readerMode ? (
           <>
+            <Sidebar
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeView={activeView}
+              onViewChange={setActiveView}
+              onAddFeed={() => setAddFeedDialogOpen(true)}
+              onSearch={() => setSearchOpen(true)}
+              selectedFeedId={selectedFeedId}
+              onFeedSelect={(feedId) => {
+                setSelectedFeedId(feedId);
+                setActiveView('feeds');
+              }}
+              onManageFeed={setManagingFeed}
+              selectedTagId={selectedTagId}
+              onTagSelect={(tagId) => {
+                setSelectedTagId(tagId);
+                if (tagId) setActiveView('tags');
+              }}
+            />
             <ContentList
               selectedArticleId={selectedArticleId}
               onSelectArticle={setSelectedArticleId}
