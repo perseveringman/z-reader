@@ -6,7 +6,7 @@ import { parseArticleContent } from '../services/parser-service';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery } from '../../shared/types';
 
 export function registerArticleHandlers() {
-  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH } = IPC_CHANNELS;
+  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED } = IPC_CHANNELS;
 
   ipcMain.handle(ARTICLE_LIST, async (_event, query: ArticleListQuery) => {
     const db = getDatabase();
@@ -102,5 +102,28 @@ export function registerArticleHandlers() {
     `);
 
     return stmt.all(searchTerm + '*', query.limit ?? 20);
+  });
+
+  // 恢复已删除文章
+  ipcMain.handle(ARTICLE_RESTORE, async (_event, id: string) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    await db.update(schema.articles).set({ deletedFlg: 0, updatedAt: now }).where(eq(schema.articles.id, id));
+    const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
+    return result;
+  });
+
+  // 永久删除文章
+  ipcMain.handle(ARTICLE_PERMANENT_DELETE, async (_event, id: string) => {
+    const db = getDatabase();
+    await db.delete(schema.articles).where(eq(schema.articles.id, id));
+  });
+
+  // 查询已删除文章
+  ipcMain.handle(ARTICLE_LIST_DELETED, async () => {
+    const db = getDatabase();
+    return db.select().from(schema.articles)
+      .where(eq(schema.articles.deletedFlg, 1))
+      .orderBy(desc(schema.articles.updatedAt));
   });
 }

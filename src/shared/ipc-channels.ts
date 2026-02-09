@@ -15,6 +15,9 @@ export const IPC_CHANNELS = {
   ARTICLE_DELETE: 'article:delete',
   ARTICLE_PARSE_CONTENT: 'article:parseContent',
   ARTICLE_SEARCH: 'article:search',
+  ARTICLE_RESTORE: 'article:restore',
+  ARTICLE_PERMANENT_DELETE: 'article:permanentDelete',
+  ARTICLE_LIST_DELETED: 'article:listDeleted',
 
   // Highlight
   HIGHLIGHT_LIST: 'highlight:list',

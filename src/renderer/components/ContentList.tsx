@@ -39,31 +39,38 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const { showToast } = useToast();
   const undoStack = useUndoStack();
 
+  const isTrash = activeView === 'trash';
+
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     try {
-      const query: ArticleListQuery = {
-        readStatus: isShortlisted ? undefined : activeTab,
-        sortBy,
-        sortOrder,
-        limit: 100,
-      };
-      // 如果有 feedId，添加到查询参数
-      if (feedId) {
-        query.feedId = feedId;
+      if (isTrash) {
+        const result = await window.electronAPI.articleListDeleted();
+        setArticles(result);
+      } else {
+        const query: ArticleListQuery = {
+          readStatus: isShortlisted ? undefined : activeTab,
+          sortBy,
+          sortOrder,
+          limit: 100,
+        };
+        // 如果有 feedId，添加到查询参数
+        if (feedId) {
+          query.feedId = feedId;
+        }
+        // Shortlist 模式
+        if (isShortlisted) {
+          query.isShortlisted = true;
+        }
+        const result = await window.electronAPI.articleList(query);
+        setArticles(result);
       }
-      // Shortlist 模式
-      if (isShortlisted) {
-        query.isShortlisted = true;
-      }
-      const result = await window.electronAPI.articleList(query);
-      setArticles(result);
     } catch (err) {
       console.error('Failed to fetch articles:', err);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash]);
 
   useEffect(() => {
     fetchArticles();
@@ -111,15 +118,37 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articleDelete(id);
       await fetchArticles();
-      showToast('已删除', 'success');
+      showToast('已移入回收站', 'success');
       undoStack.push({
         description: 'Undo delete',
         undo: async () => {
-          showToast('删除操作无法撤销', 'error');
+          await window.electronAPI.articleRestore(id);
+          await fetchArticles();
+          showToast('已恢复', 'info');
         },
       });
     } catch (err) {
       console.error('Failed to delete article:', err);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await window.electronAPI.articleRestore(id);
+      await fetchArticles();
+      showToast('已恢复', 'success');
+    } catch (err) {
+      console.error('Failed to restore article:', err);
+    }
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    try {
+      await window.electronAPI.articlePermanentDelete(id);
+      await fetchArticles();
+      showToast('已永久删除', 'success');
+    } catch (err) {
+      console.error('Failed to permanently delete article:', err);
     }
   };
 
@@ -206,7 +235,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">
-            {isShortlisted ? 'Shortlist' : 'Articles'}
+            {isTrash ? 'Trash' : isShortlisted ? 'Shortlist' : 'Articles'}
           </h2>
           <div className="flex items-center gap-1">
             <button
@@ -226,7 +255,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           </div>
         </div>
 
-        {!isShortlisted && (
+        {!isShortlisted && !isTrash && (
           <div className="flex px-4 gap-4 border-b border-[#262626]">
             {TABS.map((tab) => (
               <button
@@ -245,7 +274,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             ))}
           </div>
         )}
-        {isShortlisted && <div className="border-b border-[#262626]" />}
+        {(isShortlisted || isTrash) && <div className="border-b border-[#262626]" />}
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto">
@@ -268,6 +297,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   onDoubleClick={onOpenReader}
                   onStatusChange={handleStatusChange}
                   onToggleShortlist={(id, current) => handleToggleShortlist(id)}
+                  trashMode={isTrash}
+                  onRestore={handleRestore}
+                  onPermanentDelete={handlePermanentDelete}
                 />
               </div>
             ))}

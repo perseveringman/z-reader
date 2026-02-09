@@ -125,6 +125,9 @@ export interface ElectronAPI {
   articleDelete: (id: string) => Promise<void>;
   articleParseContent: (id: string) => Promise<Article | null>;
   articleSearch: (query: ArticleSearchQuery) => Promise<Article[]>;
+  articleRestore: (id: string) => Promise<Article>;
+  articlePermanentDelete: (id: string) => Promise<void>;
+  articleListDeleted: () => Promise<Article[]>;
 
   // Highlight 操作
   highlightList: (articleId: string) => Promise<Highlight[]>;

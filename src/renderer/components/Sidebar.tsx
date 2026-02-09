@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  Trash2,
 } from 'lucide-react';
 import type { Feed } from '../../shared/types';
 
@@ -249,13 +250,22 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           onToggle={() => toggleSection('pinned')}
         />
         {(collapsed || sections.pinned) && (
-          <NavItem
-            icon={<Star size={iconSize} />}
-            label="Shortlist"
-            active={activeView === 'shortlist'}
-            collapsed={collapsed}
-            onClick={() => onViewChange('shortlist')}
-          />
+          <>
+            <NavItem
+              icon={<Star size={iconSize} />}
+              label="Shortlist"
+              active={activeView === 'shortlist'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('shortlist')}
+            />
+            <NavItem
+              icon={<Trash2 size={iconSize} />}
+              label="Trash"
+              active={activeView === 'trash'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('trash')}
+            />
+          </>
         )}
       </nav>
 

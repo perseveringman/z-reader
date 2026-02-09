@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, Clock, MoreHorizontal, Star } from 'lucide-react';
+import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2 } from 'lucide-react';
 import type { Article } from '../../shared/types';
 
 interface ArticleCardProps {
@@ -9,6 +9,9 @@ interface ArticleCardProps {
   onDoubleClick: (id: string) => void;
   onStatusChange: (id: string, status: 'inbox' | 'later' | 'archive') => void;
   onToggleShortlist?: (id: string, current: boolean) => void;
+  trashMode?: boolean;
+  onRestore?: (id: string) => void;
+  onPermanentDelete?: (id: string) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -35,7 +38,7 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
@@ -129,39 +132,60 @@ export function ArticleCard({ article, isSelected, onSelect, onDoubleClick, onSt
       {/* Hover 快捷操作浮层 */}
       {hovered && (
         <div className="absolute right-3 top-2.5 flex items-center gap-0.5 bg-[#1e1e1e] border border-white/10 rounded-md px-0.5 py-0.5 shadow-lg">
-          <button
-            onClick={handleToggleShortlist}
-            className={`p-1 rounded hover:bg-white/10 transition-colors ${
-              article.isShortlisted === 1 ? 'text-yellow-400' : 'text-gray-400 hover:text-white'
-            }`}
-            title={article.isShortlisted === 1 ? 'Remove from Shortlist' : 'Add to Shortlist'}
-          >
-            <Star size={14} fill={article.isShortlisted === 1 ? 'currentColor' : 'none'} />
-          </button>
-          {article.readStatus !== 'archive' && (
-            <button
-              onClick={(e) => handleQuickAction(e, 'archive')}
-              className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Archive"
-            >
-              <Archive size={14} />
-            </button>
+          {trashMode ? (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRestore?.(article.id); }}
+                className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-green-400 transition-colors"
+                title="Restore"
+              >
+                <RotateCcw size={14} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onPermanentDelete?.(article.id); }}
+                className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors"
+                title="Permanently Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleToggleShortlist}
+                className={`p-1 rounded hover:bg-white/10 transition-colors ${
+                  article.isShortlisted === 1 ? 'text-yellow-400' : 'text-gray-400 hover:text-white'
+                }`}
+                title={article.isShortlisted === 1 ? 'Remove from Shortlist' : 'Add to Shortlist'}
+              >
+                <Star size={14} fill={article.isShortlisted === 1 ? 'currentColor' : 'none'} />
+              </button>
+              {article.readStatus !== 'archive' && (
+                <button
+                  onClick={(e) => handleQuickAction(e, 'archive')}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                  title="Archive"
+                >
+                  <Archive size={14} />
+                </button>
+              )}
+              {article.readStatus !== 'later' && (
+                <button
+                  onClick={(e) => handleQuickAction(e, 'later')}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                  title="Read Later"
+                >
+                  <Clock size={14} />
+                </button>
+              )}
+              <button
+                className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                title="More"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            </>
           )}
-          {article.readStatus !== 'later' && (
-            <button
-              onClick={(e) => handleQuickAction(e, 'later')}
-              className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Read Later"
-            >
-              <Clock size={14} />
-            </button>
-          )}
-          <button
-            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-            title="More"
-          >
-            <MoreHorizontal size={14} />
-          </button>
         </div>
       )}
 
