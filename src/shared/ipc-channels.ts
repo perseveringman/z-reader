@@ -41,6 +41,12 @@ export const IPC_CHANNELS = {
   ARTICLE_LIST_BY_TAG: 'article:listByTag',
   ARTICLE_TAGS_FOR_ARTICLE: 'article:tagsForArticle',
 
+  // Highlight-Tag
+  HIGHLIGHT_TAG_ADD: 'highlightTag:add',
+  HIGHLIGHT_TAG_REMOVE: 'highlightTag:remove',
+  HIGHLIGHT_TAGS_FOR_HIGHLIGHT: 'highlightTag:forHighlight',
+  HIGHLIGHT_TAGS_BATCH: 'highlightTag:batch',
+
   // Book
   BOOK_LIST: 'book:list',
   BOOK_GET: 'book:get',

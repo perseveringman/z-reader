@@ -199,6 +199,17 @@ function initTables(sqlite: Database.Database) {
   } catch {
     // Column already exists — no-op
   }
+
+  // Migration: highlight_tags 关联表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS highlight_tags (
+      highlight_id TEXT NOT NULL REFERENCES highlights(id),
+      tag_id TEXT NOT NULL REFERENCES tags(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (highlight_id, tag_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_highlight_tags_tag_id ON highlight_tags(tag_id);
+  `);
 }
 
 export { schema };

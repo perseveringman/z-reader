@@ -134,6 +134,11 @@ export interface Tag {
   articleCount?: number;
 }
 
+// ==================== Highlight-Tag 相关类型 ====================
+export interface HighlightTagsMap {
+  [highlightId: string]: Tag[];
+}
+
 // ==================== Book 相关类型 ====================
 export type BookReadStatus = 'inbox' | 'later' | 'archive';
 
@@ -216,6 +221,12 @@ export interface ElectronAPI {
   articleTagRemove: (articleId: string, tagId: string) => Promise<void>;
   articleListByTag: (tagId: string) => Promise<Article[]>;
   articleTagsForArticle: (articleId: string) => Promise<Tag[]>;
+
+  // Highlight-Tag 操作
+  highlightTagAdd: (highlightId: string, tagId: string) => Promise<void>;
+  highlightTagRemove: (highlightId: string, tagId: string) => Promise<void>;
+  highlightTagsForHighlight: (highlightId: string) => Promise<Tag[]>;
+  highlightTagsBatch: (highlightIds: string[]) => Promise<HighlightTagsMap>;
 
   // Book 操作
   bookList: (query: BookListQuery) => Promise<Book[]>;

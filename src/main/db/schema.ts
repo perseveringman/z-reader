@@ -91,6 +91,13 @@ export const views = sqliteTable('views', {
   updatedAt: text('updated_at').notNull(),
 });
 
+// ==================== highlight_tags 关联表 ====================
+export const highlightTags = sqliteTable('highlight_tags', {
+  highlightId: text('highlight_id').notNull().references(() => highlights.id),
+  tagId: text('tag_id').notNull().references(() => tags.id),
+  createdAt: text('created_at').notNull(),
+});
+
 // ==================== books 表 ====================
 export const books = sqliteTable('books', {
   id: text('id').primaryKey(),

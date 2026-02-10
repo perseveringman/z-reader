@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -39,9 +39,11 @@ export function FeedManager({
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const initialFetchDoneRef = useRef(false);
 
   const fetchData = useCallback(async () => {
     try {
+      setLoading(true);
       const [feedList, counts] = await Promise.all([
         window.electronAPI.feedList(),
         window.electronAPI.feedArticleCount(),
@@ -50,12 +52,18 @@ export function FeedManager({
       const countMap: Record<string, FeedArticleCount> = {};
       counts.forEach((c) => { countMap[c.feedId] = c; });
       setArticleCounts(countMap);
+
+      // 自动选中第一个 feed（仅当首次加载、没有选中且有 feeds 时）
+      if (selectedFeedId === null && feedList.length > 0 && !initialFetchDoneRef.current) {
+        onSelectFeed(feedList[0].id);
+        initialFetchDoneRef.current = true;
+      }
     } catch (err) {
       console.error('Failed to load feeds:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedFeedId, onSelectFeed]);
 
   useEffect(() => {
     fetchData();
@@ -211,7 +219,7 @@ export function FeedManager({
               key={feed.id}
               onClick={() => onSelectFeed(feed.id)}
               className={`
-                group grid grid-cols-[1fr_1fr_100px_120px_130px] gap-2 px-5 py-2.5 items-center
+                group grid grid-cols-[1fr_1fr_100px_120px_130px] gap-2 px-5 h-10 items-center
                 border-b border-[#1e1e1e] cursor-pointer transition-colors
                 ${selectedFeedId === feed.id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}
               `}
@@ -253,13 +261,6 @@ export function FeedManager({
 
                 {/* Row Actions (visible on hover) */}
                 <div className="hidden group-hover:flex items-center gap-0.5">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSelectFeed(feed.id); }}
-                    className="p-1.5 rounded hover:bg-white/10 text-gray-500 hover:text-gray-200 transition-colors cursor-pointer"
-                    title="View details"
-                  >
-                    <Info size={14} />
-                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onEditFeed(feed); }}
                     className="p-1.5 rounded hover:bg-white/10 text-gray-500 hover:text-gray-200 transition-colors cursor-pointer"

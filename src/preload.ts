@@ -45,6 +45,12 @@ const electronAPI: ElectronAPI = {
   articleListByTag: (tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_LIST_BY_TAG, tagId),
   articleTagsForArticle: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAGS_FOR_ARTICLE, articleId),
 
+  // Highlight-Tag
+  highlightTagAdd: (highlightId, tagId) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_TAG_ADD, highlightId, tagId),
+  highlightTagRemove: (highlightId, tagId) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_TAG_REMOVE, highlightId, tagId),
+  highlightTagsForHighlight: (highlightId) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_TAGS_FOR_HIGHLIGHT, highlightId),
+  highlightTagsBatch: (highlightIds) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_TAGS_BATCH, highlightIds),
+
   // Book
   bookList: (query) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_LIST, query),
   bookGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET, id),

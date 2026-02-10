@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag, MoreHorizontal, Highlighter } from 'lucide-react';
-import type { Article, Highlight } from '../../shared/types';
+import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter } from 'lucide-react';
+import type { Article, Highlight, Tag } from '../../shared/types';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP } from './ReaderSettings';
+import { AnnotationLayer, type EditingAnnotation } from './AnnotationLayer';
 import {
   BLOCK_SELECTOR,
   COLOR_BG_MAP,
@@ -68,10 +69,13 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
   const [readProgress, setReadProgress] = useState(0);
   const [forceTab, setForceTab] = useState<{ tab: 'notebook'; ts: number } | undefined>();
+  const [editingAnnotation, setEditingAnnotation] = useState<EditingAnnotation | null>(null);
+  const [highlightTagsMap, setHighlightTagsMap] = useState<Record<string, Tag[]>>({});
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const annotationLayerRef = useRef<HTMLDivElement>(null);
   const highlightsRef = useRef<Highlight[]>([]);
   const selectionRangeRef = useRef<Range | null>(null);
   const readProgressRef = useRef(0);
@@ -126,6 +130,20 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     return () => { cancelled = true; };
   }, [articleId]);
 
+  // ==================== 加载高亮标签 ====================
+
+  const loadHighlightTags = useCallback(async (hlIds: string[]) => {
+    if (hlIds.length === 0) return;
+    const map = await window.electronAPI.highlightTagsBatch(hlIds);
+    setHighlightTagsMap((prev) => ({ ...prev, ...map }));
+  }, []);
+
+  useEffect(() => {
+    if (highlights.length > 0) {
+      loadHighlightTags(highlights.map((h) => h.id));
+    }
+  }, [highlights, loadHighlightTags]);
+
   // ==================== 阅读进度追踪 ====================
 
   const flushProgress = useCallback(() => {
@@ -163,19 +181,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       flushProgress();
     };
   }, [flushProgress]);
-
-  // ==================== 提取 TOC ====================
-
-  useEffect(() => {
-    if (loading || !article?.content || !contentRef.current) return;
-    const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    const items: TocItem[] = Array.from(headings).map((h, i) => {
-      const id = `heading-${i}`;
-      h.id = id;
-      return { id, text: h.textContent?.trim() ?? '', level: parseInt(h.tagName.charAt(1)) };
-    });
-    setTocItems(items);
-  }, [loading, article?.content]);
 
   // ==================== 高亮渲染引擎（首次全量） ====================
 
@@ -228,8 +233,19 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   useEffect(() => {
     if (loading || !article?.content || !contentRef.current) return;
     contentRef.current.innerHTML = article.content;
-    applyHighlights();
-  }, [loading, article?.content, applyHighlights]);
+
+    // TOC 提取必须在 innerHTML 设置后执行，使用 setTimeout 确保 DOM 已更新
+    setTimeout(() => {
+      if (!contentRef.current) return;
+      const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const items: TocItem[] = Array.from(headings).map((h, i) => {
+        const id = `heading-${i}`;
+        h.id = id;
+        return { id, text: h.textContent?.trim() ?? '', level: parseInt(h.tagName.charAt(1)) };
+      });
+      setTocItems(items);
+    }, 0);
+  }, [loading, article?.content]);
 
   // highlights 列表变化时（新增/删除高亮），重新应用到当前 DOM
   useEffect(() => {
@@ -403,6 +419,12 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     await window.electronAPI.highlightDelete(highlightId);
     setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
     setToolbar(null);
+    setEditingAnnotation((prev) => prev?.highlightId === highlightId ? null : prev);
+    setHighlightTagsMap((prev) => {
+      const next = { ...prev };
+      delete next[highlightId];
+      return next;
+    });
     // 增量移除 DOM
     if (contentRef.current) {
       unwrapHighlight(contentRef.current, highlightId);
@@ -414,14 +436,44 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
       if (toolbarRef.current?.contains(e.target as Node)) return;
+      if (annotationLayerRef.current?.contains(e.target as Node)) return;
       const target = e.target as HTMLElement;
       if (target.closest('mark[data-highlight-id]')) return;
+      if (target.closest('.annotation-editor, .annotation-tag-picker')) return;
 
       setToolbar(null);
+      setEditingAnnotation(null);
       selectionRangeRef.current = null;
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  // ==================== 注释层回调 ====================
+
+  const handleSaveNote = useCallback(async (highlightId: string, note: string) => {
+    const updated = await window.electronAPI.highlightUpdate({ id: highlightId, note: note || undefined });
+    setHighlights((prev) => prev.map((h) => h.id === highlightId ? updated : h));
+    setEditingAnnotation(null);
+  }, []);
+
+  const handleAnnotationTagAdd = useCallback(async (highlightId: string, tagId: string) => {
+    await window.electronAPI.highlightTagAdd(highlightId, tagId);
+    const tags = await window.electronAPI.highlightTagsForHighlight(highlightId);
+    setHighlightTagsMap((prev) => ({ ...prev, [highlightId]: tags }));
+  }, []);
+
+  const handleAnnotationTagRemove = useCallback(async (highlightId: string, tagId: string) => {
+    await window.electronAPI.highlightTagRemove(highlightId, tagId);
+    const tags = await window.electronAPI.highlightTagsForHighlight(highlightId);
+    setHighlightTagsMap((prev) => ({ ...prev, [highlightId]: tags }));
+  }, []);
+
+  const handleAnnotationTagCreate = useCallback(async (highlightId: string, name: string) => {
+    const tag = await window.electronAPI.tagCreate(name);
+    await window.electronAPI.highlightTagAdd(highlightId, tag.id);
+    const tags = await window.electronAPI.highlightTagsForHighlight(highlightId);
+    setHighlightTagsMap((prev) => ({ ...prev, [highlightId]: tags }));
   }, []);
 
   // ==================== 键盘快捷键 ====================
@@ -432,6 +484,10 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA';
 
       if (e.key === 'Escape') {
+        if (editingAnnotation) {
+          setEditingAnnotation(null);
+          return;
+        }
         if (toolbar) {
           setToolbar(null);
           selectionRangeRef.current = null;
@@ -513,7 +569,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbar, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight]);
+  }, [onClose, toolbar, editingAnnotation, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight]);
 
   const isLoading = loading || parsing;
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
@@ -631,32 +687,51 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
               文章不存在
             </div>
           ) : (
-            <div className="mx-auto max-w-[680px] px-8 py-10">
-              <h1 className="text-[28px] font-bold leading-tight text-white">
-                {article.title}
-              </h1>
+            <div className="relative">
+              <div className="mx-auto max-w-[680px] px-8 py-10">
+                <h1 className="text-[28px] font-bold leading-tight text-white">
+                  {article.title}
+                </h1>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-gray-500">
-                {article.author && <span>{article.author}</span>}
-                {article.domain && <span>{article.domain}</span>}
-                {article.publishedAt && <span>{formatDate(article.publishedAt)}</span>}
-                {article.readingTime && <span>{article.readingTime} min read</span>}
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-gray-500">
+                  {article.author && <span>{article.author}</span>}
+                  {article.domain && <span>{article.domain}</span>}
+                  {article.publishedAt && <span>{formatDate(article.publishedAt)}</span>}
+                  {article.readingTime && <span>{article.readingTime} min read</span>}
+                </div>
+
+                {article.content ? (
+                  <div
+                    ref={contentRef}
+                    className="article-content mt-8"
+                    style={{
+                      fontFamily: FONT_FAMILY_MAP[readerSettings.font],
+                      fontSize: `${readerSettings.fontSize}px`,
+                      lineHeight: readerSettings.lineHeight,
+                    }}
+                    onMouseUp={handleMouseUp}
+                  />
+                ) : (
+                  <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>
+                )}
               </div>
 
-              {article.content ? (
-                <div
-                  ref={contentRef}
-                  className="article-content mt-8"
-                  style={{
-                    fontFamily: FONT_FAMILY_MAP[readerSettings.font],
-                    fontSize: `${readerSettings.fontSize}px`,
-                    lineHeight: readerSettings.lineHeight,
-                  }}
-                  onMouseUp={handleMouseUp}
+              {/* 注释层：覆盖整个滚动内容区域右侧 */}
+              <div ref={annotationLayerRef}>
+                <AnnotationLayer
+                  highlights={highlights}
+                  highlightTagsMap={highlightTagsMap}
+                  editingAnnotation={editingAnnotation}
+                  contentRef={contentRef}
+                  onSaveNote={handleSaveNote}
+                  onCancelEdit={() => setEditingAnnotation(null)}
+                  onTagAdd={handleAnnotationTagAdd}
+                  onTagRemove={handleAnnotationTagRemove}
+                  onTagCreate={handleAnnotationTagCreate}
+                  onStartEditNote={(hlId) => setEditingAnnotation({ highlightId: hlId, type: 'note' })}
+                  onStartEditTag={(hlId) => setEditingAnnotation({ highlightId: hlId, type: 'tag' })}
                 />
-              ) : (
-                <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>
-              )}
+              </div>
             </div>
           )}
         </div>
@@ -691,16 +766,28 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                 <X className="w-3.5 h-3.5 text-amber-400" />
               </button>
               <button
+                onClick={() => {
+                  if (toolbar.highlightId) {
+                    setEditingAnnotation({ highlightId: toolbar.highlightId, type: 'note' });
+                    setToolbar(null);
+                  }
+                }}
                 className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
                 title="添加笔记"
               >
                 <MessageSquareText className="w-3.5 h-3.5" />
               </button>
               <button
+                onClick={() => {
+                  if (toolbar.highlightId) {
+                    setEditingAnnotation({ highlightId: toolbar.highlightId, type: 'tag' });
+                    setToolbar(null);
+                  }
+                }}
                 className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
                 title="添加标签"
               >
-                <Tag className="w-3.5 h-3.5" />
+                <TagIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
