@@ -337,6 +337,11 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     }
   };
 
+  const handleOpenReader = useCallback((id: string) => {
+    markAsSeen(id);
+    onOpenReader(id);
+  }, [markAsSeen, onOpenReader]);
+
   const handleArticleContextMenu = (articleId: string, x: number, y: number) => {
     onSelectArticle(articleId);
     setCtxMenu({ articleId, x, y });
@@ -466,6 +471,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         case 'Enter': {
           if (selectedArticleId) {
             e.preventDefault();
+            markAsSeen(selectedArticleId);
             onOpenReader(selectedArticleId);
           }
           break;
@@ -529,7 +535,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [articles, selectedArticleId, onSelectArticle, onOpenReader, fetchArticles, undoStack, selectedIds, isFeedView, isLibraryView]);
+  }, [articles, selectedArticleId, onSelectArticle, onOpenReader, fetchArticles, undoStack, selectedIds, isFeedView, isLibraryView, markAsSeen]);
 
   useEffect(() => {
     if (!selectedArticleId || !listRef.current) return;
@@ -658,7 +664,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   article={article}
                   isSelected={article.id === selectedArticleId}
                   onHover={handleArticleHover}
-                  onClick={onOpenReader}
+                  onClick={handleOpenReader}
                   onStatusChange={handleStatusChange}
                   onToggleShortlist={(id) => handleToggleShortlist(id)}
                   trashMode={isTrash}

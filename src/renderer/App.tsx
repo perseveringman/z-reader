@@ -185,10 +185,14 @@ export function App() {
               collapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
               activeView={activeView}
-              onViewChange={setActiveView}
+              onViewChange={(view) => {
+                setActiveView(view);
+                if (view === 'manage-feeds') setSelectedFeedId(null);
+              }}
               onAddFeed={() => setAddFeedDialogOpen(true)}
               onAddUrl={() => setAddUrlDialogOpen(true)}
               onSearch={() => setSearchOpen(true)}
+              onShortcutsHelp={() => setShortcutsHelpOpen(true)}
               selectedFeedId={selectedFeedId}
               onFeedSelect={(feedId) => {
                 setSelectedFeedId(feedId);

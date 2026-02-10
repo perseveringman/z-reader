@@ -18,6 +18,7 @@ import {
   Trash2,
   ArrowRight,
   Pin,
+  Keyboard,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -29,6 +30,7 @@ interface SidebarProps {
   onAddFeed: () => void;
   onAddUrl: () => void;
   onSearch: () => void;
+  onShortcutsHelp: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
   selectedTagId?: string | null;
@@ -98,7 +100,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -290,7 +292,10 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               return (
                 <button
                   key={`pin-${feed.id}`}
-                  onClick={() => onFeedSelect(feed.id)}
+                  onClick={() => {
+                    onFeedSelect(feed.id);
+                    onViewChange('feeds');
+                  }}
                   className={`
                     group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
                     transition-colors duration-150 cursor-pointer outline-none
@@ -315,7 +320,9 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               label="Manage feeds"
               active={activeView === 'manage-feeds'}
               collapsed={collapsed}
-              onClick={() => onViewChange('manage-feeds')}
+              onClick={() => {
+                onViewChange('manage-feeds');
+              }}
             />
           </>
         )}
@@ -336,13 +343,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               collapsed={collapsed}
               onClick={() => onViewChange('shortlist')}
             />
-            <NavItem
-              icon={<Trash2 size={iconSize} />}
-              label="Trash"
-              active={activeView === 'trash'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('trash')}
-            />
           </>
         )}
       </nav>
@@ -350,10 +350,23 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       {/* 底部操作区 */}
       <div className="px-2 py-2 border-t border-white/5 space-y-0.5">
         <NavItem
+          icon={<Trash2 size={iconSize} />}
+          label="Trash"
+          active={activeView === 'trash'}
+          collapsed={collapsed}
+          onClick={() => onViewChange('trash')}
+        />
+        <NavItem
           icon={<Search size={iconSize} />}
           label="Search"
           collapsed={collapsed}
           onClick={onSearch}
+        />
+        <NavItem
+          icon={<Keyboard size={iconSize} />}
+          label="Shortcuts"
+          collapsed={collapsed}
+          onClick={onShortcutsHelp}
         />
         <NavItem
           icon={<Settings size={iconSize} />}

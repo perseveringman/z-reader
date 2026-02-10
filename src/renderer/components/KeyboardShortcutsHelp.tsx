@@ -94,7 +94,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         ref={panelRef}
-        className="w-[480px] max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+        className="w-[480px] max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10">
           <h2 className="text-[14px] font-semibold text-white">Keyboard Shortcuts</h2>
@@ -106,7 +106,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
           </button>
         </div>
 
-        <div className="overflow-y-auto p-5 space-y-6">
+        <div className="overflow-y-auto min-h-0 flex-1 p-5 space-y-6">
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.title}>
               <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
