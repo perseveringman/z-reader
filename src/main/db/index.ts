@@ -192,6 +192,13 @@ function initTables(sqlite: Database.Database) {
   } catch {
     // Column already exists — no-op
   }
+
+  // Migration: add anchor_path column to highlights for DOM path positioning
+  try {
+    sqlite.exec(`ALTER TABLE highlights ADD COLUMN anchor_path TEXT`);
+  } catch {
+    // Column already exists — no-op
+  }
 }
 
 export { schema };

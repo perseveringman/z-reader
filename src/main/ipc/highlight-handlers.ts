@@ -34,6 +34,7 @@ export function registerHighlightHandlers() {
       color: input.color ?? 'yellow',
       startOffset: input.startOffset ?? null,
       endOffset: input.endOffset ?? null,
+      anchorPath: input.anchorPath ?? null,
       paragraphIndex: input.paragraphIndex ?? null,
       createdAt: now,
       updatedAt: now,

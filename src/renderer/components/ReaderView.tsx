@@ -40,6 +40,9 @@ interface TocItem {
 
 // ==================== 高亮引擎工具函数 ====================
 
+// 可导航/高亮的块级元素选择器
+const BLOCK_SELECTOR = 'p, li, blockquote';
+
 function getTextNodes(root: Node): Text[] {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
@@ -48,24 +51,7 @@ function getTextNodes(root: Node): Text[] {
   return nodes;
 }
 
-function rangeToOffsets(root: HTMLElement, range: Range): { startOffset: number; endOffset: number } | null {
-  const nodes = getTextNodes(root);
-  let offset = 0;
-  let startOffset = -1;
-  let endOffset = -1;
-
-  for (const t of nodes) {
-    const len = t.data.length;
-    if (t === range.startContainer) startOffset = offset + range.startOffset;
-    if (t === range.endContainer) endOffset = offset + range.endOffset;
-    offset += len;
-  }
-
-  if (startOffset < 0 || endOffset < 0 || startOffset >= endOffset) return null;
-  return { startOffset, endOffset };
-}
-
-function offsetsToRange(root: HTMLElement, start: number, end: number): Range | null {
+function offsetsToRange(root: Node, start: number, end: number): Range | null {
   const nodes = getTextNodes(root);
   let offset = 0;
   const range = document.createRange();
@@ -128,11 +114,83 @@ function wrapRangeWithMark(root: HTMLElement, range: Range, hlId: string, color:
   }
 }
 
-function textFallbackSearch(root: HTMLElement, text: string): { startOffset: number; endOffset: number } | null {
-  const fullText = root.textContent ?? '';
+/** 移除指定高亮的所有 mark 标签（增量删除） */
+function unwrapHighlight(root: HTMLElement, hlId: string) {
+  root.querySelectorAll(`mark[data-highlight-id="${hlId}"]`).forEach((el) => {
+    const parent = el.parentNode;
+    if (parent) {
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+      parent.normalize();
+    }
+  });
+}
+
+/** 找到最近的块级祖先元素 */
+function getBlockAncestor(node: Node, contentRoot: HTMLElement): HTMLElement | null {
+  let current: Node | null = node;
+  while (current && current !== contentRoot) {
+    if (current instanceof HTMLElement && current.matches(BLOCK_SELECTOR)) {
+      return current;
+    }
+    current = current.parentNode;
+  }
+  return null;
+}
+
+/** 计算元素在 contentRoot 下的 CSS 路径 */
+function computeAnchorPath(el: HTMLElement, contentRoot: HTMLElement): string {
+  const parts: string[] = [];
+  let current: HTMLElement | null = el;
+  while (current && current !== contentRoot) {
+    const parent = current.parentElement;
+    if (!parent) break;
+    const tag = current.tagName.toLowerCase();
+    // 计算同类型兄弟中的位置
+    const siblings = Array.from(parent.children).filter(
+      (c) => c.tagName.toLowerCase() === tag
+    );
+    const idx = siblings.indexOf(current) + 1;
+    parts.unshift(`${tag}:nth-of-type(${idx})`);
+    current = parent;
+    if (current === contentRoot) break;
+  }
+  return parts.join(' > ');
+}
+
+/** 通过 CSS 路径查找元素 */
+function resolveAnchorPath(contentRoot: HTMLElement, anchorPath: string): HTMLElement | null {
+  try {
+    return contentRoot.querySelector(anchorPath);
+  } catch {
+    return null;
+  }
+}
+
+/** 在指定元素内做文本搜索 fallback */
+function textSearchInElement(el: Node, text: string): { startOffset: number; endOffset: number } | null {
+  const fullText = el.textContent ?? '';
   const idx = fullText.indexOf(text);
   if (idx === -1) return null;
   return { startOffset: idx, endOffset: idx + text.length };
+}
+
+/** 计算 Range 相对于指定块元素的段内 offset */
+function rangeToBlockOffsets(blockEl: HTMLElement, range: Range): { startOffset: number; endOffset: number } | null {
+  const nodes = getTextNodes(blockEl);
+  let offset = 0;
+  let startOffset = -1;
+  let endOffset = -1;
+
+  for (const t of nodes) {
+    const len = t.data.length;
+    if (t === range.startContainer) startOffset = offset + range.startOffset;
+    if (t === range.endContainer) endOffset = offset + range.endOffset;
+    offset += len;
+  }
+
+  if (startOffset < 0 || endOffset < 0 || startOffset >= endOffset) return null;
+  return { startOffset, endOffset };
 }
 
 // ==================== 工具栏类型 ====================
@@ -164,7 +222,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const originalHtmlRef = useRef<string>('');
   const highlightsRef = useRef<Highlight[]>([]);
   const selectionRangeRef = useRef<Range | null>(null);
   const readProgressRef = useRef(0);
@@ -257,14 +314,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     };
   }, [flushProgress]);
 
-  // ==================== 保存原始 HTML ====================
-
-  useEffect(() => {
-    if (article?.content) {
-      originalHtmlRef.current = article.content;
-    }
-  }, [article?.content]);
-
   // ==================== 提取 TOC ====================
 
   useEffect(() => {
@@ -278,43 +327,44 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     setTocItems(items);
   }, [loading, article?.content]);
 
-  // ==================== 高亮渲染引擎 ====================
+  // ==================== 高亮渲染引擎（首次全量） ====================
 
   const applyHighlights = useCallback(() => {
-    if (!contentRef.current || !originalHtmlRef.current) return;
-
-    // 先清除所有已有的 mark 标签，恢复干净 DOM
-    contentRef.current.querySelectorAll('mark[data-highlight-id]').forEach((el) => {
-      const parent = el.parentNode;
-      if (parent) {
-        while (el.firstChild) {
-          parent.insertBefore(el.firstChild, el);
-        }
-        parent.removeChild(el);
-        parent.normalize();
-      }
-    });
+    if (!contentRef.current) return;
 
     for (const hl of highlightsRef.current) {
       if (!contentRef.current) break;
 
       let range: Range | null = null;
 
-      if (hl.startOffset != null && hl.endOffset != null) {
-        range = offsetsToRange(contentRef.current, hl.startOffset, hl.endOffset);
-        if (range && hl.text) {
-          const rangeText = range.toString();
-          if (rangeText !== hl.text) {
+      // 策略 1：anchorPath + 段内 offset
+      if (hl.anchorPath && hl.startOffset != null && hl.endOffset != null) {
+        const blockEl = resolveAnchorPath(contentRef.current, hl.anchorPath);
+        if (blockEl) {
+          range = offsetsToRange(blockEl, hl.startOffset, hl.endOffset);
+          if (range && hl.text && range.toString() !== hl.text) {
             range = null;
+          }
+          // anchorPath 内 text fallback
+          if (!range && hl.text) {
+            const fb = textSearchInElement(blockEl, hl.text);
+            if (fb) range = offsetsToRange(blockEl, fb.startOffset, fb.endOffset);
           }
         }
       }
 
-      if (!range && hl.text) {
-        const fallback = textFallbackSearch(contentRef.current, hl.text);
-        if (fallback) {
-          range = offsetsToRange(contentRef.current, fallback.startOffset, fallback.endOffset);
+      // 策略 2：旧数据 — 全文 offset
+      if (!range && !hl.anchorPath && hl.startOffset != null && hl.endOffset != null) {
+        range = offsetsToRange(contentRef.current, hl.startOffset, hl.endOffset);
+        if (range && hl.text && range.toString() !== hl.text) {
+          range = null;
         }
+      }
+
+      // 策略 3：全文 text fallback
+      if (!range && hl.text) {
+        const fb = textSearchInElement(contentRef.current, hl.text);
+        if (fb) range = offsetsToRange(contentRef.current, fb.startOffset, fb.endOffset);
       }
 
       if (range) {
@@ -323,8 +373,13 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     }
   }, []);
 
+  // 首次加载完成后渲染高亮
+  const highlightsAppliedRef = useRef(false);
   useEffect(() => {
     if (loading || !article?.content) return;
+    if (highlightsAppliedRef.current) return;
+    if (highlights.length === 0 && highlightsRef.current.length === 0) return;
+    highlightsAppliedRef.current = true;
     requestAnimationFrame(applyHighlights);
   }, [loading, article?.content, highlights, applyHighlights]);
 
@@ -332,117 +387,154 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
   useEffect(() => {
     if (!contentRef.current) return;
-    const paragraphs = contentRef.current.querySelectorAll('p');
-    paragraphs.forEach((p, i) => {
-      p.setAttribute('data-focused', String(i === focusedParagraphIndex));
+    const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
+    blocks.forEach((el, i) => {
+      el.setAttribute('data-focused', String(i === focusedParagraphIndex));
     });
-    if (focusedParagraphIndex >= 0 && paragraphs[focusedParagraphIndex]) {
-      paragraphs[focusedParagraphIndex].scrollIntoView({ block: 'nearest' });
+    if (focusedParagraphIndex >= 0 && blocks[focusedParagraphIndex]) {
+      blocks[focusedParagraphIndex].scrollIntoView({ block: 'nearest' });
     }
   }, [focusedParagraphIndex]);
 
-  // ==================== 选中文字 → 弹出 selection 工具栏 ====================
+  // ==================== 鼠标交互：单击选段 / 拖拽划线 / 点击高亮 ====================
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('mark[data-highlight-id]')) return;
-
     setTimeout(() => {
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || !contentRef.current) return;
+      if (!contentRef.current) return;
 
-      const text = selection.toString().trim();
-      if (!text) return;
-      if (!contentRef.current.contains(selection.anchorNode)) return;
+      // 有选中文字 → 划线模式，弹出 selection 工具栏
+      if (selection && !selection.isCollapsed) {
+        const text = selection.toString().trim();
+        if (!text) return;
+        if (!contentRef.current.contains(selection.anchorNode)) return;
 
-      const range = selection.getRangeAt(0);
-      selectionRangeRef.current = range.cloneRange();
+        const range = selection.getRangeAt(0);
+        selectionRangeRef.current = range.cloneRange();
 
-      const rect = range.getBoundingClientRect();
-      setToolbar({
-        mode: 'selection',
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10,
-      });
+        const rect = range.getBoundingClientRect();
+        setToolbar({
+          mode: 'selection',
+          x: rect.left + rect.width / 2,
+          y: rect.top - 10,
+        });
+        return;
+      }
+
+      // 点击已有高亮 → 弹出 highlight 工具栏
+      const target = e.target as HTMLElement;
+      const markEl = target.closest('mark[data-highlight-id]') as HTMLElement | null;
+      if (markEl) {
+        const hlId = markEl.dataset.highlightId;
+        if (hlId) {
+          const rect = markEl.getBoundingClientRect();
+          setToolbar({
+            mode: 'highlight',
+            highlightId: hlId,
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10,
+          });
+        }
+        return;
+      }
+
+      // 单击段落 → 选中/取消段落
+      const blockEl = getBlockAncestor(target, contentRef.current);
+      if (blockEl) {
+        const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
+        const idx = Array.from(blocks).indexOf(blockEl);
+        if (idx !== -1) {
+          setFocusedParagraphIndex((prev) => prev === idx ? -1 : idx);
+        }
+      }
+      setToolbar(null);
     }, 10);
   }, []);
 
-  // ==================== 点击已有高亮 → 弹出 highlight 工具栏 ====================
+  // ==================== 创建高亮（通用，划线和整段共用） ====================
 
-  const handleContentClick = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const markEl = target.closest('mark[data-highlight-id]') as HTMLElement | null;
-    if (!markEl) return;
-
-    const hlId = markEl.dataset.highlightId;
-    if (!hlId) return;
-
-    e.stopPropagation();
-    const rect = markEl.getBoundingClientRect();
-    setToolbar({
-      mode: 'highlight',
-      highlightId: hlId,
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10,
-    });
-  }, []);
-
-  // ==================== 创建高亮 ====================
-
-  const handleCreateHighlight = useCallback(async () => {
+  const createHighlightFromRange = useCallback(async (range: Range) => {
     if (!article || !contentRef.current) return;
-
-    const selection = window.getSelection();
-    const range = selectionRangeRef.current;
-    if (!range) return;
 
     const text = range.toString().trim();
     if (!text) return;
 
-    // 在原始 HTML 上计算 offsets（需要先回到干净 DOM）
-    // 由于 applyHighlights 会回滚 DOM，这里在当前 DOM 上可能有 mark 标签
-    // 所以用临时容器计算
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = originalHtmlRef.current;
-    const fallback = textFallbackSearch(tempDiv, text);
+    // 计算 anchorPath 和段内 offset
+    const blockEl = getBlockAncestor(range.startContainer, contentRef.current);
+    let anchorPath: string | undefined;
+    let startOffset: number | undefined;
+    let endOffset: number | undefined;
 
-    const input: Parameters<typeof window.electronAPI.highlightCreate>[0] = {
+    if (blockEl) {
+      anchorPath = computeAnchorPath(blockEl, contentRef.current);
+      const offsets = rangeToBlockOffsets(blockEl, range);
+      if (offsets) {
+        startOffset = offsets.startOffset;
+        endOffset = offsets.endOffset;
+      }
+    }
+
+    const hl = await window.electronAPI.highlightCreate({
       articleId: article.id,
       text,
       color: 'yellow',
-      startOffset: fallback?.startOffset,
-      endOffset: fallback?.endOffset,
-    };
-
-    selection?.removeAllRanges();
-    selectionRangeRef.current = null;
-    setToolbar(null);
-
-    const hl = await window.electronAPI.highlightCreate(input);
+      anchorPath,
+      startOffset,
+      endOffset,
+    });
     setHighlights((prev) => [...prev, hl]);
 
+    // 增量渲染：直接在当前 DOM 上 wrap
     requestAnimationFrame(() => {
       if (!contentRef.current) return;
-      const marks = contentRef.current.querySelectorAll(`mark[data-highlight-id="${hl.id}"]`);
-      if (marks.length > 0) {
-        const firstMark = marks[0];
-        const rect = firstMark.getBoundingClientRect();
-        setToolbar({
-          mode: 'highlight',
-          highlightId: hl.id,
-          x: rect.left + rect.width / 2,
-          y: rect.top - 10,
-        });
+      // 重新定位（range 可能因为清除 selection 而失效）
+      let newRange: Range | null = null;
+      if (anchorPath && startOffset != null && endOffset != null) {
+        const target = resolveAnchorPath(contentRef.current!, anchorPath);
+        if (target) newRange = offsetsToRange(target, startOffset, endOffset);
+      }
+      if (!newRange) {
+        const fb = textSearchInElement(contentRef.current!, text);
+        if (fb) newRange = offsetsToRange(contentRef.current!, fb.startOffset, fb.endOffset);
+      }
+      if (newRange) {
+        wrapRangeWithMark(contentRef.current!, newRange, hl.id, hl.color);
+        // 显示高亮工具栏
+        const marks = contentRef.current!.querySelectorAll(`mark[data-highlight-id="${hl.id}"]`);
+        if (marks.length > 0) {
+          const rect = marks[0].getBoundingClientRect();
+          setToolbar({
+            mode: 'highlight',
+            highlightId: hl.id,
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10,
+          });
+        }
       }
     });
   }, [article]);
 
-  // ==================== 删除高亮 ====================
+  const handleCreateHighlight = useCallback(async () => {
+    const range = selectionRangeRef.current;
+    if (!range) return;
+
+    window.getSelection()?.removeAllRanges();
+    selectionRangeRef.current = null;
+    setToolbar(null);
+
+    await createHighlightFromRange(range);
+  }, [createHighlightFromRange]);
+
+  // ==================== 删除高亮（增量） ====================
 
   const handleDeleteHighlight = useCallback(async (highlightId: string) => {
     await window.electronAPI.highlightDelete(highlightId);
     setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
     setToolbar(null);
+    // 增量移除 DOM
+    if (contentRef.current) {
+      unwrapHighlight(contentRef.current, highlightId);
+    }
   }, []);
 
   // ==================== 关闭工具栏逻辑 ====================
@@ -503,7 +595,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
       if (inInput) return;
       if (!contentRef.current) return;
-      const total = contentRef.current.querySelectorAll('p').length;
+      const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
+      const total = blocks.length;
       if (total === 0) return;
 
       if (e.key === 'j' || e.key === 'ArrowDown') {
@@ -514,24 +607,24 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         setFocusedParagraphIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === 'h' || e.key === 'H') {
         e.preventDefault();
-        if (focusedParagraphIndex >= 0 && article) {
-          const paragraphs = contentRef.current.querySelectorAll('p');
-          const p = paragraphs[focusedParagraphIndex];
-          const pText = p?.textContent?.trim();
-          if (pText) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = originalHtmlRef.current;
-            const offsets = textFallbackSearch(tempDiv, pText);
-            window.electronAPI.highlightCreate({
-              articleId: article.id,
-              text: pText,
-              color: 'yellow',
-              paragraphIndex: focusedParagraphIndex,
-              startOffset: offsets?.startOffset,
-              endOffset: offsets?.endOffset,
-            }).then((hl) => {
-              setHighlights((prev) => [...prev, hl]);
-            });
+
+        // 优先：有文字选中 → 高亮选中文字
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed && contentRef.current.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0).cloneRange();
+          selection.removeAllRanges();
+          setToolbar(null);
+          createHighlightFromRange(range);
+          return;
+        }
+
+        // 否则：高亮聚焦段落
+        if (focusedParagraphIndex >= 0) {
+          const block = blocks[focusedParagraphIndex] as HTMLElement;
+          if (block) {
+            const range = document.createRange();
+            range.selectNodeContents(block);
+            createHighlightFromRange(range);
           }
         }
       }
@@ -539,7 +632,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbar, focusedParagraphIndex, article]);
+  }, [onClose, toolbar, focusedParagraphIndex, article, createHighlightFromRange]);
 
   const isLoading = loading || parsing;
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
@@ -680,7 +773,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                   }}
                   dangerouslySetInnerHTML={{ __html: article.content }}
                   onMouseUp={handleMouseUp}
-                  onClick={handleContentClick}
                 />
               ) : (
                 <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>

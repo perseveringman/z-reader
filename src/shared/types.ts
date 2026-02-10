@@ -101,6 +101,7 @@ export interface Highlight {
   color: string;
   startOffset: number | null;
   endOffset: number | null;
+  anchorPath: string | null;
   paragraphIndex: number | null;
   createdAt: string;
   updatedAt: string;
@@ -113,6 +114,7 @@ export interface CreateHighlightInput {
   color?: string;
   startOffset?: number;
   endOffset?: number;
+  anchorPath?: string;
   paragraphIndex?: number;
 }
 

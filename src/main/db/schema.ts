@@ -55,6 +55,7 @@ export const highlights = sqliteTable('highlights', {
   color: text('color').default('yellow'),
   startOffset: integer('start_offset'),
   endOffset: integer('end_offset'),
+  anchorPath: text('anchor_path'),
   paragraphIndex: integer('paragraph_index'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
