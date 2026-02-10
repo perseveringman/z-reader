@@ -12,6 +12,9 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { FeedManageDialog } from './components/FeedManageDialog';
 import { FeedManager } from './components/FeedManager';
 import { FeedDetailPanel } from './components/FeedDetailPanel';
+import { BookList } from './components/BookList';
+import { BookDetailPanel } from './components/BookDetailPanel';
+import { BookUploadPanel } from './components/BookUploadPanel';
 import type { Feed, ArticleSource } from '../shared/types';
 
 export function App() {
@@ -31,6 +34,9 @@ export function App() {
   const [managingFeed, setManagingFeed] = useState<Feed | null>(null);
   const [manageFeedSelectedId, setManageFeedSelectedId] = useState<string | null>(null);
   const [detailPanelCollapsed, setDetailPanelCollapsed] = useState(() => localStorage.getItem('detail-panel-collapsed') === 'true');
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [bookReaderMode, setBookReaderMode] = useState(false);
+  const [bookReaderId, setBookReaderId] = useState<string | null>(null);
 
   // Derive source and sub-view from activeView
   const contentSource: ArticleSource | undefined =
@@ -227,6 +233,35 @@ export function App() {
                   refreshTrigger={refreshTrigger}
                   collapsed={detailPanelCollapsed}
                 />
+              </>
+            ) : activeView === 'books' ? (
+              <>
+                <BookList
+                  selectedBookId={selectedBookId}
+                  onSelectBook={setSelectedBookId}
+                  onOpenReader={(id) => {
+                    setBookReaderId(id);
+                    setBookReaderMode(true);
+                  }}
+                  refreshTrigger={refreshTrigger}
+                  expanded={detailPanelCollapsed}
+                />
+                {selectedBookId ? (
+                  <BookDetailPanel
+                    bookId={selectedBookId}
+                    collapsed={detailPanelCollapsed}
+                    onOpenReader={(id) => {
+                      setBookReaderId(id);
+                      setBookReaderMode(true);
+                    }}
+                    onRefresh={handleRefresh}
+                  />
+                ) : (
+                  <BookUploadPanel
+                    onImported={handleRefresh}
+                    collapsed={detailPanelCollapsed}
+                  />
+                )}
               </>
             ) : (
               <>

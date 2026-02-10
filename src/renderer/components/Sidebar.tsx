@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Pin,
   Keyboard,
+  BookOpen,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -258,6 +259,13 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                 )}
               </button>
             ))}
+            <NavItem
+              icon={<BookOpen size={iconSize} />}
+              label="Books"
+              active={activeView === 'books'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('books')}
+            />
           </>
         )}
 

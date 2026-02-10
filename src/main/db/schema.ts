@@ -89,3 +89,24 @@ export const views = sqliteTable('views', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+// ==================== books 表 ====================
+export const books = sqliteTable('books', {
+  id: text('id').primaryKey(),
+  title: text('title'),
+  author: text('author'),
+  cover: text('cover'), // base64 或文件路径
+  filePath: text('file_path').notNull(), // EPUB 文件存储路径
+  fileSize: integer('file_size'),
+  language: text('language'),
+  publisher: text('publisher'),
+  description: text('description'),
+  readStatus: text('read_status').default('inbox'), // inbox | later | archive
+  readProgress: real('read_progress').default(0),
+  totalLocations: integer('total_locations'),
+  currentLocation: text('current_location'), // EPUB CFI 位置
+  isShortlisted: integer('is_shortlisted').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedFlg: integer('deleted_flg').default(0),
+});

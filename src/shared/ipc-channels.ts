@@ -40,4 +40,14 @@ export const IPC_CHANNELS = {
   ARTICLE_TAG_REMOVE: 'articleTag:remove',
   ARTICLE_LIST_BY_TAG: 'article:listByTag',
   ARTICLE_TAGS_FOR_ARTICLE: 'article:tagsForArticle',
+
+  // Book
+  BOOK_LIST: 'book:list',
+  BOOK_GET: 'book:get',
+  BOOK_IMPORT: 'book:import',
+  BOOK_DELETE: 'book:delete',
+  BOOK_UPDATE: 'book:update',
+  BOOK_GET_CONTENT: 'book:getContent',
+  BOOK_PERMANENT_DELETE: 'book:permanentDelete',
+  BOOK_RESTORE: 'book:restore',
 } as const;

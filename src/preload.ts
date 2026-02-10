@@ -44,6 +44,16 @@ const electronAPI: ElectronAPI = {
   articleTagRemove: (articleId, tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAG_REMOVE, articleId, tagId),
   articleListByTag: (tagId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_LIST_BY_TAG, tagId),
   articleTagsForArticle: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_TAGS_FOR_ARTICLE, articleId),
+
+  // Book
+  bookList: (query) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_LIST, query),
+  bookGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET, id),
+  bookImport: () => ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT),
+  bookDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_DELETE, id),
+  bookUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_UPDATE, input),
+  bookGetContent: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_CONTENT, id),
+  bookPermanentDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_PERMANENT_DELETE, id),
+  bookRestore: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_RESTORE, id),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -132,6 +132,45 @@ export interface Tag {
   articleCount?: number;
 }
 
+// ==================== Book 相关类型 ====================
+export type BookReadStatus = 'inbox' | 'later' | 'archive';
+
+export interface Book {
+  id: string;
+  title: string | null;
+  author: string | null;
+  cover: string | null;
+  filePath: string;
+  fileSize: number | null;
+  language: string | null;
+  publisher: string | null;
+  description: string | null;
+  readStatus: BookReadStatus;
+  readProgress: number;
+  totalLocations: number | null;
+  currentLocation: string | null;
+  isShortlisted: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookListQuery {
+  readStatus?: BookReadStatus;
+  isShortlisted?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface UpdateBookInput {
+  id: string;
+  readStatus?: BookReadStatus;
+  readProgress?: number;
+  currentLocation?: string;
+  isShortlisted?: boolean;
+  title?: string;
+  author?: string;
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
@@ -175,4 +214,14 @@ export interface ElectronAPI {
   articleTagRemove: (articleId: string, tagId: string) => Promise<void>;
   articleListByTag: (tagId: string) => Promise<Article[]>;
   articleTagsForArticle: (articleId: string) => Promise<Tag[]>;
+
+  // Book 操作
+  bookList: (query: BookListQuery) => Promise<Book[]>;
+  bookGet: (id: string) => Promise<Book | null>;
+  bookImport: () => Promise<Book[]>;
+  bookDelete: (id: string) => Promise<void>;
+  bookUpdate: (input: UpdateBookInput) => Promise<Book>;
+  bookGetContent: (id: string) => Promise<string>;
+  bookPermanentDelete: (id: string) => Promise<void>;
+  bookRestore: (id: string) => Promise<Book>;
 }

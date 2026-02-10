@@ -107,6 +107,26 @@ function initTables(sqlite: Database.Database) {
       PRIMARY KEY (article_id, tag_id)
     );
 
+    CREATE TABLE IF NOT EXISTS books (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      author TEXT,
+      cover TEXT,
+      file_path TEXT NOT NULL,
+      file_size INTEGER,
+      language TEXT,
+      publisher TEXT,
+      description TEXT,
+      read_status TEXT DEFAULT 'inbox',
+      read_progress REAL DEFAULT 0,
+      total_locations INTEGER,
+      current_location TEXT,
+      is_shortlisted INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_flg INTEGER DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS views (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -133,6 +153,8 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_articles_deleted_flg ON articles(deleted_flg);
     CREATE INDEX IF NOT EXISTS idx_feeds_deleted_flg ON feeds(deleted_flg);
     CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
+    CREATE INDEX IF NOT EXISTS idx_books_read_status ON books(read_status);
+    CREATE INDEX IF NOT EXISTS idx_books_deleted_flg ON books(deleted_flg);
 
     -- FTS5 同步触发器：插入
     CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
