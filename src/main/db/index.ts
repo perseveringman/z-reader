@@ -154,6 +154,15 @@ function initTables(sqlite: Database.Database) {
       VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author);
     END;
   `);
+
+  // Migration: add source column for Library/Feed separation
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN source TEXT DEFAULT 'feed'`);
+    sqlite.exec(`UPDATE articles SET source = 'feed' WHERE source IS NULL`);
+  } catch {
+    // Column already exists — no-op
+  }
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source)`);
 }
 
 export { schema };

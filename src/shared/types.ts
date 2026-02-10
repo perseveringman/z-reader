@@ -26,6 +26,14 @@ export interface UpdateFeedInput {
   fetchInterval?: number;
 }
 
+export type ArticleSource = 'library' | 'feed';
+export type ReadStatus = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen';
+
+export interface SaveUrlInput {
+  url: string;
+  title?: string;
+}
+
 // ==================== Article 相关类型 ====================
 export interface Article {
   id: string;
@@ -43,17 +51,19 @@ export interface Article {
   language: string | null;
   publishedAt: string | null;
   savedAt: string | null;
-  readStatus: 'inbox' | 'later' | 'archive';
+  readStatus: ReadStatus;
   readProgress: number;
   isShortlisted: number;
+  source: ArticleSource;
   domain: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ArticleListQuery {
-  readStatus?: 'inbox' | 'later' | 'archive';
+  readStatus?: ReadStatus;
   feedId?: string;
+  source?: ArticleSource;
   isShortlisted?: boolean;
   search?: string;
   sortBy?: 'saved_at' | 'published_at';
@@ -69,9 +79,10 @@ export interface ArticleSearchQuery {
 
 export interface UpdateArticleInput {
   id: string;
-  readStatus?: 'inbox' | 'later' | 'archive';
+  readStatus?: ReadStatus;
   readProgress?: number;
   isShortlisted?: boolean;
+  source?: ArticleSource;
 }
 
 // ==================== Highlight 相关类型 ====================
@@ -137,6 +148,8 @@ export interface ElectronAPI {
   articleListDeleted: () => Promise<Article[]>;
   articleBatchUpdate: (ids: string[], input: Partial<Omit<UpdateArticleInput, 'id'>>) => Promise<void>;
   articleBatchDelete: (ids: string[]) => Promise<void>;
+  articleSaveUrl: (input: SaveUrlInput) => Promise<Article>;
+  articleSaveToLibrary: (id: string) => Promise<Article>;
 
   // Highlight 操作
   highlightList: (articleId: string) => Promise<Highlight[]>;

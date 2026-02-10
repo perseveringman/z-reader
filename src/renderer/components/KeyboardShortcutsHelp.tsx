@@ -42,7 +42,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: '面板',
     items: [
-      { keys: ['['], description: '收折/展开左侧目录 (阅读视图)' },
+      { keys: ['['], description: '收折/展开左侧栏' },
       { keys: [']'], description: '收折/展开右侧详情面板' },
     ],
   },

@@ -38,6 +38,7 @@ export const articles = sqliteTable('articles', {
   readStatus: text('read_status').default('inbox'),
   readProgress: real('read_progress').default(0),
   isShortlisted: integer('is_shortlisted').default(0),
+  source: text('source').default('feed'),
   domain: text('domain'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

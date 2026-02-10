@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="dist/popup.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>Z-Reader</h1>
+      <span id="status" class="status status--offline">离线</span>
+    </header>
+    <div class="content">
+      <button id="save-btn" class="btn btn--primary">
+        💾 保存当前页面
+      </button>
+      <div id="article-info" class="article-info" style="display: none;">
+        <p class="article-title" id="article-title"></p>
+        <p class="article-meta" id="article-meta"></p>
+      </div>
+    </div>
+    <footer class="footer">
+      <a href="http://localhost:21897" target="_blank">打开 Z-Reader</a>
+    </footer>
+  </div>
+  <script src="dist/popup.js"></script>
+</body>
+</html>

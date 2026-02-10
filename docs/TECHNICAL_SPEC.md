@@ -52,25 +52,32 @@
 #### 顶部区域
 - **应用 Logo / 名称**: Z-Reader 品牌标识
 - **折叠/展开按钮**: 收起侧边栏仅显示图标
-- **全局新增按钮 (+)**: 快速添加 RSS 订阅 URL
+- **Save URL 按钮 (Link 图标)**: 手动保存 URL 到 Library
+- **Add Feed 按钮 (+)**: 快速添加 RSS 订阅 URL
 
-#### Library (核心内容库)
-按内容类型分类导航，对齐 Readwise 的 Library 区域：
-- **Articles**: 所有文章 (主视图)
+#### Library (高信噪比 - 用户策划内容)
+用户主动添加或从 Feed 提升的文章，永久存储：
+- **Inbox**: 新保存的未处理内容 (手动 URL 保存 / Feed 提升)
+- **Later**: 用户标记稍后阅读的内容
+- **Archive**: 已处理完毕的内容
 - **Tags**: 标签管理与筛选
 
-> 一期仅支持 RSS，Books/Emails/PDFs/Tweets/Videos/Podcasts 等类型预留接口，二期扩展。
+> 详见 [Library/Feed 二元分离架构](./library-feed-separation.md)
 
-#### Feed (订阅流)
-- **Feed 列表**: 显示所有 RSS 订阅源，带 Favicon 和未读计数
-- **Manage Feeds**: 管理订阅源 (添加/删除/分组/编辑)
+#### Feed (低信噪比 - RSS 自动抓取)
+RSS 自动抓取的内容，轻量级两态管理：
+- **Unseen**: 尚未浏览的新文章
+- **Seen**: 已浏览过的文章 (hover 自动标记)
+- **All Feeds**: 按订阅源浏览
+- **[订阅源列表]**: 按分类展示各订阅源，带 Favicon
 
-#### Pinned Views (固定视图)
+用户可将有价值的 Feed 文章通过 `B` 键或右键菜单"Save to Library"提升到 Library。
+
+#### Pinned Views (固定视图 - 跨 Library/Feed 共享)
 - **Shortlist**: 精选/收藏列表 (用户手动标记的高价值内容)
-- **Manage Views**: 管理自定义过滤视图
+- **Trash**: 已删除内容，支持恢复
 
 #### 底部操作区
-- **Trash (废纸篓)**: 已删除内容，支持恢复
 - **Search (全局搜索)**: 打开全文搜索面板 (FTS5)
 - **Preferences (设置)**: 应用配置 (主题、快捷键、抓取频率等)
 - **User Profile**: 用户信息与数据统计
@@ -78,11 +85,14 @@
 ### 3.3 中间内容列表 (Content List)
 
 #### 顶部导航栏
-- **分类标题**: 当前所在分类 (如 "Articles")，点击可切换
-- **状态切换 Tab**: `INBOX` / `LATER` / `ARCHIVE` 三态切换
-  - **Inbox (收件箱)**: 新到达的未处理内容
+- **分类标题**: 当前所在区域 (Library / Feed / Shortlist / Trash / Tag)
+- **状态切换 Tab (Library 视图)**: `INBOX` / `LATER` / `ARCHIVE` 三态切换
+  - **Inbox (收件箱)**: 新保存的未处理内容
   - **Later (稍后读)**: 用户标记稍后阅读的内容
   - **Archive (已归档)**: 已处理完毕的内容
+- **状态切换 Tab (Feed 视图)**: `UNSEEN` / `SEEN` 两态切换
+  - **Unseen**: 尚未浏览的新文章
+  - **Seen**: 已浏览过的文章
 - **排序控制**: 按 `Date saved` / `Date published` 排序，支持升序/降序切换
 
 #### 文章卡片 (Article Card)
@@ -183,9 +193,10 @@
 | language | TEXT | 语言 |
 | published_at | TEXT | 发布时间 |
 | saved_at | TEXT | 保存时间 |
-| read_status | TEXT | 状态: inbox / later / archive |
+| read_status | TEXT | Library: inbox / later / archive; Feed: unseen / seen |
 | read_progress | REAL | 阅读进度 (0.0 ~ 1.0) |
 | is_shortlisted | INTEGER | 是否加入 Shortlist |
+| source | TEXT | 来源: library / feed (默认 feed) |
 | domain | TEXT | 来源域名 |
 | created_at | TEXT | 创建时间 |
 | updated_at | TEXT | 更新时间 |
@@ -237,20 +248,44 @@
 
 ## 5. Feed-Library 二元架构与生命周期
 
+### 架构说明
+
+Z-Reader 采用 Library/Feed 二元分离架构，对齐 Readwise Reader 的核心设计：
+
+- **Library（高信噪比）**: 用户主动策划的内容，支持 Inbox/Later/Archive 三态管理
+- **Feed（低信噪比）**: RSS 自动抓取的内容，仅有 Unseen/Seen 两态
+
+详见 [Library/Feed 二元分离架构](./library-feed-separation.md)
+
 ### 状态流转
 
 ```
-RSS 抓取 → [Feed/Inbox]
-              │
-              ├── 用户操作 "L" ──→ [Later/稍后读]
-              ├── 用户操作 "S" ──→ [Shortlist/精选]
-              ├── 用户操作 "E" ──→ [Archive/归档]
-              ├── 用户操作 "D" ──→ [Trash/废纸篓]
-              └── 超过7天未处理 ──→ 自动淡出 (降低优先级)
+                   ┌──────────────────┐
+                   │    RSS 定时抓取   │
+                   └────────┬─────────┘
+                            │
+                            ▼
+                   Feed (Unseen)              用户手动保存 URL
+                   source='feed'              Cmd+Shift+S
+                            │                       │
+              ┌─────────────┼──────────┐            │
+              │             │          │            ▼
+         hover/选中      按 B       按 D     Library (Inbox)
+              │             │          │     source='library'
+              ▼             ▼          ▼            │
+         Feed (Seen)  Library (Inbox)  Trash   ┌────┼────┐
+                            │                  │    │    │
+                     ┌──────┼──────┐          按L  按E  按S
+                     │      │      │           │    │    │
+                    按L    按E    按S          ▼    ▼    ▼
+                     │      │      │        Later Archive Shortlist
+                     ▼      ▼      ▼
+                  Later  Archive  Shortlist
 ```
 
 - 所有状态变更支持 `Z` 撤销 (Undo Stack)
-- 每次操作后自动推进焦点到下一项
+- Feed 文章保存到 Library 后从 Feed 视图消失（干净分离）
+- Shortlist 和 Trash 跨 Library/Feed 共享
 
 ## 6. 键盘交互系统设计
 
@@ -275,10 +310,11 @@ RSS 抓取 → [Feed/Inbox]
 #### 内容操作
 | 快捷键 | 功能 |
 |--------|------|
-| `E` | 归档 (Archive) |
+| `E` | 归档 (Archive) — 仅 Library 视图 |
 | `D` | 删除 (移入废纸篓) |
-| `L` | 标记稍后阅读 (Later) |
+| `L` | 标记稍后阅读 (Later) — 仅 Library 视图 |
 | `S` | 加入 Shortlist |
+| `B` | 保存到 Library — 仅 Feed 视图 |
 | `Z` | 撤销上一步操作 |
 | `Shift + 方向键` | 批量选中 |
 | `Ctrl/Cmd + E` | 批量归档 |
@@ -297,7 +333,8 @@ RSS 抓取 → [Feed/Inbox]
 | `/` | 全文搜索 |
 | `Cmd/Ctrl + K` | 命令面板 (Command Palette) |
 | `Cmd/Ctrl + ,` | 打开设置 |
-| `1` / `2` / `3` | 切换 Inbox / Later / Archive |
+| `Cmd/Ctrl + Shift + S` | 保存 URL 到 Library |
+| `1` / `2` / `3` | Library: 切换 Inbox / Later / Archive; Feed: 切换 Unseen / Seen |
 
 ### 6.3 命令面板 (Command Palette)
 - `Cmd/Ctrl + K` 呼出
@@ -327,7 +364,8 @@ RSS 抓取 → [Feed/Inbox]
 ## 8. 内容源接入与 RSS 解析
 
 - **RSS/OPML 批量导入**: 支持标准 OPML 文件一键迁移；单 RSS URL 逐条添加
-- **定时拉取**: 每15分钟增量拉取，缓存 Etag/Last-Modified 避免重复
+- **手动 URL 保存**: 通过 `Cmd+Shift+S` 或侧边栏按钮，将任意 URL 保存到 Library（使用 @postlight/parser 解析正文）
+- **定时拉取**: 每15分钟增量拉取，缓存 Etag/Last-Modified 避免重复。新文章自动进入 Feed (source='feed', readStatus='unseen')
 - **正文提取**: RSS 摘要不完整时，使用 @postlight/parser 抓取全文
 - **解析失败降级**: 解析出错时降级为原文网页模式，用户可手动编辑元数据
 - **Feed 健康监控**: 连续失败计数，超过阈值标记为异常并通知用户

@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X, Star, BookOpen, ExternalLink, Inbox } from 'lucide-react';
-import type { Article, ArticleListQuery } from '../../shared/types';
+import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X, Star, BookOpen, ExternalLink, Inbox, BookmarkPlus } from 'lucide-react';
+import type { Article, ArticleListQuery, ArticleSource, ReadStatus as ReadStatusType } from '../../shared/types';
 import { ArticleCard } from './ArticleCard';
 import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { ContextMenu, type ContextMenuEntry } from './ContextMenu';
 
-type ReadStatus = 'inbox' | 'later' | 'archive';
 type SortBy = 'saved_at' | 'published_at';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'default' | 'compact';
@@ -21,12 +20,19 @@ interface ContentListProps {
   activeView?: string;
   tagId?: string | null;
   expanded?: boolean;
+  source?: ArticleSource;
+  initialTab?: string;
 }
 
-const TABS: { key: ReadStatus; label: string }[] = [
+const LIBRARY_TABS: { key: ReadStatusType; label: string }[] = [
   { key: 'inbox', label: 'INBOX' },
   { key: 'later', label: 'LATER' },
   { key: 'archive', label: 'ARCHIVE' },
+];
+
+const FEED_TABS: { key: ReadStatusType; label: string }[] = [
+  { key: 'unseen', label: 'UNSEEN' },
+  { key: 'seen', label: 'SEEN' },
 ];
 
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
@@ -34,8 +40,8 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded }: ContentListProps) {
-  const [activeTab, setActiveTab] = useState<ReadStatus>('inbox');
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab }: ContentListProps) {
+  const [activeTab, setActiveTab] = useState<ReadStatusType>(initialTab as ReadStatusType || 'inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -50,6 +56,21 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const undoStack = useUndoStack();
 
   const isTrash = activeView === 'trash';
+  const isFeedView = source === 'feed';
+  const isLibraryView = source === 'library';
+
+  // Determine which tabs to show
+  const tabs = isFeedView ? FEED_TABS
+    : isLibraryView ? LIBRARY_TABS
+    : LIBRARY_TABS; // fallback
+  const showTabs = !isShortlisted && !isTrash && !tagId && (isFeedView || isLibraryView);
+
+  // Sync activeTab when initialTab changes (sidebar navigation)
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab as ReadStatusType);
+    }
+  }, [initialTab]);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -62,19 +83,37 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         setArticles(result);
       } else {
         const query: ArticleListQuery = {
-          readStatus: isShortlisted ? undefined : activeTab,
           sortBy,
           sortOrder,
           limit: 100,
         };
-        // 如果有 feedId，添加到查询参数
+
+        // Source filter
+        if (source && !isShortlisted) {
+          query.source = source;
+        }
+
+        // Tab-based readStatus filter
+        if (!isShortlisted) {
+          if (isFeedView) {
+            // For feed: map 'unseen'/'seen' or use activeTab
+            query.readStatus = activeTab as ReadStatusType;
+          } else if (isLibraryView) {
+            query.readStatus = activeTab as ReadStatusType;
+          }
+        }
+
+        // Feed filter
         if (feedId) {
           query.feedId = feedId;
+          query.source = 'feed'; // Per-feed view is always feed source
         }
-        // Shortlist 模式
+
+        // Shortlist mode (shared across sources)
         if (isShortlisted) {
           query.isShortlisted = true;
         }
+
         const result = await window.electronAPI.articleList(query);
         setArticles(result);
       }
@@ -83,31 +122,33 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView]);
 
   useEffect(() => {
     fetchArticles();
   }, [fetchArticles, refreshTrigger]);
 
-  const STATUS_TOAST: Record<ReadStatus, string> = {
-    archive: '已归档',
-    later: '已加入稍后阅读',
-    inbox: '已移入收件箱',
+  const STATUS_TOAST: Record<string, string> = {
+    archive: 'Archived',
+    later: 'Saved for later',
+    inbox: 'Moved to Inbox',
+    seen: 'Marked as seen',
+    unseen: 'Marked as unseen',
   };
 
-  const handleStatusChange = async (id: string, status: ReadStatus) => {
+  const handleStatusChange = async (id: string, status: ReadStatusType) => {
     try {
       const article = articles.find((a) => a.id === id);
       const prevStatus = article?.readStatus ?? 'inbox';
       await window.electronAPI.articleUpdate({ id, readStatus: status });
       await fetchArticles();
-      showToast(STATUS_TOAST[status] ?? `已移至 ${status}`, 'success');
+      showToast(STATUS_TOAST[status] ?? `Moved to ${status}`, 'success');
       undoStack.push({
         description: `Revert to ${prevStatus}`,
         undo: async () => {
           await window.electronAPI.articleUpdate({ id, readStatus: prevStatus });
           await fetchArticles();
-          showToast('已撤销', 'info');
+          showToast('Undone', 'info');
         },
       });
     } catch (err) {
@@ -121,9 +162,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       const current = article?.isShortlisted === 1;
       await window.electronAPI.articleUpdate({ id, isShortlisted: !current });
       await fetchArticles();
-      showToast(current ? '已取消收藏' : '已加入 Shortlist', 'success');
+      showToast(current ? 'Removed from Shortlist' : 'Added to Shortlist', 'success');
     } catch (err) {
       console.error('Failed to toggle shortlist:', err);
+    }
+  };
+
+  const handleSaveToLibrary = async (id: string) => {
+    try {
+      await window.electronAPI.articleSaveToLibrary(id);
+      await fetchArticles(); // Article disappears from feed view
+      showToast('Saved to Library', 'success');
+    } catch (err) {
+      console.error('Failed to save to library:', err);
     }
   };
 
@@ -131,13 +182,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articleDelete(id);
       await fetchArticles();
-      showToast('已移入回收站', 'success');
+      showToast('Moved to Trash', 'success');
       undoStack.push({
         description: 'Undo delete',
         undo: async () => {
           await window.electronAPI.articleRestore(id);
           await fetchArticles();
-          showToast('已恢复', 'info');
+          showToast('Restored', 'info');
         },
       });
     } catch (err) {
@@ -149,7 +200,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articleRestore(id);
       await fetchArticles();
-      showToast('已恢复', 'success');
+      showToast('Restored', 'success');
     } catch (err) {
       console.error('Failed to restore article:', err);
     }
@@ -159,11 +210,30 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articlePermanentDelete(id);
       await fetchArticles();
-      showToast('已永久删除', 'success');
+      showToast('Permanently deleted', 'success');
     } catch (err) {
       console.error('Failed to permanently delete article:', err);
     }
   };
+
+  // Auto-mark feed articles as "seen" on hover
+  const handleArticleHover = useCallback(async (id: string) => {
+    onSelectArticle(id);
+    if (isFeedView) {
+      const article = articles.find(a => a.id === id);
+      if (article && article.readStatus === 'unseen') {
+        // Optimistic local update to avoid flicker
+        setArticles(prev => prev.map(a =>
+          a.id === id ? { ...a, readStatus: 'seen' as const } : a
+        ));
+        try {
+          await window.electronAPI.articleUpdate({ id, readStatus: 'seen' });
+        } catch (err) {
+          console.error('Failed to mark as seen:', err);
+        }
+      }
+    }
+  }, [onSelectArticle, isFeedView, articles]);
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
@@ -183,7 +253,6 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (e.shiftKey && lastClickedId) {
-        // Shift+click: range select
         const ids = articles.map((a) => a.id);
         const from = ids.indexOf(lastClickedId);
         const to = ids.indexOf(id);
@@ -194,11 +263,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           }
         }
       } else if (e.metaKey || e.ctrlKey) {
-        // Cmd/Ctrl+click: toggle single
         if (next.has(id)) next.delete(id);
         else next.add(id);
       } else {
-        // Plain click in multi-select mode: toggle single
         if (next.has(id)) next.delete(id);
         else next.add(id);
       }
@@ -221,7 +288,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchUpdate(Array.from(selectedIds), { readStatus: 'archive' });
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`已归档 ${selectedIds.size} 篇文章`, 'success');
+      showToast(`Archived ${selectedIds.size} articles`, 'success');
     } catch (err) {
       console.error('Batch archive failed:', err);
     }
@@ -233,7 +300,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchUpdate(Array.from(selectedIds), { readStatus: 'later' });
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`已加入稍后阅读 ${selectedIds.size} 篇`, 'success');
+      showToast(`Saved ${selectedIds.size} for later`, 'success');
     } catch (err) {
       console.error('Batch later failed:', err);
     }
@@ -246,7 +313,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchDelete(ids);
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`已删除 ${ids.length} 篇文章`, 'success');
+      showToast(`Deleted ${ids.length} articles`, 'success');
       undoStack.push({
         description: `Undo batch delete ${ids.length}`,
         undo: async () => {
@@ -254,7 +321,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             await window.electronAPI.articleRestore(id);
           }
           await fetchArticles();
-          showToast('已恢复', 'info');
+          showToast('Restored', 'info');
         },
       });
     } catch (err) {
@@ -274,41 +341,54 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
     if (isTrash) {
       return [
-        { label: '恢复', icon: Inbox, onClick: () => handleRestore(article.id) },
+        { label: 'Restore', icon: Inbox, onClick: () => handleRestore(article.id) },
         { separator: true },
-        { label: '永久删除', icon: Trash2, onClick: () => handlePermanentDelete(article.id), danger: true },
+        { label: 'Delete permanently', icon: Trash2, onClick: () => handlePermanentDelete(article.id), danger: true },
       ];
     }
 
     const items: ContextMenuEntry[] = [
-      { label: '打开阅读视图', icon: BookOpen, onClick: () => onOpenReader(article.id) },
+      { label: 'Open in Reader', icon: BookOpen, onClick: () => onOpenReader(article.id) },
       { separator: true },
     ];
 
-    if (article.readStatus !== 'inbox') {
-      items.push({ label: '移入 Inbox', icon: Inbox, onClick: () => handleStatusChange(article.id, 'inbox') });
+    // "Save to Library" for feed articles
+    if (isFeedView || article.source === 'feed') {
+      items.push({
+        label: 'Save to Library',
+        icon: BookmarkPlus,
+        onClick: () => handleSaveToLibrary(article.id),
+      });
+      items.push({ separator: true });
     }
-    if (article.readStatus !== 'later') {
-      items.push({ label: '稍后阅读', icon: Clock, onClick: () => handleStatusChange(article.id, 'later') });
-    }
-    if (article.readStatus !== 'archive') {
-      items.push({ label: '归档', icon: Archive, onClick: () => handleStatusChange(article.id, 'archive') });
+
+    // Library status actions
+    if (isLibraryView || article.source === 'library') {
+      if (article.readStatus !== 'inbox') {
+        items.push({ label: 'Move to Inbox', icon: Inbox, onClick: () => handleStatusChange(article.id, 'inbox') });
+      }
+      if (article.readStatus !== 'later') {
+        items.push({ label: 'Read later', icon: Clock, onClick: () => handleStatusChange(article.id, 'later') });
+      }
+      if (article.readStatus !== 'archive') {
+        items.push({ label: 'Archive', icon: Archive, onClick: () => handleStatusChange(article.id, 'archive') });
+      }
     }
 
     const isShortlistedNow = article.isShortlisted === 1;
     items.push({
-      label: isShortlistedNow ? '取消收藏' : '收藏',
+      label: isShortlistedNow ? 'Remove from Shortlist' : 'Add to Shortlist',
       icon: Star,
       onClick: () => handleToggleShortlist(article.id),
     });
 
     items.push({ separator: true });
-    items.push({ label: '删除', icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
+    items.push({ label: 'Delete', icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
 
     if (article.url) {
       items.push({ separator: true });
       items.push({
-        label: '在浏览器中打开',
+        label: 'Open in browser',
         icon: ExternalLink,
         onClick: () => window.open(article.url!, '_blank'),
       });
@@ -323,6 +403,25 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sortBy)?.label ?? '';
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Title
+  const getTitle = () => {
+    if (isTrash) return 'Trash';
+    if (isShortlisted) return 'Shortlist';
+    if (tagId) return 'Tag';
+    if (isLibraryView) return 'Library';
+    if (isFeedView) return 'Feed';
+    return 'Articles';
+  };
+
+  // Empty state message
+  const getEmptyMessage = () => {
+    if (isTrash) return 'Trash is empty';
+    if (isShortlisted) return 'No shortlisted articles';
+    if (isFeedView) return activeTab === 'unseen' ? 'No unseen articles' : 'No seen articles';
+    if (isLibraryView) return 'No articles — save a URL or promote from Feed';
+    return 'No articles found';
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -361,19 +460,40 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           }
           break;
         }
-        case '1': { e.preventDefault(); setActiveTab('inbox'); break; }
-        case '2': { e.preventDefault(); setActiveTab('later'); break; }
-        case '3': { e.preventDefault(); setActiveTab('archive'); break; }
+        case '1': {
+          e.preventDefault();
+          if (isFeedView) setActiveTab('unseen');
+          else setActiveTab('inbox');
+          break;
+        }
+        case '2': {
+          e.preventDefault();
+          if (isFeedView) setActiveTab('seen');
+          else setActiveTab('later');
+          break;
+        }
+        case '3': {
+          e.preventDefault();
+          if (!isFeedView) setActiveTab('archive');
+          break;
+        }
         case 'e':
         case 'E': {
           e.preventDefault();
-          if (selectedArticleId) handleStatusChange(selectedArticleId, 'archive');
+          if (selectedArticleId && isLibraryView) handleStatusChange(selectedArticleId, 'archive');
           break;
         }
         case 'l':
         case 'L': {
           e.preventDefault();
-          if (selectedArticleId) handleStatusChange(selectedArticleId, 'later');
+          if (selectedArticleId && isLibraryView) handleStatusChange(selectedArticleId, 'later');
+          break;
+        }
+        case 'b':
+        case 'B': {
+          // Save to Library (feed view only)
+          e.preventDefault();
+          if (selectedArticleId && isFeedView) handleSaveToLibrary(selectedArticleId);
           break;
         }
         case 'd':
@@ -399,7 +519,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [articles, selectedArticleId, onSelectArticle, onOpenReader, fetchArticles, undoStack, selectedIds]);
+  }, [articles, selectedArticleId, onSelectArticle, onOpenReader, fetchArticles, undoStack, selectedIds, isFeedView, isLibraryView]);
 
   useEffect(() => {
     if (!selectedArticleId || !listRef.current) return;
@@ -412,7 +532,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">
-            {isTrash ? 'Trash' : isShortlisted ? 'Shortlist' : tagId ? 'Tag' : 'Articles'}
+            {getTitle()}
           </h2>
           <div className="flex items-center gap-1">
             <button
@@ -432,16 +552,16 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             <button
               onClick={toggleViewMode}
               className="p-1 rounded text-[#666] hover:text-[#999] hover:bg-white/5 transition-colors cursor-pointer"
-              title={viewMode === 'default' ? '紧凑视图' : '默认视图'}
+              title={viewMode === 'default' ? 'Compact view' : 'Default view'}
             >
               {viewMode === 'default' ? <List size={12} /> : <LayoutGrid size={12} />}
             </button>
           </div>
         </div>
 
-        {!isShortlisted && !isTrash && !tagId && (
+        {showTabs && (
           <div className="flex px-4 gap-4 border-b border-[#262626]">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -458,7 +578,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             ))}
           </div>
         )}
-        {(isShortlisted || isTrash || tagId) && <div className="border-b border-[#262626]" />}
+        {!showTabs && <div className="border-b border-[#262626]" />}
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto">
@@ -467,41 +587,45 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2 bg-blue-500/10 border-b border-blue-500/20">
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-blue-400 font-medium">
-                已选 {selectedIds.size} 篇
+                {selectedIds.size} selected
               </span>
               <button
                 onClick={handleSelectAll}
                 className="text-[11px] text-blue-400/70 hover:text-blue-400 transition-colors cursor-pointer"
               >
-                全选
+                Select all
               </button>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={handleBatchArchive}
-                className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                title="归档"
-              >
-                <Archive size={14} />
-              </button>
-              <button
-                onClick={handleBatchLater}
-                className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                title="稍后阅读"
-              >
-                <Clock size={14} />
-              </button>
+              {isLibraryView && (
+                <>
+                  <button
+                    onClick={handleBatchArchive}
+                    className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    title="Archive"
+                  >
+                    <Archive size={14} />
+                  </button>
+                  <button
+                    onClick={handleBatchLater}
+                    className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    title="Read later"
+                  >
+                    <Clock size={14} />
+                  </button>
+                </>
+              )}
               <button
                 onClick={handleBatchDelete}
                 className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
-                title="删除"
+                title="Delete"
               >
                 <Trash2 size={14} />
               </button>
               <button
                 onClick={handleClearSelection}
                 className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                title="取消选择"
+                title="Clear selection"
               >
                 <X size={14} />
               </button>
@@ -514,7 +638,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           </div>
         ) : articles.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <span className="text-[13px] text-[#555]">暂无内容，请添加 RSS 订阅</span>
+            <span className="text-[13px] text-[#555]">{getEmptyMessage()}</span>
           </div>
         ) : (
           <div>
@@ -523,10 +647,10 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                 <ArticleCard
                   article={article}
                   isSelected={article.id === selectedArticleId}
-                  onHover={(id) => onSelectArticle(id)}
+                  onHover={handleArticleHover}
                   onClick={onOpenReader}
                   onStatusChange={handleStatusChange}
-                  onToggleShortlist={(id, current) => handleToggleShortlist(id)}
+                  onToggleShortlist={(id) => handleToggleShortlist(id)}
                   trashMode={isTrash}
                   onRestore={handleRestore}
                   onPermanentDelete={handlePermanentDelete}
@@ -535,6 +659,8 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   isChecked={selectedIds.has(article.id)}
                   onToggleCheck={handleToggleCheck}
                   onContextMenu={handleArticleContextMenu}
+                  source={source}
+                  onSaveToLibrary={isFeedView ? handleSaveToLibrary : undefined}
                 />
               </div>
             ))}

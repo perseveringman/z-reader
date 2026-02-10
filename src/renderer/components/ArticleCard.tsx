@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2, Check } from 'lucide-react';
-import type { Article } from '../../shared/types';
+import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2, Check, BookmarkPlus } from 'lucide-react';
+import type { Article, ArticleSource, ReadStatus } from '../../shared/types';
 
 interface ArticleCardProps {
   article: Article;
   isSelected: boolean;
   onHover: (id: string) => void;
   onClick: (id: string) => void;
-  onStatusChange: (id: string, status: 'inbox' | 'later' | 'archive') => void;
+  onStatusChange: (id: string, status: ReadStatus) => void;
   onToggleShortlist?: (id: string, current: boolean) => void;
   trashMode?: boolean;
   onRestore?: (id: string) => void;
@@ -17,6 +17,8 @@ interface ArticleCardProps {
   isChecked?: boolean;
   onToggleCheck?: (id: string, e: React.MouseEvent) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
+  source?: ArticleSource;
+  onSaveToLibrary?: (id: string) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -43,10 +45,13 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
-export function ArticleCard({ article, isSelected, onHover, onClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu }: ArticleCardProps) {
+export function ArticleCard({ article, isSelected, onHover, onClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu, source, onSaveToLibrary }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
-  const handleQuickAction = (e: React.MouseEvent, status: 'inbox' | 'later' | 'archive') => {
+  const isFeedArticle = source === 'feed' || article.source === 'feed';
+  const isLibraryArticle = source === 'library' || article.source === 'library';
+
+  const handleQuickAction = (e: React.MouseEvent, status: ReadStatus) => {
     e.stopPropagation();
     onStatusChange(article.id, status);
   };
@@ -56,9 +61,14 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
     onToggleShortlist?.(article.id, article.isShortlisted === 1);
   };
 
+  const handleSaveToLibrary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSaveToLibrary?.(article.id);
+  };
+
   const domainInitial = getDomainInitial(article.domain);
   const timestamp = formatRelativeTime(article.savedAt || article.publishedAt);
-  const isRead = article.readProgress >= 0.9 || article.readStatus === 'archive';
+  const isRead = article.readProgress >= 0.9 || article.readStatus === 'archive' || article.readStatus === 'seen';
 
   const metaParts: string[] = [];
   if (article.domain) metaParts.push(article.domain.replace(/^www\./, ''));
@@ -155,7 +165,7 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
             </span>
             {metaParts.map((part, i) => (
               <span key={i} className="flex items-center gap-1.5">
-                {i > 0 && <span className="text-gray-600">·</span>}
+                {i > 0 && <span className="text-gray-600">&middot;</span>}
                 <span className="truncate max-w-[120px]">{part}</span>
               </span>
             ))}
@@ -185,6 +195,16 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
             </>
           ) : (
             <>
+              {/* Save to Library button for feed articles */}
+              {isFeedArticle && onSaveToLibrary && (
+                <button
+                  onClick={handleSaveToLibrary}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-blue-400 transition-colors"
+                  title="Save to Library"
+                >
+                  <BookmarkPlus size={14} />
+                </button>
+              )}
               <button
                 onClick={handleToggleShortlist}
                 className={`p-1 rounded hover:bg-white/10 transition-colors ${
@@ -194,23 +214,28 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
               >
                 <Star size={14} fill={article.isShortlisted === 1 ? 'currentColor' : 'none'} />
               </button>
-              {article.readStatus !== 'archive' && (
-                <button
-                  onClick={(e) => handleQuickAction(e, 'archive')}
-                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                  title="Archive"
-                >
-                  <Archive size={14} />
-                </button>
-              )}
-              {article.readStatus !== 'later' && (
-                <button
-                  onClick={(e) => handleQuickAction(e, 'later')}
-                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                  title="Read Later"
-                >
-                  <Clock size={14} />
-                </button>
+              {/* Library-specific quick actions */}
+              {isLibraryArticle && (
+                <>
+                  {article.readStatus !== 'archive' && (
+                    <button
+                      onClick={(e) => handleQuickAction(e, 'archive')}
+                      className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                      title="Archive"
+                    >
+                      <Archive size={14} />
+                    </button>
+                  )}
+                  {article.readStatus !== 'later' && (
+                    <button
+                      onClick={(e) => handleQuickAction(e, 'later')}
+                      className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                      title="Read Later"
+                    >
+                      <Clock size={14} />
+                    </button>
+                  )}
+                </>
               )}
               <button
                 className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"

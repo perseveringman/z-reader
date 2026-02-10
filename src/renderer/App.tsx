@@ -6,19 +6,21 @@ import { ReaderView } from './components/ReaderView';
 import { ToastProvider } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { AddFeedDialog } from './components/AddFeedDialog';
+import { AddUrlDialog } from './components/AddUrlDialog';
 import { SearchPanel } from './components/SearchPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { FeedManageDialog } from './components/FeedManageDialog';
-import type { Feed } from '../shared/types';
+import type { Feed, ArticleSource } from '../shared/types';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<string>('articles');
+  const [activeView, setActiveView] = useState<string>('library-inbox');
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
   const [readerMode, setReaderMode] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [addFeedDialogOpen, setAddFeedDialogOpen] = useState(false);
+  const [addUrlDialogOpen, setAddUrlDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -26,6 +28,20 @@ export function App() {
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [managingFeed, setManagingFeed] = useState<Feed | null>(null);
   const [detailPanelCollapsed, setDetailPanelCollapsed] = useState(() => localStorage.getItem('detail-panel-collapsed') === 'true');
+
+  // Derive source and sub-view from activeView
+  const contentSource: ArticleSource | undefined =
+    activeView.startsWith('library-') ? 'library'
+    : activeView.startsWith('feed-') || activeView === 'feeds' ? 'feed'
+    : undefined;
+
+  const initialTab =
+    activeView === 'library-inbox' ? 'inbox'
+    : activeView === 'library-later' ? 'later'
+    : activeView === 'library-archive' ? 'archive'
+    : activeView === 'feed-unseen' ? 'unseen'
+    : activeView === 'feed-seen' ? 'seen'
+    : undefined;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,6 +53,13 @@ export function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+      }
+
+      // Cmd/Ctrl + Shift + S: Save URL to Library
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 's') {
+        e.preventDefault();
+        setAddUrlDialogOpen(true);
+        return;
       }
 
       // / 键: 搜索
@@ -59,6 +82,12 @@ export function App() {
           localStorage.setItem('detail-panel-collapsed', String(next));
           return next;
         });
+      }
+
+      // [ 键: 收折/展开左侧边栏（列表视图）
+      if (e.key === '[' && !readerMode) {
+        e.preventDefault();
+        setSidebarCollapsed((prev) => !prev);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -86,8 +115,7 @@ export function App() {
     []
   );
 
-  const handleFeedAdded = useCallback(() => {
-    // 刷新文章列表
+  const handleRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
@@ -103,7 +131,7 @@ export function App() {
 
   const handleSearchSelect = useCallback((articleId: string) => {
     setSelectedArticleId(articleId);
-    setActiveView('articles');
+    setActiveView('library-inbox');
   }, []);
 
   const handleSaveFeed = useCallback(async (feed: Feed) => {
@@ -126,7 +154,7 @@ export function App() {
       setRefreshTrigger((prev) => prev + 1);
       if (selectedFeedId === feedId) {
         setSelectedFeedId(null);
-        setActiveView('articles');
+        setActiveView('feed-unseen');
       }
     } catch (err) {
       console.error('Failed to delete feed:', err);
@@ -153,6 +181,7 @@ export function App() {
               activeView={activeView}
               onViewChange={setActiveView}
               onAddFeed={() => setAddFeedDialogOpen(true)}
+              onAddUrl={() => setAddUrlDialogOpen(true)}
               onSearch={() => setSearchOpen(true)}
               selectedFeedId={selectedFeedId}
               onFeedSelect={(feedId) => {
@@ -160,6 +189,7 @@ export function App() {
                 setActiveView('feeds');
               }}
               onManageFeed={setManagingFeed}
+              refreshTrigger={refreshTrigger}
               selectedTagId={selectedTagId}
               onTagSelect={(tagId) => {
                 setSelectedTagId(tagId);
@@ -176,6 +206,8 @@ export function App() {
               activeView={activeView}
               tagId={activeView === 'tags' ? selectedTagId : undefined}
               expanded={detailPanelCollapsed}
+              source={contentSource}
+              initialTab={initialTab}
             />
             {!detailPanelCollapsed && (
               <DetailPanel articleId={selectedArticleId} />
@@ -197,7 +229,13 @@ export function App() {
         <AddFeedDialog
           open={addFeedDialogOpen}
           onClose={() => setAddFeedDialogOpen(false)}
-          onFeedAdded={handleFeedAdded}
+          onFeedAdded={handleRefresh}
+        />
+
+        <AddUrlDialog
+          open={addUrlDialogOpen}
+          onClose={() => setAddUrlDialogOpen(false)}
+          onArticleSaved={handleRefresh}
         />
 
         <SearchPanel

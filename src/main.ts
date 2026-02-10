@@ -4,6 +4,7 @@ import started from 'electron-squirrel-startup';
 import { getDatabase } from './main/db';
 import { registerAllIpcHandlers } from './main/ipc';
 import { startScheduledFetch } from './main/services/rss-service';
+import { startApiServer, stopApiServer } from './main/services/api-server';
 
 if (started) {
   app.quit();
@@ -37,6 +38,7 @@ app.on('ready', () => {
   getDatabase();
   registerAllIpcHandlers();
   startScheduledFetch(15);
+  startApiServer();
   createWindow();
 });
 
@@ -44,6 +46,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  stopApiServer();
 });
 
 app.on('activate', () => {

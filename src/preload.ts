@@ -24,6 +24,8 @@ const electronAPI: ElectronAPI = {
   articleListDeleted: () => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_LIST_DELETED),
   articleBatchUpdate: (ids, input) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_BATCH_UPDATE, ids, input),
   articleBatchDelete: (ids) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_BATCH_DELETE, ids),
+  articleSaveUrl: (input) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_SAVE_URL, input),
+  articleSaveToLibrary: (id) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_SAVE_TO_LIBRARY, id),
 
   // Highlight
   highlightList: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_LIST, articleId),

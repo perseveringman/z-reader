@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Z-Reader Web Highlighter",
+  "version": "1.0.0",
+  "description": "在任意网页上划线高亮并保存到 Z-Reader",
+  "permissions": ["activeTab", "storage", "contextMenus"],
+  "host_permissions": ["http://localhost:21897/*"],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "css": ["dist/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,12 +1,13 @@
 import { ipcMain } from 'electron';
 import { eq, and, desc, asc, inArray } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
-import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery } from '../../shared/types';
+import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 
 export function registerArticleHandlers() {
-  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED, ARTICLE_BATCH_UPDATE, ARTICLE_BATCH_DELETE } = IPC_CHANNELS;
+  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED, ARTICLE_BATCH_UPDATE, ARTICLE_BATCH_DELETE, ARTICLE_SAVE_URL, ARTICLE_SAVE_TO_LIBRARY } = IPC_CHANNELS;
 
   ipcMain.handle(ARTICLE_LIST, async (_event, query: ArticleListQuery) => {
     const db = getDatabase();
@@ -20,6 +21,9 @@ export function registerArticleHandlers() {
     }
     if (query.isShortlisted) {
       conditions.push(eq(schema.articles.isShortlisted, 1));
+    }
+    if (query.source) {
+      conditions.push(eq(schema.articles.source, query.source));
     }
 
     const sortField = query.sortBy === 'published_at' ? schema.articles.publishedAt : schema.articles.savedAt;
@@ -47,6 +51,7 @@ export function registerArticleHandlers() {
     if (input.readStatus !== undefined) updates.readStatus = input.readStatus;
     if (input.readProgress !== undefined) updates.readProgress = input.readProgress;
     if (input.isShortlisted !== undefined) updates.isShortlisted = input.isShortlisted ? 1 : 0;
+    if (input.source !== undefined) updates.source = input.source;
 
     await db.update(schema.articles).set(updates).where(eq(schema.articles.id, input.id));
     const result = await db.select().from(schema.articles).where(eq(schema.articles.id, input.id));
@@ -143,5 +148,60 @@ export function registerArticleHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.articles).set({ deletedFlg: 1, updatedAt: now }).where(inArray(schema.articles.id, ids));
+  });
+
+  // 手动保存 URL 到 Library
+  ipcMain.handle(ARTICLE_SAVE_URL, async (_event, input: SaveUrlInput) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const id = randomUUID();
+
+    // 使用 parser-service 解析文章内容
+    const parsed = await parseArticleContent(input.url);
+
+    let domain: string | null = null;
+    try {
+      domain = new URL(input.url).hostname;
+    } catch {
+      // invalid URL
+    }
+
+    await db.insert(schema.articles).values({
+      id,
+      feedId: null,
+      guid: null,
+      url: input.url,
+      title: input.title || parsed?.title || null,
+      author: parsed?.author || null,
+      summary: parsed?.excerpt || null,
+      content: parsed?.content || null,
+      contentText: parsed?.contentText || null,
+      thumbnail: parsed?.leadImageUrl || null,
+      wordCount: parsed?.wordCount || 0,
+      readingTime: parsed?.readingTime || 0,
+      publishedAt: null,
+      savedAt: now,
+      readStatus: 'inbox',
+      source: 'library',
+      domain,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
+    return result;
+  });
+
+  // 将 Feed 文章保存到 Library
+  ipcMain.handle(ARTICLE_SAVE_TO_LIBRARY, async (_event, id: string) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    await db.update(schema.articles).set({
+      source: 'library',
+      readStatus: 'inbox',
+      updatedAt: now,
+    }).where(eq(schema.articles.id, id));
+    const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
+    return result;
   });
 }

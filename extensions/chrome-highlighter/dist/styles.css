@@ -1,0 +1,91 @@
+/* Z-Reader Web Highlighter 注入样式 */
+
+/* 高亮文本 */
+.zr-highlight {
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.zr-highlight:hover {
+  opacity: 0.75;
+}
+
+/* 浮动工具栏 */
+#zr-highlight-toolbar {
+  position: absolute;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #1f2937;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+  transform: translateX(-50%);
+  animation: zr-toolbar-fadein 0.12s ease-out;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes zr-toolbar-fadein {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* 工具栏按钮通用 */
+.zr-toolbar-btn {
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease;
+}
+
+.zr-toolbar-btn:hover {
+  transform: scale(1.15);
+}
+
+.zr-toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+/* 颜色按钮 */
+.zr-color-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.3);
+}
+
+.zr-color-btn:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+/* 操作按钮 */
+.zr-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 14px;
+}
+
+.zr-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 分隔线 */
+.zr-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+}

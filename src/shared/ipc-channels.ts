@@ -20,6 +20,8 @@ export const IPC_CHANNELS = {
   ARTICLE_LIST_DELETED: 'article:listDeleted',
   ARTICLE_BATCH_UPDATE: 'article:batchUpdate',
   ARTICLE_BATCH_DELETE: 'article:batchDelete',
+  ARTICLE_SAVE_URL: 'article:saveUrl',
+  ARTICLE_SAVE_TO_LIBRARY: 'article:saveToLibrary',
 
   // Highlight
   HIGHLIGHT_LIST: 'highlight:list',

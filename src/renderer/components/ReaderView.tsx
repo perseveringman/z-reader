@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag, MoreHorizontal, Highlighter } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP } from './ReaderSettings';
@@ -10,19 +10,14 @@ interface ReaderViewProps {
   onClose: () => void;
 }
 
-const HIGHLIGHT_COLORS = [
-  { name: 'yellow', value: '#fbbf24' },
-  { name: 'blue', value: '#3b82f6' },
-  { name: 'green', value: '#22c55e' },
-  { name: 'red', value: '#ef4444' },
-];
-
 const COLOR_BG_MAP: Record<string, string> = {
   yellow: 'rgba(251, 191, 36, 0.25)',
   blue: 'rgba(59, 130, 246, 0.25)',
   green: 'rgba(34, 197, 94, 0.25)',
   red: 'rgba(239, 68, 68, 0.25)',
 };
+
+const HIGHLIGHT_BORDER_COLOR = 'rgba(251, 191, 36, 0.45)';
 
 function formatDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
@@ -37,15 +32,118 @@ function formatDate(dateStr: string | null): string | null {
   }
 }
 
-interface ToolbarPosition {
-  x: number;
-  y: number;
-}
-
 interface TocItem {
   id: string;
   text: string;
   level: number;
+}
+
+// ==================== 高亮引擎工具函数 ====================
+
+function getTextNodes(root: Node): Text[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let n: Node | null;
+  while ((n = walker.nextNode())) nodes.push(n as Text);
+  return nodes;
+}
+
+function rangeToOffsets(root: HTMLElement, range: Range): { startOffset: number; endOffset: number } | null {
+  const nodes = getTextNodes(root);
+  let offset = 0;
+  let startOffset = -1;
+  let endOffset = -1;
+
+  for (const t of nodes) {
+    const len = t.data.length;
+    if (t === range.startContainer) startOffset = offset + range.startOffset;
+    if (t === range.endContainer) endOffset = offset + range.endOffset;
+    offset += len;
+  }
+
+  if (startOffset < 0 || endOffset < 0 || startOffset >= endOffset) return null;
+  return { startOffset, endOffset };
+}
+
+function offsetsToRange(root: HTMLElement, start: number, end: number): Range | null {
+  const nodes = getTextNodes(root);
+  let offset = 0;
+  const range = document.createRange();
+  let setStart = false;
+
+  for (const t of nodes) {
+    const len = t.data.length;
+    const next = offset + len;
+
+    if (!setStart && start >= offset && start <= next) {
+      range.setStart(t, start - offset);
+      setStart = true;
+    }
+    if (setStart && end >= offset && end <= next) {
+      range.setEnd(t, end - offset);
+      return range;
+    }
+
+    offset = next;
+  }
+  return null;
+}
+
+function wrapRangeWithMark(root: HTMLElement, range: Range, hlId: string, color: string) {
+  const textNodesInRange: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    if (range.intersectsNode(t)) textNodesInRange.push(t);
+  }
+
+  const bg = COLOR_BG_MAP[color] ?? COLOR_BG_MAP.yellow;
+
+  for (const t of textNodesInRange) {
+    const start = (t === range.startContainer) ? range.startOffset : 0;
+    const end = (t === range.endContainer) ? range.endOffset : t.data.length;
+    if (end <= start) continue;
+
+    let target = t;
+    if (start > 0) {
+      target = t.splitText(start);
+    }
+    if (end - start < target.data.length) {
+      target.splitText(end - start);
+    }
+
+    const mark = document.createElement('mark');
+    mark.dataset.highlightId = hlId;
+    mark.style.backgroundColor = bg;
+    mark.style.borderTop = `1px solid ${HIGHLIGHT_BORDER_COLOR}`;
+    mark.style.borderBottom = `1px solid ${HIGHLIGHT_BORDER_COLOR}`;
+    mark.style.borderRadius = '2px';
+    mark.style.padding = '2px 0';
+    mark.style.color = 'inherit';
+    mark.style.cursor = 'pointer';
+
+    target.parentNode!.insertBefore(mark, target);
+    mark.appendChild(target);
+  }
+}
+
+function textFallbackSearch(root: HTMLElement, text: string): { startOffset: number; endOffset: number } | null {
+  const fullText = root.textContent ?? '';
+  const idx = fullText.indexOf(text);
+  if (idx === -1) return null;
+  return { startOffset: idx, endOffset: idx + text.length };
+}
+
+// ==================== 工具栏类型 ====================
+
+type ToolbarMode = 'selection' | 'highlight';
+
+interface ToolbarState {
+  mode: ToolbarMode;
+  highlightId?: string;
+  x: number;
+  y: number;
 }
 
 export function ReaderView({ articleId, onClose }: ReaderViewProps) {
@@ -55,33 +153,36 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [parsing, setParsing] = useState(false);
   const [focusedParagraphIndex, setFocusedParagraphIndex] = useState(-1);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [toolbarPos, setToolbarPos] = useState<ToolbarPosition | null>(null);
-  const [selectedText, setSelectedText] = useState('');
+  const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
   const [readerSettings, setReaderSettings] = useState<ReaderSettingsValues>(loadReaderSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
+
   const contentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const originalHtmlRef = useRef<string>('');
+  const highlightsRef = useRef<Highlight[]>([]);
+  const selectionRangeRef = useRef<Range | null>(null);
+
+  highlightsRef.current = highlights;
+
+  // ==================== 加载文章 ====================
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       setLoading(true);
       try {
         const data = await window.electronAPI.articleGet(articleId);
         if (cancelled) return;
         setArticle(data);
-
         if (data?.feedId) {
           const feeds = await window.electronAPI.feedList();
           const feed = feeds.find((f) => f.id === data.feedId);
           if (!cancelled && feed) setFeedName(feed.title);
         }
-
         if (data && !data.content && data.url) {
           setParsing(true);
           const parsed = await window.electronAPI.articleParseContent(articleId);
@@ -96,10 +197,11 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => { cancelled = true; };
   }, [articleId]);
+
+  // ==================== 加载高亮 ====================
 
   useEffect(() => {
     let cancelled = false;
@@ -109,67 +211,78 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     return () => { cancelled = true; };
   }, [articleId]);
 
-  const applyHighlightsToContent = useCallback(() => {
-    if (!contentRef.current || highlights.length === 0) return;
+  // ==================== 保存原始 HTML ====================
 
+  useEffect(() => {
+    if (article?.content) {
+      originalHtmlRef.current = article.content;
+    }
+  }, [article?.content]);
+
+  // ==================== 提取 TOC ====================
+
+  useEffect(() => {
+    if (loading || !article?.content || !contentRef.current) return;
+    const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const items: TocItem[] = Array.from(headings).map((h, i) => {
+      const id = `heading-${i}`;
+      h.id = id;
+      return { id, text: h.textContent?.trim() ?? '', level: parseInt(h.tagName.charAt(1)) };
+    });
+    setTocItems(items);
+  }, [loading, article?.content]);
+
+  // ==================== 高亮渲染引擎 ====================
+
+  const applyHighlights = useCallback(() => {
+    if (!contentRef.current || !originalHtmlRef.current) return;
+
+    // 先清除所有已有的 mark 标签，恢复干净 DOM
     contentRef.current.querySelectorAll('mark[data-highlight-id]').forEach((el) => {
       const parent = el.parentNode;
       if (parent) {
-        parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
         parent.normalize();
       }
     });
 
-    const treeWalker = document.createTreeWalker(contentRef.current, NodeFilter.SHOW_TEXT);
-    const textNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = treeWalker.nextNode())) {
-      textNodes.push(node as Text);
-    }
+    for (const hl of highlightsRef.current) {
+      if (!contentRef.current) break;
 
-    for (const hl of highlights) {
-      if (!hl.text) continue;
-      for (const textNode of textNodes) {
-        const idx = (textNode.textContent ?? '').indexOf(hl.text);
-        if (idx === -1) continue;
+      let range: Range | null = null;
 
-        const range = document.createRange();
-        range.setStart(textNode, idx);
-        range.setEnd(textNode, idx + hl.text.length);
+      if (hl.startOffset != null && hl.endOffset != null) {
+        range = offsetsToRange(contentRef.current, hl.startOffset, hl.endOffset);
+        if (range && hl.text) {
+          const rangeText = range.toString();
+          if (rangeText !== hl.text) {
+            range = null;
+          }
+        }
+      }
 
-        const mark = document.createElement('mark');
-        mark.setAttribute('data-highlight-id', hl.id);
-        mark.style.backgroundColor = COLOR_BG_MAP[hl.color] ?? COLOR_BG_MAP.yellow;
-        mark.style.borderRadius = '2px';
-        mark.style.padding = '1px 0';
-        mark.style.color = 'inherit';
+      if (!range && hl.text) {
+        const fallback = textFallbackSearch(contentRef.current, hl.text);
+        if (fallback) {
+          range = offsetsToRange(contentRef.current, fallback.startOffset, fallback.endOffset);
+        }
+      }
 
-        range.surroundContents(mark);
-        break;
+      if (range) {
+        wrapRangeWithMark(contentRef.current, range, hl.id, hl.color);
       }
     }
-  }, [highlights]);
+  }, []);
 
   useEffect(() => {
-    if (!loading && article?.content) {
-      requestAnimationFrame(applyHighlightsToContent);
+    if (loading || !article?.content) return;
+    requestAnimationFrame(applyHighlights);
+  }, [loading, article?.content, highlights, applyHighlights]);
 
-      // Extract TOC from headings
-      if (contentRef.current) {
-        const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        const items: TocItem[] = Array.from(headings).map((h, i) => {
-          const id = `heading-${i}`;
-          h.id = id;
-          return {
-            id,
-            text: h.textContent?.trim() ?? '',
-            level: parseInt(h.tagName.charAt(1)),
-          };
-        });
-        setTocItems(items);
-      }
-    }
-  }, [loading, article?.content, applyHighlightsToContent]);
+  // ==================== 段落焦点 ====================
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -180,57 +293,128 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     if (focusedParagraphIndex >= 0 && paragraphs[focusedParagraphIndex]) {
       paragraphs[focusedParagraphIndex].scrollIntoView({ block: 'nearest' });
     }
-  }, [focusedParagraphIndex, article]);
+  }, [focusedParagraphIndex]);
 
-  const handleCreateHighlight = useCallback(async (color: string) => {
-    if (!selectedText.trim() || !article) return;
+  // ==================== 选中文字 → 弹出 selection 工具栏 ====================
 
-    const hl = await window.electronAPI.highlightCreate({
-      articleId: article.id,
-      text: selectedText.trim(),
-      color,
-    });
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('mark[data-highlight-id]')) return;
 
-    setHighlights((prev) => [...prev, hl]);
-    setToolbarPos(null);
-    setSelectedText('');
-    window.getSelection()?.removeAllRanges();
-  }, [selectedText, article]);
-
-  const handleMouseUp = useCallback(() => {
     setTimeout(() => {
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || !contentRef.current) {
-        return;
-      }
+      if (!selection || selection.isCollapsed || !contentRef.current) return;
 
       const text = selection.toString().trim();
       if (!text) return;
-
       if (!contentRef.current.contains(selection.anchorNode)) return;
 
       const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const containerRect = scrollContainerRef.current?.getBoundingClientRect();
+      selectionRangeRef.current = range.cloneRange();
 
-      if (containerRect) {
-        setToolbarPos({
-          x: rect.left + rect.width / 2 - containerRect.left,
-          y: rect.top - containerRect.top - 8,
-        });
-      }
-      setSelectedText(text);
+      const rect = range.getBoundingClientRect();
+      setToolbar({
+        mode: 'selection',
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10,
+      });
     }, 10);
   }, []);
+
+  // ==================== 点击已有高亮 → 弹出 highlight 工具栏 ====================
+
+  const handleContentClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const markEl = target.closest('mark[data-highlight-id]') as HTMLElement | null;
+    if (!markEl) return;
+
+    const hlId = markEl.dataset.highlightId;
+    if (!hlId) return;
+
+    e.stopPropagation();
+    const rect = markEl.getBoundingClientRect();
+    setToolbar({
+      mode: 'highlight',
+      highlightId: hlId,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10,
+    });
+  }, []);
+
+  // ==================== 创建高亮 ====================
+
+  const handleCreateHighlight = useCallback(async () => {
+    if (!article || !contentRef.current) return;
+
+    const selection = window.getSelection();
+    const range = selectionRangeRef.current;
+    if (!range) return;
+
+    const text = range.toString().trim();
+    if (!text) return;
+
+    // 在原始 HTML 上计算 offsets（需要先回到干净 DOM）
+    // 由于 applyHighlights 会回滚 DOM，这里在当前 DOM 上可能有 mark 标签
+    // 所以用临时容器计算
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = originalHtmlRef.current;
+    const fallback = textFallbackSearch(tempDiv, text);
+
+    const input: Parameters<typeof window.electronAPI.highlightCreate>[0] = {
+      articleId: article.id,
+      text,
+      color: 'yellow',
+      startOffset: fallback?.startOffset,
+      endOffset: fallback?.endOffset,
+    };
+
+    selection?.removeAllRanges();
+    selectionRangeRef.current = null;
+    setToolbar(null);
+
+    const hl = await window.electronAPI.highlightCreate(input);
+    setHighlights((prev) => [...prev, hl]);
+
+    requestAnimationFrame(() => {
+      if (!contentRef.current) return;
+      const marks = contentRef.current.querySelectorAll(`mark[data-highlight-id="${hl.id}"]`);
+      if (marks.length > 0) {
+        const firstMark = marks[0];
+        const rect = firstMark.getBoundingClientRect();
+        setToolbar({
+          mode: 'highlight',
+          highlightId: hl.id,
+          x: rect.left + rect.width / 2,
+          y: rect.top - 10,
+        });
+      }
+    });
+  }, [article]);
+
+  // ==================== 删除高亮 ====================
+
+  const handleDeleteHighlight = useCallback(async (highlightId: string) => {
+    await window.electronAPI.highlightDelete(highlightId);
+    setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    setToolbar(null);
+  }, []);
+
+  // ==================== 关闭工具栏逻辑 ====================
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
       if (toolbarRef.current?.contains(e.target as Node)) return;
-      setToolbarPos(null);
+      const target = e.target as HTMLElement;
+      if (target.closest('mark[data-highlight-id]')) return;
+
+      setToolbar(null);
+      selectionRangeRef.current = null;
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, []);
+
+  // ==================== 键盘快捷键 ====================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -238,8 +422,10 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA';
 
       if (e.key === 'Escape') {
-        if (toolbarPos) {
-          setToolbarPos(null);
+        if (toolbar) {
+          setToolbar(null);
+          selectionRangeRef.current = null;
+          window.getSelection()?.removeAllRanges();
           return;
         }
         if (inInput) {
@@ -270,7 +456,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       }
 
       if (inInput) return;
-
       if (!contentRef.current) return;
       const total = contentRef.current.querySelectorAll('p').length;
       if (total === 0) return;
@@ -285,13 +470,19 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         e.preventDefault();
         if (focusedParagraphIndex >= 0 && article) {
           const paragraphs = contentRef.current.querySelectorAll('p');
-          const pText = paragraphs[focusedParagraphIndex]?.textContent?.trim();
+          const p = paragraphs[focusedParagraphIndex];
+          const pText = p?.textContent?.trim();
           if (pText) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = originalHtmlRef.current;
+            const offsets = textFallbackSearch(tempDiv, pText);
             window.electronAPI.highlightCreate({
               articleId: article.id,
               text: pText,
               color: 'yellow',
               paragraphIndex: focusedParagraphIndex,
+              startOffset: offsets?.startOffset,
+              endOffset: offsets?.endOffset,
             }).then((hl) => {
               setHighlights((prev) => [...prev, hl]);
             });
@@ -302,10 +493,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbarPos, focusedParagraphIndex, article]);
+  }, [onClose, toolbar, focusedParagraphIndex, article]);
 
   const isLoading = loading || parsing;
-
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
 
   return (
@@ -349,7 +539,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       </div>
 
       {/* Center - Article Content */}
-      <div ref={scrollContainerRef} className="relative flex-1 flex flex-col overflow-hidden">
+      <div className="relative flex-1 flex flex-col overflow-hidden">
         <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626]">
           <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
             <button
@@ -436,36 +626,66 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                   }}
                   dangerouslySetInnerHTML={{ __html: article.content }}
                   onMouseUp={handleMouseUp}
+                  onClick={handleContentClick}
                 />
               ) : (
                 <p className="mt-8 text-gray-500 text-sm">暂无正文内容</p>
               )}
             </div>
           )}
-
-          {toolbarPos && (
-            <div
-              ref={toolbarRef}
-              className="absolute z-50 flex items-center gap-1.5 px-2 py-1.5 bg-[#252525] rounded-lg shadow-xl border border-white/10"
-              style={{
-                left: toolbarPos.x,
-                top: toolbarPos.y,
-                transform: 'translate(-50%, -100%)',
-              }}
-            >
-              {HIGHLIGHT_COLORS.map((c) => (
-                <button
-                  key={c.name}
-                  onClick={() => handleCreateHighlight(c.name)}
-                  className="w-5 h-5 rounded-full transition-transform hover:scale-125 cursor-pointer"
-                  style={{ backgroundColor: c.value }}
-                  title={c.name}
-                />
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* 悬浮工具栏 (fixed 定位，不受滚动影响) */}
+      {toolbar && (
+        <div
+          ref={toolbarRef}
+          className="fixed z-[9999] flex items-center gap-0.5 px-1.5 py-1 bg-[#2a2a2a] rounded-full shadow-xl border border-white/10"
+          style={{
+            left: toolbar.x,
+            top: toolbar.y,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          {toolbar.mode === 'selection' ? (
+            <button
+              onClick={handleCreateHighlight}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500/20 hover:bg-amber-500/30 transition-colors cursor-pointer"
+              title="高亮"
+            >
+              <Highlighter className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => toolbar.highlightId && handleDeleteHighlight(toolbar.highlightId)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#4a3a1a] hover:bg-[#5a4520] transition-colors cursor-pointer"
+                title="删除高亮"
+              >
+                <X className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+              <button
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+                title="添加笔记"
+              >
+                <MessageSquareText className="w-3.5 h-3.5" />
+              </button>
+              <button
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+                title="添加标签"
+              >
+                <Tag className="w-3.5 h-3.5" />
+              </button>
+              <button
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+                title="更多"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Right Sidebar - Info/Notebook/Chat */}
       <div className={`shrink-0 transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>

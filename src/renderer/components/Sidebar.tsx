@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  FileText,
+  Inbox,
+  Clock,
+  Archive,
   Tag,
   Rss,
+  Eye,
+  EyeOff,
   Star,
   Search,
   Settings,
@@ -13,6 +17,7 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  Link,
   Trash2,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
@@ -23,12 +28,14 @@ interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
   onAddFeed: () => void;
+  onAddUrl: () => void;
   onSearch: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
   onManageFeed?: (feed: Feed) => void;
   selectedTagId?: string | null;
   onTagSelect?: (tagId: string | null) => void;
+  refreshTrigger?: number;
 }
 
 interface NavItemProps {
@@ -93,7 +100,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onSearch, selectedFeedId, onFeedSelect, onManageFeed, selectedTagId, onTagSelect }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, selectedFeedId, onFeedSelect, onManageFeed, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -125,7 +132,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       }
     };
     loadFeeds();
-  }, []);
+  }, [refreshTrigger]);
 
   // 加载 Tags
   useEffect(() => {
@@ -149,7 +156,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       className={`
         flex flex-col h-full border-r border-white/5 bg-[#111111]
         transition-all duration-200 shrink-0
-        ${collapsed ? 'w-[52px]' : 'w-[220px]'}
+        ${collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[220px]'}
       `}
     >
       {/* 顶部区域 - macOS 红绿灯空间 */}
@@ -159,9 +166,16 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         )}
         <div className="flex items-center gap-1 no-drag">
           <button
+            onClick={onAddUrl}
+            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title="Save URL to Library"
+          >
+            <Link size={16} />
+          </button>
+          <button
             onClick={onAddFeed}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="添加 RSS 订阅"
+            title="Add RSS Feed"
           >
             <Plus size={16} />
           </button>
@@ -176,6 +190,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
 
       {/* 导航区域 */}
       <nav className="flex-1 overflow-y-auto px-2 mt-1">
+        {/* ===== Library Section ===== */}
         <SectionLabel
           label="Library"
           collapsed={collapsed}
@@ -185,11 +200,25 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         {(collapsed || sections.library) && (
           <>
             <NavItem
-              icon={<FileText size={iconSize} />}
-              label="Articles"
-              active={activeView === 'articles'}
+              icon={<Inbox size={iconSize} />}
+              label="Inbox"
+              active={activeView === 'library-inbox'}
               collapsed={collapsed}
-              onClick={() => onViewChange('articles')}
+              onClick={() => onViewChange('library-inbox')}
+            />
+            <NavItem
+              icon={<Clock size={iconSize} />}
+              label="Later"
+              active={activeView === 'library-later'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-later')}
+            />
+            <NavItem
+              icon={<Archive size={iconSize} />}
+              label="Archive"
+              active={activeView === 'library-archive'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-archive')}
             />
             <NavItem
               icon={<Tag size={iconSize} />}
@@ -231,6 +260,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           </>
         )}
 
+        {/* ===== Feed Section ===== */}
         <SectionLabel
           label="Feed"
           collapsed={collapsed}
@@ -239,6 +269,20 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         />
         {(collapsed || sections.feed) && (
           <>
+            <NavItem
+              icon={<EyeOff size={iconSize} />}
+              label="Unseen"
+              active={activeView === 'feed-unseen'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('feed-unseen')}
+            />
+            <NavItem
+              icon={<Eye size={iconSize} />}
+              label="Seen"
+              active={activeView === 'feed-seen'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('feed-seen')}
+            />
             <NavItem
               icon={<Rss size={iconSize} />}
               label="All Feeds"
@@ -291,7 +335,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                             onManageFeed(feed);
                           }}
                           className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-all cursor-pointer"
-                          title="管理 Feed"
+                          title="Manage Feed"
                         >
                           <Settings2 size={12} />
                         </span>
@@ -304,6 +348,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           </>
         )}
 
+        {/* ===== Pinned Section ===== */}
         <SectionLabel
           label="Pinned"
           collapsed={collapsed}
