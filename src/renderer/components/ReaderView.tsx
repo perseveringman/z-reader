@@ -67,6 +67,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
   const [readProgress, setReadProgress] = useState(0);
+  const [forceTab, setForceTab] = useState<{ tab: 'notebook'; ts: number } | undefined>();
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -222,13 +223,29 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     }
   }, []);
 
-  // 每次 React 渲染后重新应用高亮到 DOM
-  // （因为 dangerouslySetInnerHTML 会在重渲染时重置 DOM，丢失手动添加的 <mark> 标签）
+  // 手动管理内容 DOM：只在 article.content 变化时设置 innerHTML 并应用高亮
+  // 这样 toolbar、focusedParagraphIndex 等 state 变化不会重置内容 DOM，高亮自然保留
   useEffect(() => {
-    if (loading || !article?.content) return;
+    if (loading || !article?.content || !contentRef.current) return;
+    contentRef.current.innerHTML = article.content;
+    applyHighlights();
+  }, [loading, article?.content, applyHighlights]);
+
+  // highlights 列表变化时（新增/删除高亮），重新应用到当前 DOM
+  useEffect(() => {
+    if (loading || !article?.content || !contentRef.current) return;
     if (highlightsRef.current.length === 0) return;
-    requestAnimationFrame(applyHighlights);
-  }, [loading, article?.content, highlights, applyHighlights, toolbar, focusedParagraphIndex]);
+    // 先清除所有已有 mark 标签，再全量重新应用
+    contentRef.current.querySelectorAll('mark[data-highlight-id]').forEach((el) => {
+      const parent = el.parentNode;
+      if (parent) {
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+        parent.normalize();
+      }
+    });
+    applyHighlights();
+  }, [highlights, loading, article?.content, applyHighlights]);
 
   // ==================== 段落焦点 ====================
 
@@ -321,6 +338,20 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       }
     }
 
+    // 去重：相同位置或相同文本的高亮不重复创建
+    const isDuplicate = highlightsRef.current.some((hl) => {
+      if (anchorPath && hl.anchorPath === anchorPath
+        && startOffset != null && hl.startOffset === startOffset
+        && endOffset != null && hl.endOffset === endOffset) {
+        return true;
+      }
+      if (hl.text === text && hl.anchorPath === anchorPath) {
+        return true;
+      }
+      return false;
+    });
+    if (isDuplicate) return;
+
     // 先在当前 DOM 上 wrap（在 range 失效之前）
     const tempId = `pending-${Date.now()}`;
     wrapRangeWithMark(contentRef.current, range, tempId, 'yellow');
@@ -334,6 +365,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       endOffset,
     });
     setHighlights((prev) => [...prev, hl]);
+    setForceTab({ tab: 'notebook', ts: Date.now() });
 
     // 替换临时 id 为真实 id
     contentRef.current.querySelectorAll(`mark[data-highlight-id="${tempId}"]`).forEach((el) => {
@@ -458,10 +490,19 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           return;
         }
 
-        // 否则：高亮聚焦段落
+        // 否则：切换聚焦段落的高亮（已高亮则删除，未高亮则创建）
         if (focusedParagraphIndex >= 0) {
           const block = blocks[focusedParagraphIndex] as HTMLElement;
           if (block) {
+            // 检查该段落内是否存在高亮
+            const existingMark = block.querySelector('mark[data-highlight-id]') as HTMLElement | null;
+            if (existingMark) {
+              const hlId = existingMark.dataset.highlightId;
+              if (hlId) {
+                handleDeleteHighlight(hlId);
+                return;
+              }
+            }
             const range = document.createRange();
             range.selectNodeContents(block);
             createHighlightFromRange(range);
@@ -472,7 +513,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbar, focusedParagraphIndex, article, createHighlightFromRange]);
+  }, [onClose, toolbar, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight]);
 
   const isLoading = loading || parsing;
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
@@ -611,7 +652,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                     fontSize: `${readerSettings.fontSize}px`,
                     lineHeight: readerSettings.lineHeight,
                   }}
-                  dangerouslySetInnerHTML={{ __html: article.content }}
                   onMouseUp={handleMouseUp}
                 />
               ) : (
@@ -674,8 +714,14 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       )}
 
       {/* Right Sidebar - Info/Notebook/Chat */}
-      <div className={`shrink-0 transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
-        <ReaderDetailPanel articleId={articleId} />
+      <div className={`shrink-0 h-full transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
+        <ReaderDetailPanel
+          articleId={articleId}
+          highlights={highlights}
+          onHighlightsChange={setHighlights}
+          onDeleteHighlight={handleDeleteHighlight}
+          forceTab={forceTab}
+        />
       </div>
     </div>
   );

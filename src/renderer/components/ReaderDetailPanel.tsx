@@ -6,13 +6,12 @@ type DetailTab = 'info' | 'notebook' | 'chat';
 
 interface ReaderDetailPanelProps {
   articleId: string;
+  highlights: Highlight[];
+  onHighlightsChange: (highlights: Highlight[]) => void;
+  onDeleteHighlight: (id: string) => void;
+  /** 外部指定切换到的 tab，变化时触发切换 */
+  forceTab?: { tab: DetailTab; ts: number };
 }
-
-const TABS: { key: DetailTab; label: string }[] = [
-  { key: 'info', label: 'Info' },
-  { key: 'notebook', label: 'Notebook' },
-  { key: 'chat', label: 'Chat' },
-];
 
 interface MetaRow {
   label: string;
@@ -52,13 +51,17 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
+export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, forceTab }: ReaderDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
+
+  // 外部触发 tab 切换
+  useEffect(() => {
+    if (forceTab) setActiveTab(forceTab.tab);
+  }, [forceTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,29 +79,21 @@ export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
       }
     });
 
-    window.electronAPI.highlightList(articleId).then((list) => {
-      if (!cancelled) setHighlights(list);
-    });
-
     return () => { cancelled = true; };
   }, [articleId]);
 
   const handleDeleteHighlight = useCallback(async (id: string) => {
-    await window.electronAPI.highlightDelete(id);
-    setHighlights((prev) => prev.filter((h) => h.id !== id));
-  }, []);
+    onDeleteHighlight(id);
+  }, [onDeleteHighlight]);
 
   const handleSaveNote = useCallback(async (hlId: string, note: string) => {
     const updated = await window.electronAPI.highlightUpdate({ id: hlId, note });
-    setHighlights((prev) => prev.map((h) => h.id === hlId ? updated : h));
+    onHighlightsChange(highlights.map((h) => h.id === hlId ? updated : h));
     setEditingNoteId(null);
-  }, []);
+  }, [highlights, onHighlightsChange]);
 
   const handleExport = useCallback(async (mode: 'clipboard' | 'file') => {
-    const result = await window.electronAPI.highlightExport(articleId, mode);
-    if (result === 'clipboard') {
-      // Could show toast but this panel doesn't have access to showToast
-    }
+    await window.electronAPI.highlightExport(articleId, mode);
   }, [articleId]);
 
   const metaRows: MetaRow[] = article
@@ -114,15 +109,19 @@ export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
     : [];
 
   return (
-    <div className="w-[280px] shrink-0 flex flex-col border-l border-[#262626] bg-[#141414]">
+    <div className="w-[280px] shrink-0 flex flex-col h-full min-h-0 border-l border-[#262626] bg-[#141414]">
       {/* Tab 切换 */}
       <div className="shrink-0 flex gap-2 px-4 pt-3 pb-2 border-b border-[#262626]">
-        {TABS.map((tab) => (
+        {[
+          { key: 'info' as DetailTab, label: 'Info' },
+          { key: 'notebook' as DetailTab, label: 'Notebook', count: highlights.length },
+          { key: 'chat' as DetailTab, label: 'Chat' },
+        ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`
-              px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer
+              px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1
               ${activeTab === tab.key
                 ? 'text-white bg-white/10'
                 : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
@@ -130,12 +129,15 @@ export function ReaderDetailPanel({ articleId }: ReaderDetailPanelProps) {
             `}
           >
             {tab.label}
+            {tab.count != null && tab.count > 0 && (
+              <span className="text-[10px] text-gray-500">{tab.count}</span>
+            )}
           </button>
         ))}
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             加载中…
