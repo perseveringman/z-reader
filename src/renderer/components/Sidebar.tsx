@@ -51,7 +51,7 @@ function NavItem({ icon, label, active, collapsed, count, onClick }: NavItemProp
       onClick={onClick}
       className={`
         relative flex items-center gap-3 w-full px-3 py-2 rounded-md text-[13px]
-        transition-colors duration-150 cursor-pointer
+        transition-colors duration-150 cursor-pointer outline-none
         ${active
           ? 'text-white bg-white/[0.08]'
           : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
@@ -90,7 +90,7 @@ function SectionLabel({
   return (
     <button
       onClick={onToggle}
-      className="flex items-center gap-1.5 w-full px-3 pt-5 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-gray-500 hover:text-gray-400 transition-colors cursor-pointer"
+      className="flex items-center gap-1.5 w-full px-3 pt-5 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-gray-500 hover:text-gray-400 transition-colors cursor-pointer outline-none"
     >
       {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       <span>{label}</span>
@@ -240,7 +240,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                 }}
                 className={`
                   relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
-                  transition-colors duration-150 cursor-pointer ml-3
+                  transition-colors duration-150 cursor-pointer outline-none ml-3
                   ${selectedTagId === tag.id
                     ? 'text-white bg-white/[0.08]'
                     : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
@@ -293,7 +293,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                   onClick={() => onFeedSelect(feed.id)}
                   className={`
                     group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
-                    transition-colors duration-150 cursor-pointer
+                    transition-colors duration-150 cursor-pointer outline-none
                     ${selectedFeedId === feed.id
                       ? 'text-white bg-white/[0.08]'
                       : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'

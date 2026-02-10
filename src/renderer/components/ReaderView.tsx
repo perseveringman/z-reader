@@ -159,12 +159,16 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
+  const [readProgress, setReadProgress] = useState(0);
 
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const originalHtmlRef = useRef<string>('');
   const highlightsRef = useRef<Highlight[]>([]);
   const selectionRangeRef = useRef<Range | null>(null);
+  const readProgressRef = useRef(0);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   highlightsRef.current = highlights;
 
@@ -178,6 +182,10 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         const data = await window.electronAPI.articleGet(articleId);
         if (cancelled) return;
         setArticle(data);
+        if (data) {
+          setReadProgress(data.readProgress ?? 0);
+          readProgressRef.current = data.readProgress ?? 0;
+        }
         if (data?.feedId) {
           const feeds = await window.electronAPI.feedList();
           const feed = feeds.find((f) => f.id === data.feedId);
@@ -210,6 +218,44 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     });
     return () => { cancelled = true; };
   }, [articleId]);
+
+  // ==================== 阅读进度追踪 ====================
+
+  const flushProgress = useCallback(() => {
+    if (readProgressRef.current > 0) {
+      window.electronAPI.articleUpdate({ id: articleId, readProgress: readProgressRef.current });
+    }
+  }, [articleId]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const maxScroll = scrollHeight - clientHeight;
+      if (maxScroll <= 0) return;
+      const progress = Math.min(scrollTop / maxScroll, 1);
+      // 只允许进度前进
+      const next = Math.max(progress, readProgressRef.current);
+      readProgressRef.current = next;
+      setReadProgress(next);
+
+      // debounce 写入数据库
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        flushProgress();
+      }, 1000);
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      // 卸载时 flush
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      flushProgress();
+    };
+  }, [flushProgress]);
 
   // ==================== 保存原始 HTML ====================
 
@@ -590,7 +636,15 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           onSettingsChange={setReaderSettings}
         />
 
-        <div className="flex-1 overflow-y-auto">
+        {/* 阅读进度条 */}
+        <div className="shrink-0 h-[2px] bg-white/5">
+          <div
+            className="h-full bg-blue-500 transition-[width] duration-300"
+            style={{ width: `${Math.round(readProgress * 100)}%` }}
+          />
+        </div>
+
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />

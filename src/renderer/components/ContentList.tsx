@@ -6,6 +6,7 @@ import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { ContextMenu, type ContextMenuEntry } from './ContextMenu';
 
+type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all';
 type SortBy = 'saved_at' | 'published_at';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'default' | 'compact';
@@ -24,15 +25,16 @@ interface ContentListProps {
   initialTab?: string;
 }
 
-const LIBRARY_TABS: { key: ReadStatusType; label: string }[] = [
+const LIBRARY_TABS: { key: TabKey; label: string }[] = [
   { key: 'inbox', label: 'INBOX' },
   { key: 'later', label: 'LATER' },
   { key: 'archive', label: 'ARCHIVE' },
 ];
 
-const FEED_TABS: { key: ReadStatusType; label: string }[] = [
+const FEED_TABS: { key: TabKey; label: string }[] = [
   { key: 'unseen', label: 'UNSEEN' },
   { key: 'seen', label: 'SEEN' },
+  { key: 'all', label: 'ALL' },
 ];
 
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
@@ -41,7 +43,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
 ];
 
 export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab }: ContentListProps) {
-  const [activeTab, setActiveTab] = useState<ReadStatusType>(initialTab as ReadStatusType || 'inbox');
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab as TabKey || 'inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -68,7 +70,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   // Sync activeTab when initialTab changes (sidebar navigation)
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab as ReadStatusType);
+      setActiveTab(initialTab as TabKey);
     }
   }, [initialTab]);
 
@@ -99,11 +101,12 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
         // Tab-based readStatus filter
         if (!isShortlisted) {
-          if (isFeedView) {
-            // For feed: map 'unseen'/'seen' or use activeTab
-            query.readStatus = activeTab as ReadStatusType;
-          } else if (isLibraryView) {
-            query.readStatus = activeTab as ReadStatusType;
+          if (activeTab !== 'all') {
+            if (isFeedView) {
+              query.readStatus = activeTab as ReadStatusType;
+            } else if (isLibraryView) {
+              query.readStatus = activeTab as ReadStatusType;
+            }
           }
         }
 
@@ -220,24 +223,25 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     }
   };
 
-  // Auto-mark feed articles as "seen" on hover
-  const handleArticleHover = useCallback(async (id: string) => {
+  const handleArticleHover = useCallback((id: string) => {
     onSelectArticle(id);
-    if (isFeedView) {
-      const article = articles.find(a => a.id === id);
-      if (article && article.readStatus === 'unseen') {
-        // Optimistic local update to avoid flicker
-        setArticles(prev => prev.map(a =>
-          a.id === id ? { ...a, readStatus: 'seen' as const } : a
-        ));
-        try {
-          await window.electronAPI.articleUpdate({ id, readStatus: 'seen' });
-        } catch (err) {
-          console.error('Failed to mark as seen:', err);
-        }
+  }, [onSelectArticle]);
+
+  // 点击进入文章时自动标记 feed 文章为 seen
+  const markAsSeen = useCallback(async (id: string) => {
+    if (!isFeedView) return;
+    const article = articles.find(a => a.id === id);
+    if (article && article.readStatus === 'unseen') {
+      setArticles(prev => prev.map(a =>
+        a.id === id ? { ...a, readStatus: 'seen' as const } : a
+      ));
+      try {
+        await window.electronAPI.articleUpdate({ id, readStatus: 'seen' });
+      } catch (err) {
+        console.error('Failed to mark as seen:', err);
       }
     }
-  }, [onSelectArticle, isFeedView, articles]);
+  }, [isFeedView, articles]);
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));

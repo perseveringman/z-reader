@@ -44,6 +44,7 @@ export function App() {
     : activeView === 'library-archive' ? 'archive'
     : activeView === 'feed-unseen' ? 'unseen'
     : activeView === 'feed-seen' ? 'seen'
+    : activeView === 'feeds' ? 'unseen'
     : undefined;
 
   useEffect(() => {
