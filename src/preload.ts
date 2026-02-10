@@ -11,6 +11,8 @@ const electronAPI: ElectronAPI = {
   feedFetch: (id) => ipcRenderer.invoke(IPC_CHANNELS.FEED_FETCH, id),
   feedFetchAll: () => ipcRenderer.invoke(IPC_CHANNELS.FEED_FETCH_ALL),
   feedImportOpml: () => ipcRenderer.invoke(IPC_CHANNELS.FEED_IMPORT_OPML),
+  feedTogglePin: (id) => ipcRenderer.invoke(IPC_CHANNELS.FEED_TOGGLE_PIN, id),
+  feedArticleCount: () => ipcRenderer.invoke(IPC_CHANNELS.FEED_ARTICLE_COUNT),
 
   // Article
   articleList: (query) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_LIST, query),

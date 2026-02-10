@@ -7,6 +7,7 @@ type DetailTab = 'info' | 'notebook' | 'chat';
 
 interface DetailPanelProps {
   articleId: string | null;
+  collapsed?: boolean;
 }
 
 const TABS: { key: DetailTab; label: string }[] = [
@@ -53,7 +54,7 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function DetailPanel({ articleId }: DetailPanelProps) {
+export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,7 +128,12 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-[320px] bg-[#0f0f0f]">
+    <div className={`
+      flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+      transition-[width] duration-200 overflow-hidden
+      ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
+    `}>
+      <div className="min-w-[360px]">
       {/* Tab 切换 */}
       <div className="shrink-0 flex gap-1 px-4 pt-3 border-b border-white/5">
         {TABS.map((tab) => (
@@ -143,6 +149,9 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
             `}
           >
             {tab.label}
+            {tab.key === 'notebook' && (
+              <span className="ml-1 min-w-[1em] text-center text-[10px] text-gray-500 tabular-nums inline-block">{highlights.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -328,6 +337,7 @@ export function DetailPanel({ articleId }: DetailPanelProps) {
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );

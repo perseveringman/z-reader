@@ -7,6 +7,8 @@ export const IPC_CHANNELS = {
   FEED_FETCH: 'feed:fetch',
   FEED_FETCH_ALL: 'feed:fetchAll',
   FEED_IMPORT_OPML: 'feed:importOpml',
+  FEED_TOGGLE_PIN: 'feed:togglePin',
+  FEED_ARTICLE_COUNT: 'feed:articleCount',
 
   // Article
   ARTICLE_LIST: 'article:list',

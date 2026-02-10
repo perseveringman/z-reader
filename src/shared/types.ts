@@ -9,8 +9,15 @@ export interface Feed {
   fetchInterval: number;
   lastFetchedAt: string | null;
   errorCount: number;
+  pinned: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FeedArticleCount {
+  feedId: string;
+  total: number;
+  unseen: number;
 }
 
 export interface CreateFeedInput {
@@ -135,6 +142,8 @@ export interface ElectronAPI {
   feedFetch: (id: string) => Promise<void>;
   feedFetchAll: () => Promise<void>;
   feedImportOpml: () => Promise<Feed[]>;
+  feedTogglePin: (id: string) => Promise<Feed>;
+  feedArticleCount: () => Promise<FeedArticleCount[]>;
 
   // Article 操作
   articleList: (query: ArticleListQuery) => Promise<Article[]>;

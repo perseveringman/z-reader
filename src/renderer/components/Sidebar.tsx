@@ -5,12 +5,9 @@ import {
   Archive,
   Tag,
   Rss,
-  Eye,
-  EyeOff,
   Star,
   Search,
   Settings,
-  Settings2,
   PanelLeftClose,
   PanelLeft,
   User,
@@ -19,6 +16,8 @@ import {
   Plus,
   Link,
   Trash2,
+  ArrowRight,
+  Pin,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -32,7 +31,6 @@ interface SidebarProps {
   onSearch: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
-  onManageFeed?: (feed: Feed) => void;
   selectedTagId?: string | null;
   onTagSelect?: (tagId: string | null) => void;
   refreshTrigger?: number;
@@ -100,7 +98,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, selectedFeedId, onFeedSelect, onManageFeed, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -155,16 +153,17 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
     <aside
       className={`
         flex flex-col h-full border-r border-white/5 bg-[#111111]
-        transition-all duration-200 shrink-0
-        ${collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[220px]'}
+        transition-[width] duration-200 shrink-0 overflow-hidden
+        ${collapsed ? 'w-0 border-r-0' : 'w-[220px]'}
       `}
     >
-      {/* 顶部区域 - macOS 红绿灯空间 */}
-      <div className="h-10 flex items-center justify-between px-3 drag-region shrink-0">
+      <div className={`flex flex-col h-full min-w-[220px] ${collapsed ? 'opacity-0' : 'opacity-100'}`}>
+      {/* 顶部工具栏 */}
+      <div className="flex items-center justify-between px-3 py-1.5 shrink-0">
         {!collapsed && (
-          <span className="text-xs font-medium text-gray-500 tracking-tight pl-16">Z-Reader</span>
+          <span className="text-xs font-medium text-gray-500 tracking-tight">Z-Reader</span>
         )}
-        <div className="flex items-center gap-1 no-drag">
+        <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={onAddUrl}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
@@ -270,20 +269,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         {(collapsed || sections.feed) && (
           <>
             <NavItem
-              icon={<EyeOff size={iconSize} />}
-              label="Unseen"
-              active={activeView === 'feed-unseen'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('feed-unseen')}
-            />
-            <NavItem
-              icon={<Eye size={iconSize} />}
-              label="Seen"
-              active={activeView === 'feed-seen'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('feed-seen')}
-            />
-            <NavItem
               icon={<Rss size={iconSize} />}
               label="All Feeds"
               active={activeView === 'feeds' && selectedFeedId === null}
@@ -293,58 +278,45 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                 onFeedSelect(null);
               }}
             />
-            {/* Feed 列表 - 按分类展示 */}
-            {!collapsed && Object.keys(feedCategories).map((category) => (
-              <div key={category} className="mt-2">
-                <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600">
-                  {category}
+            {/* Pinned feeds */}
+            {!collapsed && Object.values(feedCategories).flat().filter(f => f.pinned).map((feed) => {
+              const displayIcon = feed.favicon ? (
+                <img src={feed.favicon} alt="" className="w-4 h-4 rounded" />
+              ) : (
+                <div className="w-4 h-4 rounded bg-gray-700 flex items-center justify-center text-[10px] text-gray-400">
+                  {feed.title?.charAt(0).toUpperCase() || 'F'}
                 </div>
-                {feedCategories[category].map((feed) => {
-                  // 获取 favicon 或首字母
-                  const displayIcon = feed.favicon ? (
-                    <img src={feed.favicon} alt="" className="w-4 h-4 rounded" />
-                  ) : (
-                    <div className="w-4 h-4 rounded bg-gray-700 flex items-center justify-center text-[10px] text-gray-400">
-                      {feed.title?.charAt(0).toUpperCase() || 'F'}
-                    </div>
-                  );
-
-                  return (
-                    <button
-                      key={feed.id}
-                      onClick={() => onFeedSelect(feed.id)}
-                      className={`
-                        group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
-                        transition-colors duration-150 cursor-pointer
-                        ${selectedFeedId === feed.id
-                          ? 'text-white bg-white/[0.08]'
-                          : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-                        }
-                      `}
-                      title={feed.title || feed.url}
-                    >
-                      {selectedFeedId === feed.id && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-500" />
-                      )}
-                      <span className="shrink-0">{displayIcon}</span>
-                      <span className="flex-1 text-left truncate">{feed.title || feed.url}</span>
-                      {onManageFeed && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onManageFeed(feed);
-                          }}
-                          className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-all cursor-pointer"
-                          title="Manage Feed"
-                        >
-                          <Settings2 size={12} />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+              );
+              return (
+                <button
+                  key={`pin-${feed.id}`}
+                  onClick={() => onFeedSelect(feed.id)}
+                  className={`
+                    group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
+                    transition-colors duration-150 cursor-pointer
+                    ${selectedFeedId === feed.id
+                      ? 'text-white bg-white/[0.08]'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                    }
+                  `}
+                  title={feed.title || feed.url}
+                >
+                  {selectedFeedId === feed.id && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-500" />
+                  )}
+                  <Pin size={10} className="shrink-0 text-blue-400/60" />
+                  <span className="shrink-0">{displayIcon}</span>
+                  <span className="flex-1 text-left truncate">{feed.title || feed.url}</span>
+                </button>
+              );
+            })}
+            <NavItem
+              icon={<ArrowRight size={iconSize} />}
+              label="Manage feeds"
+              active={activeView === 'manage-feeds'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('manage-feeds')}
+            />
           </>
         )}
 
@@ -393,6 +365,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           label="Profile"
           collapsed={collapsed}
         />
+      </div>
       </div>
     </aside>
   );

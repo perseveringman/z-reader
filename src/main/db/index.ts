@@ -163,6 +163,13 @@ function initTables(sqlite: Database.Database) {
     // Column already exists — no-op
   }
   sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source)`);
+
+  // Migration: add pinned column to feeds for sidebar pinning
+  try {
+    sqlite.exec(`ALTER TABLE feeds ADD COLUMN pinned INTEGER DEFAULT 0`);
+  } catch {
+    // Column already exists — no-op
+  }
 }
 
 export { schema };

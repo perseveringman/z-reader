@@ -10,6 +10,8 @@ import { AddUrlDialog } from './components/AddUrlDialog';
 import { SearchPanel } from './components/SearchPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { FeedManageDialog } from './components/FeedManageDialog';
+import { FeedManager } from './components/FeedManager';
+import { FeedDetailPanel } from './components/FeedDetailPanel';
 import type { Feed, ArticleSource } from '../shared/types';
 
 export function App() {
@@ -27,6 +29,7 @@ export function App() {
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [managingFeed, setManagingFeed] = useState<Feed | null>(null);
+  const [manageFeedSelectedId, setManageFeedSelectedId] = useState<string | null>(null);
   const [detailPanelCollapsed, setDetailPanelCollapsed] = useState(() => localStorage.getItem('detail-panel-collapsed') === 'true');
 
   // Derive source and sub-view from activeView
@@ -154,7 +157,7 @@ export function App() {
       setRefreshTrigger((prev) => prev + 1);
       if (selectedFeedId === feedId) {
         setSelectedFeedId(null);
-        setActiveView('feed-unseen');
+        setActiveView('feeds');
       }
     } catch (err) {
       console.error('Failed to delete feed:', err);
@@ -172,9 +175,11 @@ export function App() {
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
+      <div className="flex flex-col h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
+        {/* macOS title bar drag region */}
+        <div className="h-[38px] shrink-0 drag-region flex items-center" />
         {!readerMode ? (
-          <>
+          <div className="flex flex-1 min-h-0">
             <Sidebar
               collapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -188,7 +193,6 @@ export function App() {
                 setSelectedFeedId(feedId);
                 setActiveView('feeds');
               }}
-              onManageFeed={setManagingFeed}
               refreshTrigger={refreshTrigger}
               selectedTagId={selectedTagId}
               onTagSelect={(tagId) => {
@@ -196,28 +200,55 @@ export function App() {
                 if (tagId) setActiveView('tags');
               }}
             />
-            <ContentList
-              selectedArticleId={selectedArticleId}
-              onSelectArticle={setSelectedArticleId}
-              onOpenReader={handleOpenReader}
-              refreshTrigger={refreshTrigger}
-              feedId={activeView === 'feeds' ? selectedFeedId : undefined}
-              isShortlisted={activeView === 'shortlist'}
-              activeView={activeView}
-              tagId={activeView === 'tags' ? selectedTagId : undefined}
-              expanded={detailPanelCollapsed}
-              source={contentSource}
-              initialTab={initialTab}
-            />
-            {!detailPanelCollapsed && (
-              <DetailPanel articleId={selectedArticleId} />
+            {activeView === 'manage-feeds' ? (
+              <>
+                <FeedManager
+                  onSelectFeed={setManageFeedSelectedId}
+                  selectedFeedId={manageFeedSelectedId}
+                  onEditFeed={setManagingFeed}
+                  onAddFeed={() => setAddFeedDialogOpen(true)}
+                  refreshTrigger={refreshTrigger}
+                  onDeleteFeed={handleDeleteFeed}
+                />
+                <FeedDetailPanel
+                  feedId={manageFeedSelectedId}
+                  onEditFeed={setManagingFeed}
+                  onDeleteFeed={handleDeleteFeed}
+                  onFetchFeed={handleFetchFeed}
+                  onOpenArticle={(id) => {
+                    setSelectedArticleId(id);
+                    setActiveView('feeds');
+                  }}
+                  refreshTrigger={refreshTrigger}
+                  collapsed={detailPanelCollapsed}
+                />
+              </>
+            ) : (
+              <>
+                <ContentList
+                  selectedArticleId={selectedArticleId}
+                  onSelectArticle={setSelectedArticleId}
+                  onOpenReader={handleOpenReader}
+                  refreshTrigger={refreshTrigger}
+                  feedId={activeView === 'feeds' ? selectedFeedId : undefined}
+                  isShortlisted={activeView === 'shortlist'}
+                  activeView={activeView}
+                  tagId={activeView === 'tags' ? selectedTagId : undefined}
+                  expanded={detailPanelCollapsed}
+                  source={contentSource}
+                  initialTab={initialTab}
+                />
+                <DetailPanel articleId={selectedArticleId} collapsed={detailPanelCollapsed} />
+              </>
             )}
-          </>
+          </div>
         ) : (
-          <ReaderView
-            articleId={readerArticleId!}
-            onClose={handleCloseReader}
-          />
+          <div className="flex-1 min-h-0">
+            <ReaderView
+              articleId={readerArticleId!}
+              onClose={handleCloseReader}
+            />
+          </div>
         )}
 
         <CommandPalette

@@ -16,6 +16,7 @@ export const feeds = sqliteTable('feeds', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
+  pinned: integer('pinned').default(0),
 });
 
 // ==================== articles 表 ====================

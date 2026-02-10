@@ -78,9 +78,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       if (isTrash) {
         const result = await window.electronAPI.articleListDeleted();
         setArticles(result);
-      } else if (tagId) {
-        const result = await window.electronAPI.articleListByTag(tagId);
-        setArticles(result);
+      } else if (activeView === 'tags') {
+        if (tagId) {
+          const result = await window.electronAPI.articleListByTag(tagId);
+          setArticles(result);
+        } else {
+          setArticles([]);
+        }
       } else {
         const query: ArticleListQuery = {
           sortBy,
@@ -122,7 +126,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView, activeView]);
 
   useEffect(() => {
     fetchArticles();
@@ -419,6 +423,8 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     if (isTrash) return 'Trash is empty';
     if (isShortlisted) return 'No shortlisted articles';
     if (isFeedView) return activeTab === 'unseen' ? 'No unseen articles' : 'No seen articles';
+    if (activeView === 'tags' && !tagId) return '请从左侧选择一个标签查看文章';
+    if (activeView === 'tags' && tagId) return '该标签下暂无文章';
     if (isLibraryView) return 'No articles — save a URL or promote from Feed';
     return 'No articles found';
   };
@@ -528,7 +534,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   }, [selectedArticleId]);
 
   return (
-    <div className={`flex flex-col min-w-[300px] border-r border-[#262626] bg-[#141414] h-full ${expanded ? 'flex-1' : 'w-[380px]'}`}>
+    <div className={`flex flex-col min-w-[300px] border-r border-[#262626] bg-[#141414] h-full flex-1`}>
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">
