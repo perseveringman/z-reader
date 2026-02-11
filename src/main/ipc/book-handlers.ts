@@ -6,6 +6,7 @@ import { join, basename, extname } from 'node:path';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type { BookListQuery, UpdateBookInput } from '../../shared/types';
+import { extractEpubMetadata } from '../services/epub-metadata';
 
 export function registerBookHandlers() {
   const { BOOK_LIST, BOOK_GET, BOOK_IMPORT, BOOK_DELETE, BOOK_UPDATE, BOOK_GET_CONTENT, BOOK_PERMANENT_DELETE, BOOK_RESTORE } = IPC_CHANNELS;
@@ -63,26 +64,46 @@ export function registerBookHandlers() {
       const id = randomUUID();
       const fileName = basename(srcPath);
       const ext = extname(fileName).toLowerCase();
-      const title = basename(fileName, ext);
+      const fallbackTitle = basename(fileName, ext);
       const destPath = join(booksDir, `${id}${ext}`);
+      const isEpub = ext === '.epub';
 
-      // 复制文件到应用数据目录
       await copyFile(srcPath, destPath);
 
-      // 获取文件大小
       const fileStat = await stat(destPath);
+
+      let title: string | null = fallbackTitle;
+      let author: string | null = null;
+      let cover: string | null = null;
+      let language: string | null = null;
+      let publisher: string | null = null;
+      let description: string | null = null;
+
+      if (isEpub) {
+        try {
+          const meta = await extractEpubMetadata(destPath);
+          if (meta.title) title = meta.title;
+          if (meta.author) author = meta.author;
+          if (meta.cover) cover = meta.cover;
+          if (meta.language) language = meta.language;
+          if (meta.publisher) publisher = meta.publisher;
+          if (meta.description) description = meta.description;
+        } catch {
+          // 元数据提取失败不影响导入
+        }
+      }
 
       await db.insert(schema.books).values({
         id,
         title,
-        author: null,
-        cover: null,
+        author,
+        cover,
         filePath: destPath,
-        fileType: ext === '.epub' ? 'epub' : 'pdf',
+        fileType: isEpub ? 'epub' : 'pdf',
         fileSize: fileStat.size,
-        language: null,
-        publisher: null,
-        description: null,
+        language,
+        publisher,
+        description,
         readStatus: 'inbox',
         readProgress: 0,
         totalLocations: null,
