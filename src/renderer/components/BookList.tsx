@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BookOpen, Upload, Loader2 } from 'lucide-react';
 import type { Book, BookReadStatus, BookListQuery } from '../../shared/types';
+import { useToast } from './Toast';
+import { useUndoStack } from '../hooks/useUndoStack';
 
 type TabKey = 'inbox' | 'later' | 'archive';
 
@@ -29,6 +31,8 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const { showToast } = useToast();
+  const undoStack = useUndoStack();
   const listRef = useRef<HTMLDivElement>(null);
 
   const fetchBooks = useCallback(async () => {
@@ -67,6 +71,47 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
     }
   }, [onSelectBook]);
 
+  const handleStatusChange = useCallback(async (id: string, status: BookReadStatus) => {
+    try {
+      const book = books.find((b) => b.id === id);
+      const prevStatus = book?.readStatus ?? 'inbox';
+      await window.electronAPI.bookUpdate({ id, readStatus: status });
+      await fetchBooks();
+      onSelectBook(id);
+      showToast(status === 'archive' ? 'Archived' : status === 'later' ? 'Saved for later' : 'Moved to Inbox', 'success');
+      undoStack.push({
+        description: `Revert to ${prevStatus}`,
+        undo: async () => {
+          await window.electronAPI.bookUpdate({ id, readStatus: prevStatus });
+          await fetchBooks();
+          onSelectBook(id);
+          showToast('Undone', 'info');
+        },
+      });
+    } catch (err) {
+      console.error('Failed to update book status:', err);
+    }
+  }, [books, fetchBooks, onSelectBook, showToast, undoStack]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await window.electronAPI.bookDelete(id);
+      await fetchBooks();
+      showToast('Moved to Trash', 'success');
+      undoStack.push({
+        description: 'Undo delete',
+        undo: async () => {
+          await window.electronAPI.bookRestore(id);
+          await fetchBooks();
+          onSelectBook(id);
+          showToast('Restored', 'info');
+        },
+      });
+    } catch (err) {
+      console.error('Failed to delete book:', err);
+    }
+  }, [fetchBooks, onSelectBook, showToast, undoStack]);
+
   useEffect(() => {
     fetchBooks();
   }, [fetchBooks, refreshTrigger]);
@@ -76,6 +121,81 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
     const el = listRef.current.querySelector(`[data-book-id="${selectedBookId}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedBookId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case 'j':
+        case 'ArrowDown': {
+          e.preventDefault();
+          const idx = books.findIndex((b) => b.id === selectedBookId);
+          const next = idx < books.length - 1 ? idx + 1 : idx;
+          if (books[next]) onSelectBook(books[next].id);
+          break;
+        }
+        case 'k':
+        case 'ArrowUp': {
+          e.preventDefault();
+          const idx = books.findIndex((b) => b.id === selectedBookId);
+          const prev = idx > 0 ? idx - 1 : 0;
+          if (books[prev]) onSelectBook(books[prev].id);
+          break;
+        }
+        case 'Enter': {
+          if (selectedBookId) {
+            e.preventDefault();
+            onOpenReader(selectedBookId);
+          }
+          break;
+        }
+        case '1': {
+          e.preventDefault();
+          setActiveTab('inbox');
+          break;
+        }
+        case '2': {
+          e.preventDefault();
+          setActiveTab('later');
+          break;
+        }
+        case '3': {
+          e.preventDefault();
+          setActiveTab('archive');
+          break;
+        }
+        case 'e':
+        case 'E': {
+          e.preventDefault();
+          if (selectedBookId) handleStatusChange(selectedBookId, 'archive');
+          break;
+        }
+        case 'l':
+        case 'L': {
+          e.preventDefault();
+          if (selectedBookId) handleStatusChange(selectedBookId, 'later');
+          break;
+        }
+        case 'd':
+        case 'D': {
+          e.preventDefault();
+          if (selectedBookId) handleDelete(selectedBookId);
+          break;
+        }
+        case 'z':
+        case 'Z': {
+          e.preventDefault();
+          if (undoStack.canUndo) undoStack.undo();
+          break;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [books, selectedBookId, onSelectBook, onOpenReader, handleStatusChange, handleDelete, undoStack]);
 
   return (
     <div className={`flex flex-col border-r border-[#262626] bg-[#141414] h-full flex-1 ${_expanded ? 'min-w-[360px]' : 'min-w-[300px]'}`}>
