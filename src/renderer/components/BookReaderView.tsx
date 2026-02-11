@@ -48,6 +48,25 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
     return () => { cancelled = true; };
   }, [bookId]);
 
+  const handleTocNavigate = useCallback((item: TocItem) => {
+    readerRef.current?.navigateTo(item.href);
+  }, []);
+
+  const handleHighlightNavigate = useCallback((highlightId: string) => {
+    const hl = highlights.find((h) => h.id === highlightId);
+    if (hl?.anchorPath) {
+      readerRef.current?.navigateToHighlight(hl.anchorPath);
+    }
+
+    if (detailCollapsed) {
+      setDetailCollapsed(false);
+      localStorage.setItem('book-reader-detail-collapsed', 'false');
+    }
+    setDetailActiveTab('notebook');
+    setFocusedHighlightId(highlightId);
+    setFocusSignal((n) => n + 1);
+  }, [highlights, detailCollapsed]);
+
   useEffect(() => {
     let cancelled = false;
     window.electronAPI.bookHighlightList(bookId).then((list) => {
@@ -67,25 +86,6 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
     window.addEventListener('book-reader:highlight-click', handler as EventListener);
     return () => window.removeEventListener('book-reader:highlight-click', handler as EventListener);
   }, [bookId, handleHighlightNavigate]);
-
-  const handleTocNavigate = useCallback((item: TocItem) => {
-    readerRef.current?.navigateTo(item.href);
-  }, []);
-
-  const handleHighlightNavigate = useCallback((highlightId: string) => {
-    const hl = highlights.find((h) => h.id === highlightId);
-    if (hl?.anchorPath) {
-      readerRef.current?.navigateToHighlight(hl.anchorPath);
-    }
-
-    if (detailCollapsed) {
-      setDetailCollapsed(false);
-      localStorage.setItem('book-reader-detail-collapsed', 'false');
-    }
-    setDetailActiveTab('notebook');
-    setFocusedHighlightId(highlightId);
-    setFocusSignal((n) => n + 1);
-  }, [highlights]);
 
   const handleDeleteHighlight = useCallback(async (id: string) => {
     await window.electronAPI.highlightDelete(id);
