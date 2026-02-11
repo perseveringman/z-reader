@@ -64,4 +64,12 @@ export const IPC_CHANNELS = {
   // Transcript
   TRANSCRIPT_GET: 'transcript:get',
   TRANSCRIPT_FETCH: 'transcript:fetch',
+
+  // YouTube 视频流
+  YOUTUBE_GET_STREAM_URL: 'youtube:getStreamUrl',
+
+  // YouTube 认证
+  YOUTUBE_LOGIN: 'youtube:login',
+  YOUTUBE_LOGOUT: 'youtube:logout',
+  YOUTUBE_AUTH_STATUS: 'youtube:authStatus',
 } as const;

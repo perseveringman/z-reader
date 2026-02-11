@@ -278,4 +278,12 @@ export interface ElectronAPI {
   // Transcript 操作
   transcriptGet: (articleId: string) => Promise<Transcript | null>;
   transcriptFetch: (articleId: string) => Promise<Transcript | null>;
+
+  // YouTube 视频流
+  youtubeGetStreamUrl: (videoId: string) => Promise<{ url: string; mimeType: string } | null>;
+
+  // YouTube 认证
+  youtubeLogin: () => Promise<boolean>;
+  youtubeLogout: () => Promise<void>;
+  youtubeAuthStatus: () => Promise<boolean>;
 }

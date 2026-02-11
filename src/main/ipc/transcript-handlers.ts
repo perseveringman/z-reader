@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
-import { fetchTranscript } from '../services/youtube-service';
+import { fetchTranscript, getVideoStreamUrl } from '../services/youtube-service';
+import { openLoginWindow, clearAuth, isLoggedIn } from '../services/youtube-auth';
 
 export function registerTranscriptHandlers() {
   // 查询缓存字幕
@@ -54,5 +55,25 @@ export function registerTranscriptHandlers() {
       language: result.language,
       createdAt: now,
     };
+  });
+
+  // 获取 YouTube 视频流直链 URL
+  ipcMain.handle(IPC_CHANNELS.YOUTUBE_GET_STREAM_URL, async (_event, videoId: string) => {
+    return getVideoStreamUrl(videoId);
+  });
+
+  // YouTube 认证：打开登录窗口
+  ipcMain.handle(IPC_CHANNELS.YOUTUBE_LOGIN, async () => {
+    return openLoginWindow();
+  });
+
+  // YouTube 认证：清除 cookie
+  ipcMain.handle(IPC_CHANNELS.YOUTUBE_LOGOUT, async () => {
+    return clearAuth();
+  });
+
+  // YouTube 认证：查询登录状态
+  ipcMain.handle(IPC_CHANNELS.YOUTUBE_AUTH_STATUS, async () => {
+    return isLoggedIn();
   });
 }

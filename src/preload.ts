@@ -68,6 +68,14 @@ const electronAPI: ElectronAPI = {
   // Transcript
   transcriptGet: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_GET, articleId),
   transcriptFetch: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_FETCH, articleId),
+
+  // YouTube 视频流
+  youtubeGetStreamUrl: (videoId) => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_GET_STREAM_URL, videoId),
+
+  // YouTube 认证
+  youtubeLogin: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_LOGIN),
+  youtubeLogout: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_LOGOUT),
+  youtubeAuthStatus: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_AUTH_STATUS),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
