@@ -6,6 +6,9 @@ import { registerExportHandlers } from './export-handlers';
 import { registerBookHandlers } from './book-handlers';
 import { registerHighlightTagHandlers } from './highlight-tag-handlers';
 import { registerTranscriptHandlers } from './transcript-handlers';
+import { registerPodcastHandlers } from './podcast-handlers';
+import { registerSettingsHandlers } from './settings-handlers';
+import { registerDownloadHandlers } from './download-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -16,4 +19,7 @@ export function registerAllIpcHandlers() {
   registerBookHandlers();
   registerHighlightTagHandlers();
   registerTranscriptHandlers();
+  registerPodcastHandlers();
+  registerSettingsHandlers();
+  registerDownloadHandlers();
 }

@@ -76,4 +76,18 @@ export const IPC_CHANNELS = {
   YOUTUBE_LOGIN: 'youtube:login',
   YOUTUBE_LOGOUT: 'youtube:logout',
   YOUTUBE_AUTH_STATUS: 'youtube:authStatus',
+
+  // Podcast
+  PODCAST_SEARCH: 'podcast:search',
+  PODCAST_RESOLVE_URL: 'podcast:resolveUrl',
+
+  // Download
+  DOWNLOAD_START: 'download:start',
+  DOWNLOAD_CANCEL: 'download:cancel',
+  DOWNLOAD_LIST: 'download:list',
+  DOWNLOAD_STATUS: 'download:status',
+
+  // Settings
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
 } as const;

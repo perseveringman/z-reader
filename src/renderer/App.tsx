@@ -17,6 +17,9 @@ import { BookDetailPanel } from './components/BookDetailPanel';
 import { BookUploadPanel } from './components/BookUploadPanel';
 import { BookReaderView } from './components/BookReaderView';
 import { VideoReaderView } from './components/VideoReaderView';
+import { PodcastReaderView } from './components/PodcastReaderView';
+import { DownloadManager } from './components/DownloadManager';
+import { PreferencesDialog } from './components/PreferencesDialog';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
 
 export function App() {
@@ -30,6 +33,8 @@ export function App() {
   const [addUrlDialogOpen, setAddUrlDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedFeedId, setSelectedFeedId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
@@ -208,6 +213,8 @@ export function App() {
               onAddUrl={() => setAddUrlDialogOpen(true)}
               onSearch={() => setSearchOpen(true)}
               onShortcutsHelp={() => setShortcutsHelpOpen(true)}
+              onDownloads={() => setDownloadManagerOpen(true)}
+              onPreferences={() => setPreferencesOpen(true)}
               selectedFeedId={selectedFeedId}
               onFeedSelect={(feedId) => {
                 setSelectedFeedId(feedId);
@@ -302,6 +309,13 @@ export function App() {
               }}
             />
           </div>
+        ) : readerMediaType === 'podcast' ? (
+          <div className="flex-1 min-h-0">
+            <PodcastReaderView
+              articleId={readerArticleId!}
+              onClose={handleCloseReader}
+            />
+          </div>
         ) : readerMediaType === 'video' ? (
           <div className="flex-1 min-h-0">
             <VideoReaderView
@@ -345,6 +359,16 @@ export function App() {
         <KeyboardShortcutsHelp
           open={shortcutsHelpOpen}
           onClose={() => setShortcutsHelpOpen(false)}
+        />
+
+        <DownloadManager
+          open={downloadManagerOpen}
+          onClose={() => setDownloadManagerOpen(false)}
+        />
+
+        <PreferencesDialog
+          open={preferencesOpen}
+          onClose={() => setPreferencesOpen(false)}
         />
 
         {managingFeed && (

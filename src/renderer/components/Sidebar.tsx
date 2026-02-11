@@ -26,6 +26,7 @@ import {
   Twitter,
   Video,
   Podcast,
+  Download,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -38,6 +39,8 @@ interface SidebarProps {
   onAddUrl: () => void;
   onSearch: () => void;
   onShortcutsHelp: () => void;
+  onDownloads: () => void;
+  onPreferences: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
   selectedTagId?: string | null;
@@ -107,7 +110,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -404,9 +407,16 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           onClick={onShortcutsHelp}
         />
         <NavItem
+          icon={<Download size={iconSize} />}
+          label="Downloads"
+          collapsed={collapsed}
+          onClick={onDownloads}
+        />
+        <NavItem
           icon={<Settings size={iconSize} />}
           label="Preferences"
           collapsed={collapsed}
+          onClick={onPreferences}
         />
         <NavItem
           icon={<User size={iconSize} />}

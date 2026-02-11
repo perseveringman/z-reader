@@ -45,6 +45,12 @@ export const articles = sqliteTable('articles', {
   mediaType: text('media_type').default('article'),
   videoId: text('video_id'),
   duration: integer('duration'),
+  audioUrl: text('audio_url'),
+  audioMime: text('audio_mime'),
+  audioBytes: integer('audio_bytes'),
+  audioDuration: integer('audio_duration'),
+  episodeNumber: integer('episode_number'),
+  seasonNumber: integer('season_number'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
@@ -123,6 +129,17 @@ export const books = sqliteTable('books', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
+});
+
+// ==================== downloads 表 ====================
+export const downloads = sqliteTable('downloads', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').references(() => articles.id),
+  filePath: text('file_path'),
+  bytes: integer('bytes'),
+  status: text('status').default('queued'), // queued | downloading | ready | failed
+  addedAt: text('added_at').notNull(),
+  lastAccessedAt: text('last_accessed_at'),
 });
 
 // ==================== transcripts 表 ====================

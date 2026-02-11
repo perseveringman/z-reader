@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Loader2, Plus, FileUp } from 'lucide-react';
+import { X, Loader2, Plus, FileUp, Rss, Podcast } from 'lucide-react';
 import { useToast } from './Toast';
+import { PodcastSearchPanel } from './PodcastSearchPanel';
+
+type DialogTab = 'rss' | 'podcast';
 
 interface AddFeedDialogProps {
   open: boolean;
@@ -9,6 +12,7 @@ interface AddFeedDialogProps {
 }
 
 export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps) {
+  const [activeTab, setActiveTab] = useState<DialogTab>('rss');
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -23,9 +27,11 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
       setTitle('');
       setCategory('');
       // 聚焦输入框
-      setTimeout(() => inputRef.current?.focus(), 100);
+      if (activeTab === 'rss') {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }
-  }, [open]);
+  }, [open, activeTab]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +88,10 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
     }
   };
 
+  const handlePodcastSubscribed = () => {
+    onFeedAdded?.();
+  };
+
   if (!open) return null;
 
   return (
@@ -93,10 +103,10 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
       />
 
       {/* 对话框 */}
-      <div className="relative w-full max-w-md bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl">
+      <div className="relative w-full max-w-lg bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl">
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">添加 RSS 订阅</h2>
+          <h2 className="text-lg font-semibold text-white">添加订阅</h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
@@ -106,93 +116,129 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
           </button>
         </div>
 
-        {/* 表单 */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label htmlFor="feed-url" className="block text-sm font-medium text-gray-300 mb-1.5">
-              RSS URL <span className="text-red-400">*</span>
-            </label>
-            <input
-              ref={inputRef}
-              id="feed-url"
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com/feed.xml 或 YouTube 频道 URL"
-              className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="feed-title" className="block text-sm font-medium text-gray-300 mb-1.5">
-              订阅名称 (可选)
-            </label>
-            <input
-              id="feed-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="自动从 RSS 获取"
-              className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="feed-category" className="block text-sm font-medium text-gray-300 mb-1.5">
-              分类 (可选)
-            </label>
-            <input
-              id="feed-category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="例如: 技术、新闻、博客"
-              className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-
-          {/* 操作按钮 */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={loading || !url.trim()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>添加中...</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={16} />
-                  <span>添加订阅</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleImportOpml}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
-              title="导入 OPML 文件"
-            >
-              <FileUp size={16} />
-              <span>导入 OPML</span>
-            </button>
-          </div>
-        </form>
-
-        {/* 提示信息 */}
-        <div className="px-6 pb-6 pt-0">
-          <p className="text-xs text-gray-500">
-            提示: 可以直接输入 RSS URL、网站首页或 YouTube 频道链接
-          </p>
+        {/* Tab 切换 */}
+        <div className="flex border-b border-white/10 px-6">
+          <button
+            onClick={() => setActiveTab('rss')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'rss'
+                ? 'border-blue-500 text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <Rss size={16} />
+            RSS / YouTube
+          </button>
+          <button
+            onClick={() => setActiveTab('podcast')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'podcast'
+                ? 'border-blue-500 text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <Podcast size={16} />
+            播客
+          </button>
         </div>
+
+        {/* Tab 内容 */}
+        {activeTab === 'rss' ? (
+          <>
+            {/* RSS 表单 */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label htmlFor="feed-url" className="block text-sm font-medium text-gray-300 mb-1.5">
+                  RSS URL <span className="text-red-400">*</span>
+                </label>
+                <input
+                  ref={inputRef}
+                  id="feed-url"
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com/feed.xml 或 YouTube 频道 URL"
+                  className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="feed-title" className="block text-sm font-medium text-gray-300 mb-1.5">
+                  订阅名称 (可选)
+                </label>
+                <input
+                  id="feed-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="自动从 RSS 获取"
+                  className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="feed-category" className="block text-sm font-medium text-gray-300 mb-1.5">
+                  分类 (可选)
+                </label>
+                <input
+                  id="feed-category"
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="例如: 技术、新闻、博客"
+                  className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={loading || !url.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>添加中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      <span>添加订阅</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleImportOpml}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                  title="导入 OPML 文件"
+                >
+                  <FileUp size={16} />
+                  <span>导入 OPML</span>
+                </button>
+              </div>
+            </form>
+
+            {/* 提示信息 */}
+            <div className="px-6 pb-6 pt-0">
+              <p className="text-xs text-gray-500">
+                提示: 可以直接输入 RSS URL、网站首页或 YouTube 频道链接
+              </p>
+            </div>
+          </>
+        ) : (
+          /* 播客搜索 Tab */
+          <div className="p-6">
+            <PodcastSearchPanel onSubscribed={handlePodcastSubscribed} />
+          </div>
+        )}
       </div>
     </div>
   );

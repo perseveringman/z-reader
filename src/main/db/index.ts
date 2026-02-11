@@ -254,6 +254,41 @@ function initTables(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_transcripts_article_id ON transcripts(article_id);
   `);
+
+  // Migration: articles 表新增 Podcast 相关字段
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_url TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_mime TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_bytes INTEGER`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_duration INTEGER`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN episode_number INTEGER`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN season_number INTEGER`);
+  } catch { /* Column already exists */ }
+
+  // Migration: downloads 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS downloads (
+      id TEXT PRIMARY KEY,
+      article_id TEXT REFERENCES articles(id),
+      file_path TEXT,
+      bytes INTEGER,
+      status TEXT DEFAULT 'queued',
+      added_at TEXT NOT NULL,
+      last_accessed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_downloads_article_id ON downloads(article_id);
+    CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
+  `);
 }
 
 export { schema };
