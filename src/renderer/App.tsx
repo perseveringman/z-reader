@@ -16,7 +16,7 @@ import { BookList } from './components/BookList';
 import { BookDetailPanel } from './components/BookDetailPanel';
 import { BookUploadPanel } from './components/BookUploadPanel';
 import { BookReaderView } from './components/BookReaderView';
-import type { Feed, ArticleSource } from '../shared/types';
+import type { Feed, ArticleSource, MediaType } from '../shared/types';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,6 +50,12 @@ export function App() {
     : activeView === 'feed-unseen' ? 'unseen'
     : activeView === 'feed-seen' ? 'seen'
     : activeView === 'feeds' ? 'unseen'
+    : undefined;
+
+  const contentMediaType: MediaType | undefined =
+    activeView === 'library-videos' ? 'video'
+    : activeView === 'library-podcasts' ? 'podcast'
+    : activeView === 'library-articles' ? 'article'
     : undefined;
 
   useEffect(() => {
@@ -276,6 +282,7 @@ export function App() {
                   expanded={detailPanelCollapsed}
                   source={contentSource}
                   initialTab={initialTab}
+                  mediaType={contentMediaType}
                 />
                 <DetailPanel articleId={selectedArticleId} collapsed={detailPanelCollapsed} />
               </>

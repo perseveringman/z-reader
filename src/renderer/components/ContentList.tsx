@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X, Star, BookOpen, ExternalLink, Inbox, BookmarkPlus } from 'lucide-react';
-import type { Article, ArticleListQuery, ArticleSource, ReadStatus as ReadStatusType } from '../../shared/types';
+import type { Article, ArticleListQuery, ArticleSource, ReadStatus as ReadStatusType, MediaType } from '../../shared/types';
 import { ArticleCard } from './ArticleCard';
 import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
@@ -23,6 +23,7 @@ interface ContentListProps {
   expanded?: boolean;
   source?: ArticleSource;
   initialTab?: string;
+  mediaType?: MediaType;
 }
 
 const LIBRARY_TABS: { key: TabKey; label: string }[] = [
@@ -42,7 +43,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType }: ContentListProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab as TabKey || 'inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -99,6 +100,11 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           query.source = source;
         }
 
+        // MediaType filter
+        if (mediaType) {
+          query.mediaType = mediaType;
+        }
+
         // Tab-based readStatus filter
         if (!isShortlisted) {
           if (activeTab !== 'all') {
@@ -129,7 +135,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView, activeView]);
+  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView, activeView, mediaType]);
 
   useEffect(() => {
     fetchArticles();
@@ -698,7 +704,9 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       </div>
 
       <div className="shrink-0 px-4 py-1.5 border-t border-[#262626] text-[11px] text-[#555]">
-        {articles.length} {articles.length === 1 ? 'article' : 'articles'}
+        {articles.length} {articles.length === 1
+          ? (mediaType === 'video' ? 'video' : mediaType === 'podcast' ? 'podcast' : 'article')
+          : (mediaType === 'video' ? 'videos' : mediaType === 'podcast' ? 'podcasts' : 'articles')}
       </div>
 
       {/* 右键上下文菜单 */}
