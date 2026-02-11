@@ -57,6 +57,7 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
   const bookRef = useRef<Book | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const locationsGeneratedRef = useRef(false);
+  const appliedHighlightAnchorsRef = useRef<string[]>([]);
   const highlightsRef = useRef(highlights);
   highlightsRef.current = highlights;
 
@@ -80,7 +81,33 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
     rendition.themes.override('line-height', String(s.lineHeight));
   }, []);
 
+  const clearSelectionInRendition = useCallback(() => {
+    try {
+      const rendition = renditionRef.current as unknown as { getContents?: () => Array<{ window?: Window }> } | null;
+      const contents = rendition?.getContents?.() ?? [];
+      for (const content of contents) {
+        content.window?.getSelection?.()?.removeAllRanges();
+      }
+      window.getSelection()?.removeAllRanges();
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const clearAppliedHighlights = useCallback((rendition: Rendition) => {
+    for (const cfiRange of appliedHighlightAnchorsRef.current) {
+      try {
+        rendition.annotations.remove(cfiRange, 'epub-highlight');
+      } catch {
+        // ignore
+      }
+    }
+    appliedHighlightAnchorsRef.current = [];
+  }, []);
+
   const applyHighlights = useCallback((rendition: Rendition, hls: Highlight[]) => {
+    const nextAppliedAnchors: string[] = [];
+
     for (const hl of hls) {
       if (!hl.anchorPath) continue;
       const colorValue = HIGHLIGHT_COLORS.find((c) => c.name === hl.color)?.value ?? HIGHLIGHT_COLORS[0].value;
@@ -90,84 +117,140 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
           'fill-opacity': '0.3',
           'mix-blend-mode': 'multiply',
         });
+        nextAppliedAnchors.push(hl.anchorPath);
       } catch {
         // CFI 可能无效，忽略
       }
     }
+
+    appliedHighlightAnchorsRef.current = nextAppliedAnchors;
   }, []);
 
   useEffect(() => {
     if (!viewerRef.current) return;
+    let cancelled = false;
+    let localBook: Book | null = null;
+    let localRendition: Rendition | null = null;
 
-    const url = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
-    const book = ePub(url) as unknown as Book;
-    bookRef.current = book;
+    async function init() {
+      const binary = await window.electronAPI.bookReadFile(bookId);
+      if (cancelled || !binary || !viewerRef.current) return;
 
-    const rendition = book.renderTo(viewerRef.current, {
-      flow: 'scrolled',
-      width: '100%',
-      height: '100%',
+      const book = ePub(binary) as unknown as Book;
+      localBook = book;
+      bookRef.current = book;
+
+      const rendition = book.renderTo(viewerRef.current, {
+        flow: 'scrolled',
+        width: '100%',
+        height: '100%',
+      });
+      localRendition = rendition;
+      renditionRef.current = rendition;
+
+      applyTheme(rendition, settings);
+
+      const target = initialLocation || undefined;
+      rendition.display(target);
+
+      book.loaded.navigation.then((nav) => {
+        onTocLoaded(convertNavItems(nav.toc));
+      }).catch(() => {
+        onTocLoaded([]);
+      });
+
+      book.ready.then(() => {
+        if (!locationsGeneratedRef.current) {
+          locationsGeneratedRef.current = true;
+          book.locations.generate(1600);
+        }
+      });
+
+      rendition.on('relocated', (location: Location) => {
+        if (location?.start) {
+          onProgressChange(location.start.percentage);
+          onLocationChange(location.start.cfi);
+        }
+      });
+
+      rendition.on('selected', (cfiRange: string) => {
+        try {
+          const range = rendition.getRange(cfiRange);
+          const text = range?.toString() ?? '';
+          if (!text.trim()) return;
+
+          // 已存在相同锚点的高亮时，不重复弹出创建工具栏
+          const exists = highlightsRef.current.some((hl) => hl.anchorPath === cfiRange);
+          if (exists) {
+            clearSelectionInRendition();
+            setToolbar(null);
+            return;
+          }
+
+          const rect = range.getBoundingClientRect();
+          const containerRect = viewerRef.current?.getBoundingClientRect();
+          if (!rect || !containerRect) return;
+
+          const ownerDoc = range.startContainer?.ownerDocument ?? null;
+          const frameEl = ownerDoc?.defaultView?.frameElement as HTMLElement | null;
+          const frameRect = frameEl?.getBoundingClientRect();
+
+          const anchorX = frameRect
+            ? frameRect.left + rect.left + rect.width / 2
+            : rect.left + rect.width / 2;
+          const anchorY = frameRect
+            ? frameRect.top + rect.top
+            : rect.top;
+
+          setToolbar({
+            x: anchorX - containerRect.left,
+            y: anchorY - containerRect.top - 8,
+            cfiRange,
+            text,
+          });
+        } catch {
+          // ignore
+        }
+      });
+
+      rendition.on('markClicked', (_cfiRange: unknown, data: unknown) => {
+        const possibleAnchor =
+          (typeof _cfiRange === 'string' && _cfiRange)
+          || ((data as { cfiRange?: string } | undefined)?.cfiRange)
+          || ((data as { annotation?: { cfiRange?: string } } | undefined)?.annotation?.cfiRange)
+          || null;
+
+        if (!possibleAnchor) return;
+
+        const target = highlightsRef.current.find((hl) => hl.anchorPath === possibleAnchor);
+        if (!target) return;
+
+        window.dispatchEvent(new CustomEvent('book-reader:highlight-click', {
+          detail: {
+            bookId,
+            highlightId: target.id,
+          },
+        }));
+      });
+
+      clearAppliedHighlights(rendition);
+      applyHighlights(rendition, highlightsRef.current);
+    }
+
+    init().catch(() => {
+      onTocLoaded([]);
     });
-    renditionRef.current = rendition;
-
-    applyTheme(rendition, settings);
-
-    const target = initialLocation || undefined;
-    rendition.display(target);
-
-    book.loaded.navigation.then((nav) => {
-      onTocLoaded(convertNavItems(nav.toc));
-    });
-
-    book.ready.then(() => {
-      if (!locationsGeneratedRef.current) {
-        locationsGeneratedRef.current = true;
-        book.locations.generate(1600);
-      }
-    });
-
-    rendition.on('relocated', (location: Location) => {
-      if (location?.start) {
-        onProgressChange(location.start.percentage);
-        onLocationChange(location.start.cfi);
-      }
-    });
-
-    rendition.on('selected', (cfiRange: string) => {
-      try {
-        const range = rendition.getRange(cfiRange);
-        const text = range?.toString() ?? '';
-        if (!text.trim()) return;
-
-        const rect = range.getBoundingClientRect();
-        const containerRect = viewerRef.current?.getBoundingClientRect();
-        if (!rect || !containerRect) return;
-
-        setToolbar({
-          x: rect.left + rect.width / 2 - containerRect.left,
-          y: rect.top - containerRect.top - 8,
-          cfiRange,
-          text,
-        });
-      } catch {
-        // ignore
-      }
-    });
-
-    rendition.on('markClicked', () => {
-      // 点击已有高亮时不做额外操作
-    });
-
-    applyHighlights(rendition, highlightsRef.current);
 
     return () => {
-      rendition.destroy();
-      book.destroy();
+      cancelled = true;
+      if (localRendition) localRendition.destroy();
+      if (localBook) localBook.destroy();
       bookRef.current = null;
       renditionRef.current = null;
+      appliedHighlightAnchorsRef.current = [];
       locationsGeneratedRef.current = false;
     };
-  }, [filePath, bookId]); // eslint-disable-line
+  }, [filePath, bookId, initialLocation, onLocationChange, onProgressChange, onTocLoaded, applyTheme, applyHighlights, clearAppliedHighlights, clearSelectionInRendition]); // eslint-disable-line
 
   useEffect(() => {
     if (!renditionRef.current) return;
@@ -178,17 +261,9 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
     const rendition = renditionRef.current;
     if (!rendition) return;
 
-    const existing = rendition.annotations.each?.() ?? [];
-    for (const ann of existing) {
-      try {
-        // @ts-expect-error epubjs annotation 有 cfiRange 属性但类型未暴露
-        rendition.annotations.remove(ann.cfiRange, 'highlight');
-      } catch {
-        // ignore
-      }
-    }
+    clearAppliedHighlights(rendition);
     applyHighlights(rendition, highlights);
-  }, [highlights, applyHighlights]);
+  }, [highlights, applyHighlights, clearAppliedHighlights]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -209,19 +284,22 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
   const handleHighlight = useCallback(async (colorName: string) => {
     if (!toolbar || !renditionRef.current) return;
     const { cfiRange, text } = toolbar;
-    const colorValue = HIGHLIGHT_COLORS.find((c) => c.name === colorName)?.value ?? HIGHLIGHT_COLORS[0].value;
-
-    try {
-      renditionRef.current.annotations.highlight(cfiRange, {}, undefined, 'epub-highlight', {
-        fill: colorValue,
-        'fill-opacity': '0.3',
-        'mix-blend-mode': 'multiply',
-      });
-    } catch {
-      // ignore
-    }
+    const existing = highlightsRef.current.find((hl) => hl.anchorPath === cfiRange);
 
     setToolbar(null);
+    clearSelectionInRendition();
+
+    if (existing) {
+      if (existing.color !== colorName) {
+        try {
+          const updated = await window.electronAPI.highlightUpdate({ id: existing.id, color: colorName });
+          onHighlightsChange(highlightsRef.current.map((hl) => (hl.id === existing.id ? updated : hl)));
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
 
     try {
       const created = await window.electronAPI.bookHighlightCreate({
@@ -234,7 +312,7 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
     } catch {
       // ignore
     }
-  }, [toolbar, bookId, onHighlightsChange]);
+  }, [toolbar, bookId, onHighlightsChange, clearSelectionInRendition]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">

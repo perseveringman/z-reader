@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Upload, Loader2 } from 'lucide-react';
 import type { Book, BookReadStatus, BookListQuery } from '../../shared/types';
 
 type TabKey = 'inbox' | 'later' | 'archive';
@@ -24,10 +24,11 @@ const EMPTY_MESSAGES: Record<TabKey, string> = {
   archive: 'Archived books will appear here',
 };
 
-export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTrigger, expanded }: BookListProps) {
+export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTrigger, expanded: _expanded }: BookListProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('inbox');
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   const fetchBooks = useCallback(async () => {
@@ -46,6 +47,26 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
     }
   }, [activeTab]);
 
+  const handleImportBooks = useCallback(async () => {
+    setImporting(true);
+    try {
+      const imported = await window.electronAPI.bookImport();
+      if (imported.length === 0) return;
+
+      setActiveTab('inbox');
+      const result = await window.electronAPI.bookList({
+        readStatus: 'inbox',
+        limit: 100,
+      });
+      setBooks(result);
+      onSelectBook(imported[0].id);
+    } catch (err) {
+      console.error('Failed to import books:', err);
+    } finally {
+      setImporting(false);
+    }
+  }, [onSelectBook]);
+
   useEffect(() => {
     fetchBooks();
   }, [fetchBooks, refreshTrigger]);
@@ -57,10 +78,19 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
   }, [selectedBookId]);
 
   return (
-    <div className="flex flex-col min-w-[300px] border-r border-[#262626] bg-[#141414] h-full flex-1">
+    <div className={`flex flex-col border-r border-[#262626] bg-[#141414] h-full flex-1 ${_expanded ? 'min-w-[360px]' : 'min-w-[300px]'}`}>
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">Books</h2>
+          <button
+            onClick={handleImportBooks}
+            disabled={importing}
+            className="h-8 px-2.5 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed text-xs text-gray-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            title="导入书籍"
+          >
+            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            <span>导入</span>
+          </button>
         </div>
 
         <div className="flex px-4 gap-4 border-b border-[#262626]">

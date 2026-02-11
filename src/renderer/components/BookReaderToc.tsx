@@ -13,7 +13,7 @@ interface BookReaderTocProps {
 }
 
 export function BookReaderToc({ items, onNavigate, loading }: BookReaderTocProps) {
-  function renderItems(list: TocItem[], depth: number = 0) {
+  function renderItems(list: TocItem[], depth = 0) {
     return list.map((item) => (
       <li key={item.id}>
         <button

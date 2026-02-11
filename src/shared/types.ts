@@ -101,7 +101,8 @@ export interface UpdateArticleInput {
 // ==================== Highlight 相关类型 ====================
 export interface Highlight {
   id: string;
-  articleId: string;
+  articleId: string | null;
+  bookId: string | null;
   text: string | null;
   note: string | null;
   color: string;
@@ -180,7 +181,7 @@ export interface Book {
   author: string | null;
   cover: string | null;
   filePath: string;
-  fileType: string;
+  fileType: 'epub' | 'pdf';
   fileSize: number | null;
   language: string | null;
   publisher: string | null;
@@ -263,6 +264,8 @@ export interface ElectronAPI {
   highlightDelete: (id: string) => Promise<void>;
   highlightUpdate: (input: UpdateHighlightInput) => Promise<Highlight>;
   highlightExport: (articleId: string, mode: 'clipboard' | 'file') => Promise<string>;
+  highlightListByBook: (bookId: string) => Promise<Highlight[]>;
+  highlightCreateForBook: (input: CreateBookHighlightInput) => Promise<Highlight>;
 
   // Tag 操作
   tagList: () => Promise<Tag[]>;
@@ -285,7 +288,9 @@ export interface ElectronAPI {
   bookImport: () => Promise<Book[]>;
   bookDelete: (id: string) => Promise<void>;
   bookUpdate: (input: UpdateBookInput) => Promise<Book>;
-  bookGetContent: (id: string) => Promise<string>;
+  bookGetContent: (id: string) => Promise<string | null>;
+  bookGetFilePath: (id: string) => Promise<string | null>;
+  bookReadFile: (id: string) => Promise<ArrayBuffer | null>;
   bookPermanentDelete: (id: string) => Promise<void>;
   bookRestore: (id: string) => Promise<Book>;
 

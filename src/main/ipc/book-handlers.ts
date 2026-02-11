@@ -1,15 +1,26 @@
 import { ipcMain, dialog, app } from 'electron';
 import { eq, and, desc } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, stat, unlink } from 'node:fs/promises';
 import { join, basename, extname } from 'node:path';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type { BookListQuery, UpdateBookInput } from '../../shared/types';
-import { extractEpubMetadata } from '../services/epub-metadata';
+import { extractEpubMetadata, extractPdfMetadata } from '../services/epub-metadata';
 
 export function registerBookHandlers() {
-  const { BOOK_LIST, BOOK_GET, BOOK_IMPORT, BOOK_DELETE, BOOK_UPDATE, BOOK_GET_CONTENT, BOOK_PERMANENT_DELETE, BOOK_RESTORE } = IPC_CHANNELS;
+  const {
+    BOOK_LIST,
+    BOOK_GET,
+    BOOK_IMPORT,
+    BOOK_DELETE,
+    BOOK_UPDATE,
+    BOOK_GET_CONTENT,
+    BOOK_GET_FILE_PATH,
+    BOOK_READ_FILE,
+    BOOK_PERMANENT_DELETE,
+    BOOK_RESTORE,
+  } = IPC_CHANNELS;
 
   // 获取书籍存储目录
   function getBooksDir() {
@@ -44,7 +55,7 @@ export function registerBookHandlers() {
     return result[0] ?? null;
   });
 
-  // 导入 EPUB 文件
+  // 导入书籍文件（EPUB/PDF）
   ipcMain.handle(BOOK_IMPORT, async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: '选择书籍文件',
@@ -85,6 +96,17 @@ export function registerBookHandlers() {
           if (meta.title) title = meta.title;
           if (meta.author) author = meta.author;
           if (meta.cover) cover = meta.cover;
+          if (meta.language) language = meta.language;
+          if (meta.publisher) publisher = meta.publisher;
+          if (meta.description) description = meta.description;
+        } catch {
+          // 元数据提取失败不影响导入
+        }
+      } else {
+        try {
+          const meta = await extractPdfMetadata(destPath);
+          if (meta.title) title = meta.title;
+          if (meta.author) author = meta.author;
           if (meta.language) language = meta.language;
           if (meta.publisher) publisher = meta.publisher;
           if (meta.description) description = meta.description;
@@ -151,6 +173,28 @@ export function registerBookHandlers() {
     const [book] = await db.select().from(schema.books).where(eq(schema.books.id, id));
     if (!book) return null;
     return book.filePath;
+  });
+
+  // 与文档定义对齐：book:getFilePath
+  ipcMain.handle(BOOK_GET_FILE_PATH, async (_event, id: string) => {
+    const db = getDatabase();
+    const [book] = await db.select().from(schema.books).where(eq(schema.books.id, id));
+    if (!book) return null;
+    return book.filePath;
+  });
+
+  // 读取书籍原始二进制（用于渲染进程避免 file:// 访问限制）
+  ipcMain.handle(BOOK_READ_FILE, async (_event, id: string) => {
+    const db = getDatabase();
+    const [book] = await db.select().from(schema.books).where(eq(schema.books.id, id));
+    if (!book) return null;
+
+    try {
+      const buffer = await readFile(book.filePath);
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    } catch {
+      return null;
+    }
   });
 
   // 永久删除书籍（同时删除文件）

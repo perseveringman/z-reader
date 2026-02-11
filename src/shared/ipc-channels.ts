@@ -31,6 +31,8 @@ export const IPC_CHANNELS = {
   HIGHLIGHT_DELETE: 'highlight:delete',
   HIGHLIGHT_UPDATE: 'highlight:update',
   HIGHLIGHT_EXPORT: 'highlight:export',
+  HIGHLIGHT_LIST_BY_BOOK: 'highlight:listByBook',
+  HIGHLIGHT_CREATE_FOR_BOOK: 'highlight:createForBook',
 
   // Tag
   TAG_LIST: 'tag:list',
@@ -54,6 +56,8 @@ export const IPC_CHANNELS = {
   BOOK_DELETE: 'book:delete',
   BOOK_UPDATE: 'book:update',
   BOOK_GET_CONTENT: 'book:getContent',
+  BOOK_GET_FILE_PATH: 'book:getFilePath',
+  BOOK_READ_FILE: 'book:readFile',
   BOOK_PERMANENT_DELETE: 'book:permanentDelete',
   BOOK_RESTORE: 'book:restore',
 

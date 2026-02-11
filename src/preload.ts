@@ -35,6 +35,8 @@ const electronAPI: ElectronAPI = {
   highlightDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_DELETE, id),
   highlightUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_UPDATE, input),
   highlightExport: (articleId, mode) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_EXPORT, articleId, mode),
+  highlightListByBook: (bookId) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_LIST_BY_BOOK, bookId),
+  highlightCreateForBook: (input) => ipcRenderer.invoke(IPC_CHANNELS.HIGHLIGHT_CREATE_FOR_BOOK, input),
 
   // Tag
   tagList: () => ipcRenderer.invoke(IPC_CHANNELS.TAG_LIST),
@@ -58,6 +60,8 @@ const electronAPI: ElectronAPI = {
   bookDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_DELETE, id),
   bookUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_UPDATE, input),
   bookGetContent: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_CONTENT, id),
+  bookGetFilePath: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_FILE_PATH, id),
+  bookReadFile: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_READ_FILE, id),
   bookPermanentDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_PERMANENT_DELETE, id),
   bookRestore: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_RESTORE, id),
 

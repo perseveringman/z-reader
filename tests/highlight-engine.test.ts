@@ -476,7 +476,7 @@ describe('端到端：创建高亮 → 持久化 → 恢复', () => {
     const target = resolveAnchorPath(freshRoot, anchorPath);
     expect(target).not.toBeNull();
 
-    let restoredRange = offsetsToRange(target!, offsets.startOffset, offsets.endOffset);
+    const restoredRange = offsetsToRange(target!, offsets.startOffset, offsets.endOffset);
     expect(restoredRange).not.toBeNull();
     expect(restoredRange!.toString()).toBe(text);
 

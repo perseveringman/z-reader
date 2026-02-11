@@ -45,7 +45,7 @@ export function BookUploadPanel({ onImported, collapsed }: BookUploadPanelProps)
     `}>
       <div className="min-w-[360px] flex flex-col h-full">
         <div className="shrink-0 px-4 pt-3 pb-2 border-b border-white/5">
-          <h3 className="text-[13px] font-semibold text-white">Upload EPUBs</h3>
+          <h3 className="text-[13px] font-semibold text-white">Upload Books</h3>
         </div>
 
         <div className="flex-1 flex items-center justify-center p-6">
@@ -66,7 +66,7 @@ export function BookUploadPanel({ onImported, collapsed }: BookUploadPanelProps)
             </div>
 
             <div className="text-center">
-              <p className="text-[14px] text-gray-300">Drag and drop EPUB files here</p>
+              <p className="text-[14px] text-gray-300">Drag and drop EPUB/PDF files here</p>
               <p className="mt-1 text-[12px] text-gray-600">Max file size: 500 MB</p>
             </div>
 
@@ -74,14 +74,14 @@ export function BookUploadPanel({ onImported, collapsed }: BookUploadPanelProps)
               onClick={handleImport}
               className="text-[13px] text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
             >
-              Select an EPUB file
+              Select a book file
             </button>
           </div>
         </div>
 
         <div className="shrink-0 px-6 pb-6 flex items-center gap-2 text-[12px] text-gray-600">
           <BookOpen size={14} />
-          <span>Supported: EPUB format</span>
+          <span>Supported: EPUB, PDF</span>
         </div>
       </div>
     </div>

@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Clock, User, Building2, Globe, FileText, MessageSquare, Trash2, Highlighter } from 'lucide-react';
 import type { Book, Highlight } from '../../shared/types';
 
-type DetailTab = 'info' | 'notebook' | 'chat';
+export type DetailTab = 'info' | 'notebook' | 'chat';
 
 const HIGHLIGHT_COLOR_MAP: Record<string, string> = {
   yellow: '#fbbf24',
@@ -25,16 +25,60 @@ function formatRelativeTime(dateStr: string): string {
 
 interface BookReaderDetailPanelProps {
   book: Book | null;
+  readProgress?: number;
   highlights: Highlight[];
+  activeTab?: DetailTab;
+  onTabChange?: (tab: DetailTab) => void;
+  focusedHighlightId?: string | null;
+  focusSignal?: number;
   onHighlightsChange: (highlights: Highlight[]) => void;
   onDeleteHighlight: (id: string) => void;
   onHighlightClick?: (highlightId: string) => void;
 }
 
-export function BookReaderDetailPanel({ book, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick }: BookReaderDetailPanelProps) {
-  const [activeTab, setActiveTab] = useState<DetailTab>('info');
+export function BookReaderDetailPanel({
+  book,
+  readProgress,
+  highlights,
+  activeTab: controlledActiveTab,
+  onTabChange,
+  focusedHighlightId,
+  focusSignal,
+  onHighlightsChange,
+  onDeleteHighlight,
+  onHighlightClick,
+}: BookReaderDetailPanelProps) {
+  const [uncontrolledActiveTab, setUncontrolledActiveTab] = useState<DetailTab>('info');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
+  const [focusedPulseId, setFocusedPulseId] = useState<string | null>(null);
+  const highlightRefsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
+
+  const handleTabChange = useCallback((tab: DetailTab) => {
+    if (controlledActiveTab === undefined) {
+      setUncontrolledActiveTab(tab);
+    }
+    onTabChange?.(tab);
+  }, [controlledActiveTab, onTabChange]);
+
+  useEffect(() => {
+    if (!focusedHighlightId) return;
+    if (activeTab !== 'notebook') return;
+
+    const target = highlightRefsRef.current.get(focusedHighlightId);
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFocusedPulseId(focusedHighlightId);
+
+    const timer = window.setTimeout(() => {
+      setFocusedPulseId((curr) => (curr === focusedHighlightId ? null : curr));
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [focusedHighlightId, focusSignal, activeTab]);
 
   const handleSaveNote = useCallback(async (hlId: string, note: string) => {
     const updated = await window.electronAPI.highlightUpdate({ id: hlId, note });
@@ -54,7 +98,7 @@ export function BookReaderDetailPanel({ book, highlights, onHighlightsChange, on
         ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => handleTabChange(tab.key)}
             className={`
               px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1
               ${activeTab === tab.key
@@ -83,7 +127,7 @@ export function BookReaderDetailPanel({ book, highlights, onHighlightsChange, on
                 { label: 'Author', value: book.author, icon: <User className="w-3.5 h-3.5" /> },
                 { label: 'Publisher', value: book.publisher, icon: <Building2 className="w-3.5 h-3.5" /> },
                 { label: 'Language', value: book.language, icon: <Globe className="w-3.5 h-3.5" /> },
-                { label: 'Progress', value: `${Math.round((book.readProgress ?? 0) * 100)}%`, icon: <Clock className="w-3.5 h-3.5" /> },
+                { label: 'Progress', value: `${Math.round((readProgress ?? book.readProgress ?? 0) * 100)}%`, icon: <Clock className="w-3.5 h-3.5" /> },
               ].map((row) => (
                 <div key={row.label} className="flex items-center py-2 border-b border-white/5 last:border-b-0">
                   <span className="flex items-center gap-1.5 text-[11px] text-gray-500 w-[90px] shrink-0">
@@ -120,7 +164,17 @@ export function BookReaderDetailPanel({ book, highlights, onHighlightsChange, on
                 {sortedHighlights.map((hl) => (
                   <div
                     key={hl.id}
+                    ref={(el) => {
+                      if (el) {
+                        highlightRefsRef.current.set(hl.id, el);
+                      } else {
+                        highlightRefsRef.current.delete(hl.id);
+                      }
+                    }}
                     className="group relative flex rounded-lg bg-[#1a1a1a] border border-white/5 overflow-hidden cursor-pointer hover:border-white/15 transition-colors"
+                    style={{
+                      boxShadow: focusedPulseId === hl.id ? '0 0 0 2px rgba(59,130,246,0.55) inset' : undefined,
+                    }}
                     onClick={() => onHighlightClick?.(hl.id)}
                   >
                     <div className="w-[3px] shrink-0" style={{ backgroundColor: HIGHLIGHT_COLOR_MAP[hl.color] ?? HIGHLIGHT_COLOR_MAP.yellow }} />

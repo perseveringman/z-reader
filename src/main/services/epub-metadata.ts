@@ -10,6 +10,14 @@ export interface EpubMetadata {
   description?: string;
 }
 
+export interface PdfMetadata {
+  title?: string;
+  author?: string;
+  language?: string;
+  publisher?: string;
+  description?: string;
+}
+
 function getTextContent(xml: string, tag: string): string | undefined {
   const regex = new RegExp(`<(?:dc:)?${tag}[^>]*>([\\s\\S]*?)<\\/(?:dc:)?${tag}>`, 'i');
   const match = xml.match(regex);
@@ -105,16 +113,32 @@ export async function extractEpubMetadata(filePath: string): Promise<EpubMetadat
   return metadata;
 }
 
-export async function extractPdfMetadata(filePath: string): Promise<{ title?: string; author?: string }> {
+export async function extractPdfMetadata(filePath: string): Promise<PdfMetadata> {
   try {
-    const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
-    GlobalWorkerOptions.workerSrc = '';
-    const doc = await getDocument({ url: `file://${filePath}`, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+    const buffer = await readFile(filePath);
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const doc = await getDocument({
+      data: new Uint8Array(buffer),
+      isEvalSupported: false,
+      useSystemFonts: true,
+    }).promise;
+
     const info = await doc.getMetadata();
-    const pdfInfo = info?.info as Record<string, string> | undefined;
-    const result: { title?: string; author?: string } = {};
+    const pdfInfo = info?.info as Record<string, string | undefined> | undefined;
+    const metadata = info?.metadata as { get?: (name: string) => string | undefined } | undefined;
+    const result: PdfMetadata = {};
+
     if (pdfInfo?.Title) result.title = pdfInfo.Title;
     if (pdfInfo?.Author) result.author = pdfInfo.Author;
+    if (pdfInfo?.Producer) result.publisher = pdfInfo.Producer;
+    if (pdfInfo?.Subject) result.description = pdfInfo.Subject;
+    if (pdfInfo?.Creator && !result.author) result.author = pdfInfo.Creator;
+    if (metadata?.get) {
+      result.language = metadata.get('dc:language') ?? metadata.get('language') ?? result.language;
+      result.publisher = metadata.get('dc:publisher') ?? metadata.get('publisher') ?? result.publisher;
+      result.description = metadata.get('dc:description') ?? metadata.get('description') ?? result.description;
+    }
+
     doc.destroy();
     return result;
   } catch {

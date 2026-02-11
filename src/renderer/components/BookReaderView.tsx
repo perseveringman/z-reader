@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2 } from 'lucide-react';
 import type { Book, Highlight } from '../../shared/types';
 import { BookReaderToc, type TocItem } from './BookReaderToc';
-import { BookReaderDetailPanel } from './BookReaderDetailPanel';
+import { BookReaderDetailPanel, type DetailTab } from './BookReaderDetailPanel';
 import { BookReaderSettings, loadBookReaderSettings, type BookReaderSettingsValues } from './BookReaderSettings';
 import { EpubReader, type BookReaderHandle } from './EpubReader';
 import { PdfReader } from './PdfReader';
@@ -22,6 +22,9 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<BookReaderSettingsValues>(loadBookReaderSettings);
   const [readProgress, setReadProgress] = useState(0);
+  const [detailActiveTab, setDetailActiveTab] = useState<DetailTab>('info');
+  const [focusedHighlightId, setFocusedHighlightId] = useState<string | null>(null);
+  const [focusSignal, setFocusSignal] = useState(0);
   const readerRef = useRef<BookReaderHandle>(null);
 
   useEffect(() => {
@@ -53,6 +56,18 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
     return () => { cancelled = true; };
   }, [bookId]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ bookId: string; highlightId: string }>;
+      const detail = customEvent.detail;
+      if (!detail || detail.bookId !== bookId) return;
+      handleHighlightNavigate(detail.highlightId);
+    };
+
+    window.addEventListener('book-reader:highlight-click', handler as EventListener);
+    return () => window.removeEventListener('book-reader:highlight-click', handler as EventListener);
+  }, [bookId, handleHighlightNavigate]);
+
   const handleTocNavigate = useCallback((item: TocItem) => {
     readerRef.current?.navigateTo(item.href);
   }, []);
@@ -62,6 +77,14 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
     if (hl?.anchorPath) {
       readerRef.current?.navigateToHighlight(hl.anchorPath);
     }
+
+    if (detailCollapsed) {
+      setDetailCollapsed(false);
+      localStorage.setItem('book-reader-detail-collapsed', 'false');
+    }
+    setDetailActiveTab('notebook');
+    setFocusedHighlightId(highlightId);
+    setFocusSignal((n) => n + 1);
   }, [highlights]);
 
   const handleDeleteHighlight = useCallback(async (id: string) => {
@@ -172,6 +195,7 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
               bookId={bookId}
               filePath={book.filePath}
               highlights={highlights}
+              onHighlightClick={handleHighlightNavigate}
               onHighlightsChange={setHighlights}
               onTocLoaded={setTocItems}
               onProgressChange={handleProgressChange}
@@ -200,7 +224,12 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
       <div className={`shrink-0 h-full transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
         <BookReaderDetailPanel
           book={book}
+          readProgress={readProgress}
           highlights={highlights}
+          activeTab={detailActiveTab}
+          onTabChange={setDetailActiveTab}
+          focusedHighlightId={focusedHighlightId}
+          focusSignal={focusSignal}
           onHighlightsChange={setHighlights}
           onDeleteHighlight={handleDeleteHighlight}
           onHighlightClick={handleHighlightNavigate}

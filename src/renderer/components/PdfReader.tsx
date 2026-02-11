@@ -16,6 +16,7 @@ import type { BookReaderSettingsValues } from './BookReaderSettings';
 import type { BookReaderHandle } from './EpubReader';
 
 // @ts-expect-error Vite ?url import
+// eslint-disable-next-line import/no-unresolved
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker as string;
 
@@ -39,6 +40,7 @@ interface PdfReaderProps {
   bookId: string;
   filePath: string;
   highlights: Highlight[];
+  onHighlightClick?: (highlightId: string) => void;
   onHighlightsChange: (highlights: Highlight[]) => void;
   onTocLoaded: (items: TocItem[]) => void;
   onProgressChange: (progress: number) => void;
@@ -122,6 +124,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
     bookId,
     filePath,
     highlights,
+    onHighlightClick,
     onHighlightsChange,
     onTocLoaded,
     onProgressChange,
@@ -398,8 +401,10 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
     let doc: PDFDocumentProxy | null = null;
 
     async function init() {
-      const url = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
-      const loadingTask = pdfjsLib.getDocument({ url });
+      const binary = await window.electronAPI.bookReadFile(bookId);
+      if (!binary) return;
+
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(binary) });
       doc = await loadingTask.promise;
       if (cancelled) {
         doc.destroy();
@@ -520,7 +525,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
       if (doc) doc.destroy();
       pdfDocRef.current = null;
     };
-  }, [filePath]); // eslint-disable-line
+  }, [bookId, filePath]); // eslint-disable-line
 
   useEffect(() => {
     if (!pdfDocRef.current) return;
@@ -659,6 +664,19 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
     setToolbar((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  const handleExistingHighlightClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const mark = target?.closest('mark[data-highlight-id]') as HTMLElement | null;
+    if (!mark) return;
+
+    const highlightId = mark.dataset.highlightId;
+    if (!highlightId) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    onHighlightClick?.(highlightId);
+  }, [onHighlightClick]);
+
   useEffect(() => {
     if (!toolbar.visible) return;
     const handler = (e: MouseEvent) => {
@@ -706,6 +724,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
         className="w-full h-full overflow-y-auto outline-none py-4"
         tabIndex={0}
         onMouseUp={handleMouseUp}
+        onClick={handleExistingHighlightClick}
         style={{ backgroundColor: bgColor }}
       />
 

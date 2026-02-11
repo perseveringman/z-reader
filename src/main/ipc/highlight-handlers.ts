@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
-import type { CreateHighlightInput, UpdateHighlightInput } from '../../shared/types';
+import type { CreateHighlightInput, CreateBookHighlightInput, UpdateHighlightInput } from '../../shared/types';
 
 export function registerHighlightHandlers() {
   const { HIGHLIGHT_LIST, HIGHLIGHT_CREATE, HIGHLIGHT_DELETE, HIGHLIGHT_UPDATE } = IPC_CHANNELS;
@@ -72,8 +72,52 @@ export function registerHighlightHandlers() {
       );
   });
 
+  // 与文档定义对齐：highlight:listByBook
+  ipcMain.handle(IPC_CHANNELS.HIGHLIGHT_LIST_BY_BOOK, async (_event, bookId: string) => {
+    const db = getDatabase();
+    return db
+      .select()
+      .from(schema.highlights)
+      .where(
+        and(
+          eq(schema.highlights.bookId, bookId),
+          eq(schema.highlights.deletedFlg, 0),
+        ),
+      );
+  });
+
   // Book 高亮创建
-  ipcMain.handle(IPC_CHANNELS.BOOK_HIGHLIGHT_CREATE, async (_event, input: { bookId: string; text: string; note?: string; color?: string; startOffset?: number; endOffset?: number; anchorPath?: string; paragraphIndex?: number }) => {
+  ipcMain.handle(IPC_CHANNELS.BOOK_HIGHLIGHT_CREATE, async (_event, input: CreateBookHighlightInput) => {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const id = randomUUID();
+
+    await db.insert(schema.highlights).values({
+      id,
+      articleId: null,
+      bookId: input.bookId,
+      text: input.text,
+      note: input.note ?? null,
+      color: input.color ?? 'yellow',
+      startOffset: input.startOffset ?? null,
+      endOffset: input.endOffset ?? null,
+      anchorPath: input.anchorPath ?? null,
+      paragraphIndex: input.paragraphIndex ?? null,
+      createdAt: now,
+      updatedAt: now,
+      deletedFlg: 0,
+    });
+
+    const [result] = await db
+      .select()
+      .from(schema.highlights)
+      .where(eq(schema.highlights.id, id));
+
+    return result;
+  });
+
+  // 与文档定义对齐：highlight:createForBook
+  ipcMain.handle(IPC_CHANNELS.HIGHLIGHT_CREATE_FOR_BOOK, async (_event, input: CreateBookHighlightInput) => {
     const db = getDatabase();
     const now = new Date().toISOString();
     const id = randomUUID();
