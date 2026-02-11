@@ -211,6 +211,24 @@ export interface UpdateBookInput {
   author?: string;
 }
 
+// ==================== YouTube 视频流相关类型 ====================
+export interface VideoFormat {
+  itag: number;
+  qualityLabel: string;    // "1080p", "720p", "360p" 等
+  width: number;
+  height: number;
+  url: string;
+  mimeType: string;
+  bitrate: number;
+  hasAudio: boolean;
+  hasVideo: boolean;
+}
+
+export interface VideoStreamData {
+  formats: VideoFormat[];     // 所有可用的视频 format（muxed + adaptive 视频）
+  bestAudio: VideoFormat | null; // 最佳音频流（给 adaptive 纯视频配对用）
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
@@ -280,7 +298,7 @@ export interface ElectronAPI {
   transcriptFetch: (articleId: string) => Promise<Transcript | null>;
 
   // YouTube 视频流
-  youtubeGetStreamUrl: (videoId: string) => Promise<{ url: string; mimeType: string } | null>;
+  youtubeGetStreamUrl: (videoId: string) => Promise<VideoStreamData | null>;
 
   // YouTube 认证
   youtubeLogin: () => Promise<boolean>;

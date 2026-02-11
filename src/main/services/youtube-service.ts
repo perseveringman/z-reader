@@ -1,5 +1,5 @@
 import { Innertube, Platform } from 'youtubei.js';
-import type { TranscriptSegment } from '../../shared/types';
+import type { TranscriptSegment, VideoFormat, VideoStreamData } from '../../shared/types';
 import { getStoredCookies } from './youtube-auth';
 import vm from 'node:vm';
 
@@ -140,10 +140,10 @@ export async function fetchTranscript(videoId: string): Promise<{ segments: Tran
 }
 
 /**
- * 获取 YouTube 视频流媒体直链 URL
- * 使用 cookie 认证的 Innertube 实例调用 /player 端点
+ * 获取 YouTube 视频所有可用流媒体格式
+ * 返回所有视频格式列表 + 最佳音频流，供前端选择清晰度
  */
-export async function getVideoStreamUrl(videoId: string): Promise<{ url: string; mimeType: string } | null> {
+export async function getVideoStreamUrl(videoId: string): Promise<VideoStreamData | null> {
   const cookie = await getStoredCookies();
   if (!cookie) {
     console.error('[YouTube Stream] 未登录，无法获取视频流');
@@ -172,8 +172,14 @@ export async function getVideoStreamUrl(videoId: string): Promise<{ url: string;
     const data = response.data as Record<string, unknown>;
     const playability = data.playabilityStatus as { status?: string; reason?: string } | undefined;
     const streamingData = data.streamingData as {
-      formats?: Array<{ url?: string; signatureCipher?: string; mimeType?: string; qualityLabel?: string }>;
-      adaptiveFormats?: Array<{ url?: string; signatureCipher?: string; mimeType?: string; qualityLabel?: string }>;
+      formats?: Array<{
+        itag?: number; url?: string; signatureCipher?: string; mimeType?: string;
+        qualityLabel?: string; width?: number; height?: number; bitrate?: number;
+      }>;
+      adaptiveFormats?: Array<{
+        itag?: number; url?: string; signatureCipher?: string; mimeType?: string;
+        qualityLabel?: string; width?: number; height?: number; bitrate?: number;
+      }>;
     } | undefined;
 
     console.log(`[YouTube Stream] 响应:`, {
@@ -187,33 +193,92 @@ export async function getVideoStreamUrl(videoId: string): Promise<{ url: string;
       return null;
     }
 
-    const allFormats = [
-      ...(streamingData.formats ?? []),
-      ...(streamingData.adaptiveFormats ?? []),
-    ];
+    // 辅助函数：解密单个 format 的 URL
+    const decipherUrl = async (fmt: { url?: string; signatureCipher?: string }): Promise<string | null> => {
+      let url = fmt.url;
+      if (!url && fmt.signatureCipher && player) {
+        url = await player.decipher(undefined, fmt.signatureCipher, undefined, new Map());
+      } else if (url && player) {
+        url = await player.decipher(url, undefined, undefined, new Map());
+      }
+      return url ?? null;
+    };
 
-    if (allFormats.length === 0) return null;
+    // 收集所有视频格式
+    const videoFormats: VideoFormat[] = [];
 
-    // 优先 muxed MP4（音视频合一），其次 adaptive 视频 MP4
-    const muxedMp4 = (streamingData.formats ?? []).filter(f => f.mimeType?.startsWith('video/mp4'));
-    const adaptiveVideo = (streamingData.adaptiveFormats ?? []).filter(f => f.mimeType?.startsWith('video/mp4'));
-    const bestFormat = muxedMp4.length > 0
-      ? muxedMp4[muxedMp4.length - 1]
-      : adaptiveVideo.length > 0
-        ? adaptiveVideo[0]
-        : allFormats[0];
-
-    // 解密 URL
-    let url = bestFormat.url;
-    if (!url && bestFormat.signatureCipher && player) {
-      url = await player.decipher(undefined, bestFormat.signatureCipher, undefined, new Map());
-    } else if (url && player) {
-      url = await player.decipher(url, undefined, undefined, new Map());
+    // muxed formats（音视频合一，通常最高 720p）
+    for (const fmt of streamingData.formats ?? []) {
+      if (!fmt.mimeType?.startsWith('video/')) continue;
+      const url = await decipherUrl(fmt);
+      if (!url) continue;
+      videoFormats.push({
+        itag: fmt.itag ?? 0,
+        qualityLabel: fmt.qualityLabel ?? `${fmt.height ?? 0}p`,
+        width: fmt.width ?? 0,
+        height: fmt.height ?? 0,
+        url,
+        mimeType: fmt.mimeType,
+        bitrate: fmt.bitrate ?? 0,
+        hasAudio: true,
+        hasVideo: true,
+      });
     }
 
-    if (!url) return null;
+    // adaptive video formats（纯视频，可到 4K）
+    for (const fmt of streamingData.adaptiveFormats ?? []) {
+      if (!fmt.mimeType?.startsWith('video/')) continue;
+      const url = await decipherUrl(fmt);
+      if (!url) continue;
+      videoFormats.push({
+        itag: fmt.itag ?? 0,
+        qualityLabel: fmt.qualityLabel ?? `${fmt.height ?? 0}p`,
+        width: fmt.width ?? 0,
+        height: fmt.height ?? 0,
+        url,
+        mimeType: fmt.mimeType,
+        bitrate: fmt.bitrate ?? 0,
+        hasAudio: false,
+        hasVideo: true,
+      });
+    }
 
-    return { url, mimeType: bestFormat.mimeType ?? 'video/mp4' };
+    if (videoFormats.length === 0) return null;
+
+    // 按 height 降序排列，同 qualityLabel 取 bitrate 最高的
+    videoFormats.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+    const seen = new Set<string>();
+    const dedupedFormats = videoFormats.filter(f => {
+      if (seen.has(f.qualityLabel)) return false;
+      seen.add(f.qualityLabel);
+      return true;
+    });
+
+    // 找最佳音频流（audio/mp4，最高 bitrate）
+    let bestAudio: VideoFormat | null = null;
+    for (const fmt of streamingData.adaptiveFormats ?? []) {
+      if (!fmt.mimeType?.startsWith('audio/mp4')) continue;
+      const url = await decipherUrl(fmt);
+      if (!url) continue;
+      const audioFmt: VideoFormat = {
+        itag: fmt.itag ?? 0,
+        qualityLabel: '',
+        width: 0,
+        height: 0,
+        url,
+        mimeType: fmt.mimeType,
+        bitrate: fmt.bitrate ?? 0,
+        hasAudio: true,
+        hasVideo: false,
+      };
+      if (!bestAudio || audioFmt.bitrate > bestAudio.bitrate) {
+        bestAudio = audioFmt;
+      }
+    }
+
+    console.log(`[YouTube Stream] 可用格式: ${dedupedFormats.map(f => f.qualityLabel).join(', ')}，最佳音频: ${bestAudio ? bestAudio.bitrate + 'bps' : '无'}`);
+
+    return { formats: dedupedFormats, bestAudio };
   } catch (err) {
     console.error('[YouTube Stream] 获取视频流失败:', err);
     return null;
