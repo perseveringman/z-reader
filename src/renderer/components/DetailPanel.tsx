@@ -8,6 +8,12 @@ type DetailTab = 'info' | 'notebook' | 'chat';
 interface DetailPanelProps {
   articleId: string | null;
   collapsed?: boolean;
+  /** 外部传入的高亮列表（视频模式由 VideoReaderView 管理） */
+  externalHighlights?: Highlight[];
+  /** 外部删除高亮回调（视频模式） */
+  onExternalDeleteHighlight?: (id: string) => void;
+  /** 点击高亮条目回调（用于跳转到对应位置） */
+  onHighlightClick?: (highlightId: string) => void;
 }
 
 const TABS: { key: DetailTab; label: string }[] = [
@@ -63,18 +69,22 @@ function formatDuration(seconds: number | null): string | null {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
+export function DetailPanel({ articleId, collapsed, externalHighlights, onExternalDeleteHighlight, onHighlightClick }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [internalHighlights, setInternalHighlights] = useState<Highlight[]>([]);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
+
+  // 使用外部高亮或内部高亮
+  const useExternal = externalHighlights != null;
+  const highlights = useExternal ? externalHighlights : internalHighlights;
 
   useEffect(() => {
     if (!articleId) {
       setArticle(null);
-      setHighlights([]);
+      setInternalHighlights([]);
       return;
     }
 
@@ -93,23 +103,32 @@ export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
       }
     });
 
-    window.electronAPI.highlightList(articleId).then((list) => {
-      if (!cancelled) setHighlights(list);
-    });
+    // 仅在非外部管理模式下自行加载高亮
+    if (!useExternal) {
+      window.electronAPI.highlightList(articleId).then((list) => {
+        if (!cancelled) setInternalHighlights(list);
+      });
+    }
 
     return () => { cancelled = true; };
-  }, [articleId]);
+  }, [articleId, useExternal]);
 
   const handleDeleteHighlight = useCallback(async (id: string) => {
-    await window.electronAPI.highlightDelete(id);
-    setHighlights((prev) => prev.filter((h) => h.id !== id));
-  }, []);
+    if (useExternal && onExternalDeleteHighlight) {
+      onExternalDeleteHighlight(id);
+    } else {
+      await window.electronAPI.highlightDelete(id);
+      setInternalHighlights((prev) => prev.filter((h) => h.id !== id));
+    }
+  }, [useExternal, onExternalDeleteHighlight]);
 
   const handleSaveNote = useCallback(async (hlId: string, note: string) => {
     const updated = await window.electronAPI.highlightUpdate({ id: hlId, note });
-    setHighlights((prev) => prev.map((h) => h.id === hlId ? updated : h));
+    if (!useExternal) {
+      setInternalHighlights((prev) => prev.map((h) => h.id === hlId ? updated : h));
+    }
     setEditingNoteId(null);
-  }, []);
+  }, [useExternal]);
 
   const handleExport = useCallback(async (mode: 'clipboard' | 'file') => {
     if (!articleId) return;
@@ -288,7 +307,8 @@ export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
                     {highlights.map((hl) => (
                       <div
                         key={hl.id}
-                        className="group relative flex rounded-lg bg-[#1a1a1a] border border-white/5 overflow-hidden"
+                        className={`group relative flex rounded-lg bg-[#1a1a1a] border border-white/5 overflow-hidden ${onHighlightClick ? 'cursor-pointer hover:border-white/10' : ''}`}
+                        onClick={() => onHighlightClick?.(hl.id)}
                       >
                         <div
                           className="w-[3px] shrink-0"

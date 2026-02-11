@@ -1,4 +1,7 @@
 import { BrowserWindow, session } from 'electron';
+import { writeFile, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const PARTITION = 'persist:youtube-auth';
 const YOUTUBE_LOGIN_URL = 'https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&continue=https://www.youtube.com/';
@@ -80,4 +83,42 @@ export async function isLoggedIn(): Promise<boolean> {
   const ses = session.fromPartition(PARTITION);
   const cookies = await ses.cookies.get({ domain: '.youtube.com', name: 'SAPISID' });
   return cookies.length > 0;
+}
+
+// 缓存 cookie 文件路径，避免重复写入
+let cachedCookieFilePath: string | null = null;
+
+/**
+ * 将 Electron session 中的 YouTube cookie 导出为 Netscape 格式临时文件
+ * 供 yt-dlp --cookies 使用；返回临时文件路径，用完需调用 cleanupCookieFile 清理
+ */
+export async function exportCookieFile(): Promise<string | null> {
+  const ses = session.fromPartition(PARTITION);
+  const cookies = await ses.cookies.get({ domain: '.youtube.com' });
+  if (cookies.length === 0) return null;
+
+  const lines = ['# Netscape HTTP Cookie File'];
+  for (const c of cookies) {
+    const domain = c.domain ?? '.youtube.com';
+    const includeSubdomains = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+    const path = c.path ?? '/';
+    const secure = c.secure ? 'TRUE' : 'FALSE';
+    const expires = c.expirationDate ? Math.floor(c.expirationDate) : 0;
+    lines.push(`${domain}\t${includeSubdomains}\t${path}\t${secure}\t${expires}\t${c.name}\t${c.value}`);
+  }
+
+  const filePath = join(tmpdir(), `yt-dlp-cookies-${process.pid}.txt`);
+  await writeFile(filePath, lines.join('\n'), 'utf-8');
+  cachedCookieFilePath = filePath;
+  return filePath;
+}
+
+/**
+ * 清理导出的临时 cookie 文件
+ */
+export async function cleanupCookieFile(): Promise<void> {
+  if (cachedCookieFilePath) {
+    await unlink(cachedCookieFilePath).catch(() => {});
+    cachedCookieFilePath = null;
+  }
 }

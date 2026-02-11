@@ -1,7 +1,8 @@
 import { Innertube, Platform } from 'youtubei.js';
 import type { TranscriptSegment, VideoFormat, VideoStreamData } from '../../shared/types';
-import { getStoredCookies } from './youtube-auth';
+import { getStoredCookies, exportCookieFile, cleanupCookieFile } from './youtube-auth';
 import vm from 'node:vm';
+import { execFile } from 'node:child_process';
 
 // 注册自定义 JS 评估器，用于解密 YouTube 视频流 URL
 // youtubei.js 默认不内置解释器，需要外部提供
@@ -103,39 +104,110 @@ export async function resolveYouTubeChannelFeed(url: string): Promise<string | n
 }
 
 /**
- * 获取 YouTube 视频字幕
- * 优先手动上传字幕，其次自动生成字幕
+ * 使用 yt-dlp 获取 YouTube 视频字幕
+ * 优先手动字幕，其次自动生成字幕；格式使用 json3 解析
  */
 export async function fetchTranscript(videoId: string): Promise<{ segments: TranscriptSegment[]; language: string | null } | null> {
+  let cookieFile: string | null = null;
   try {
-    const client = await getClient();
-    const info = await client.getInfo(videoId);
-    const transcriptInfo = await info.getTranscript();
+    // 导出 cookie 文件供 yt-dlp 使用
+    cookieFile = await exportCookieFile();
 
-    const body = transcriptInfo?.transcript?.content?.body;
-    if (!body?.initial_segments) {
+    // 用 yt-dlp --dump-json 获取视频元数据（含字幕 URL）
+    const args = ['--dump-json', '--skip-download'];
+    if (cookieFile) {
+      args.push('--cookies', cookieFile);
+    }
+    args.push(`https://www.youtube.com/watch?v=${videoId}`);
+
+    const metadata = await new Promise<Record<string, unknown>>((resolve, reject) => {
+      execFile('yt-dlp', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        if (err) return reject(err);
+        try {
+          resolve(JSON.parse(stdout) as Record<string, unknown>);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    const subtitles = metadata.subtitles as Record<string, Array<{ ext: string; url: string }>> | undefined;
+    const autoCaptions = metadata.automatic_captions as Record<string, Array<{ ext: string; url: string }>> | undefined;
+
+    // 语言优先级：en > zh-Hans > zh > 第一个可用语言
+    const langPriority = ['en', 'zh-Hans', 'zh'];
+
+    // 查找字幕 URL：优先手动字幕，其次自动字幕
+    let subUrl: string | null = null;
+    let language: string | null = null;
+
+    for (const source of [subtitles, autoCaptions]) {
+      if (!source) continue;
+      // 按优先级查找
+      for (const lang of langPriority) {
+        const formats = source[lang];
+        if (!formats) continue;
+        const json3 = formats.find(f => f.ext === 'json3');
+        if (json3) {
+          subUrl = json3.url;
+          language = lang;
+          break;
+        }
+      }
+      if (subUrl) break;
+      // 没找到优先语言，取第一个有 json3 的语言
+      for (const [lang, formats] of Object.entries(source)) {
+        const json3 = formats.find(f => f.ext === 'json3');
+        if (json3) {
+          subUrl = json3.url;
+          language = lang;
+          break;
+        }
+      }
+      if (subUrl) break;
+    }
+
+    if (!subUrl) {
+      console.log(`[YouTube Transcript] 视频 ${videoId} 无可用字幕`);
       return null;
     }
 
-    const segments: TranscriptSegment[] = [];
-    for (const seg of body.initial_segments) {
-      if (seg.type === 'TranscriptSegment') {
-        const startMs = (seg as unknown as Record<string, unknown>).start_ms;
-        const endMs = (seg as unknown as Record<string, unknown>).end_ms;
-        const snippet = (seg as unknown as Record<string, unknown>).snippet as { text?: string } | undefined;
-        const start = Number(startMs) / 1000;
-        const end = Number(endMs) / 1000;
-        const text = snippet?.text ?? '';
-        if (text) {
-          segments.push({ start, end, text });
-        }
-      }
+    console.log(`[YouTube Transcript] 下载字幕: ${language}`);
+
+    // 下载 json3 格式字幕
+    const res = await fetch(subUrl);
+    if (!res.ok) {
+      console.error(`[YouTube Transcript] 下载字幕失败: ${res.status}`);
+      return null;
     }
 
-    return segments.length > 0 ? { segments, language: null } : null;
+    const json3Data = await res.json() as {
+      events?: Array<{
+        tStartMs?: number;
+        dDurationMs?: number;
+        segs?: Array<{ utf8?: string }>;
+      }>;
+    };
+
+    if (!json3Data.events) return null;
+
+    // 解析 json3 events 为 TranscriptSegment
+    const segments: TranscriptSegment[] = [];
+    for (const event of json3Data.events) {
+      if (!event.segs || event.tStartMs == null) continue;
+      const text = event.segs.map(s => s.utf8 ?? '').join('').trim();
+      if (!text || text === '\n') continue;
+      const start = event.tStartMs / 1000;
+      const end = (event.tStartMs + (event.dDurationMs ?? 0)) / 1000;
+      segments.push({ start, end, text });
+    }
+
+    return segments.length > 0 ? { segments, language } : null;
   } catch (err) {
     console.error('获取字幕失败:', err);
     return null;
+  } finally {
+    await cleanupCookieFile();
   }
 }
 

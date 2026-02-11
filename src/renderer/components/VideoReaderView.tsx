@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Loader2, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { Article, TranscriptSegment } from '../../shared/types';
+import type { Article, TranscriptSegment, Highlight, HighlightTagsMap } from '../../shared/types';
 import { VideoPlayer, type VideoPlayerRef } from './VideoPlayer';
 import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
@@ -8,6 +8,14 @@ import { DetailPanel } from './DetailPanel';
 interface VideoReaderViewProps {
   articleId: string;
   onClose: () => void;
+}
+
+/** 解析 anchorPath "transcript:startIdx-endIdx" 获取起始 segment */
+function parseScrollTarget(anchorPath: string | null): number | null {
+  if (!anchorPath?.startsWith('transcript:')) return null;
+  const parts = anchorPath.slice('transcript:'.length).split('-');
+  const idx = parseInt(parts[0], 10);
+  return isNaN(idx) ? null : idx;
 }
 
 export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
@@ -19,6 +27,13 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   const [detailCollapsed, setDetailCollapsed] = useState(() =>
     localStorage.getItem('video-reader-detail-collapsed') === 'true'
   );
+
+  // 高亮状态
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [highlightTagsMap, setHighlightTagsMap] = useState<HighlightTagsMap>({});
+  // 外部触发 TranscriptView 滚动到某个 segment（使用自增计数器触发更新）
+  const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
+  const scrollTriggerRef = useRef(0);
 
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const progressSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +76,75 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     return () => { cancelled = true; };
   }, [articleId, article?.videoId]);
 
+  // 加载高亮数据
+  useEffect(() => {
+    let cancelled = false;
+
+    window.electronAPI.highlightList(articleId).then((list) => {
+      if (!cancelled) {
+        setHighlights(list);
+        // 批量加载高亮标签
+        if (list.length > 0) {
+          const ids = list.map((h) => h.id);
+          window.electronAPI.highlightTagsBatch(ids).then((map) => {
+            if (!cancelled) setHighlightTagsMap(map);
+          });
+        }
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [articleId]);
+
+  // 创建高亮
+  const handleCreateHighlight = useCallback(async (data: {
+    text: string;
+    paragraphIndex: number;
+    startOffset: number;
+    endOffset: number;
+    anchorPath: string;
+  }) => {
+    const hl = await window.electronAPI.highlightCreate({
+      articleId,
+      text: data.text,
+      color: 'yellow',
+      paragraphIndex: data.paragraphIndex,
+      startOffset: data.startOffset,
+      endOffset: data.endOffset,
+      anchorPath: data.anchorPath,
+    });
+    setHighlights((prev) => [...prev, hl]);
+  }, [articleId]);
+
+  // 删除高亮
+  const handleDeleteHighlight = useCallback(async (id: string) => {
+    await window.electronAPI.highlightDelete(id);
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    setHighlightTagsMap((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  // 更新高亮笔记
+  const handleUpdateHighlight = useCallback(async (id: string, note: string) => {
+    const updated = await window.electronAPI.highlightUpdate({ id, note });
+    setHighlights((prev) => prev.map((h) => h.id === id ? updated : h));
+  }, []);
+
+  // 点击高亮跳转到对应字幕 segment
+  const handleHighlightClick = useCallback((highlightId: string) => {
+    const hl = highlights.find((h) => h.id === highlightId);
+    if (!hl) return;
+    const segIdx = parseScrollTarget(hl.anchorPath);
+    if (segIdx != null) {
+      // 使用自增计数器确保即使是同一个 segment 也能触发滚动
+      scrollTriggerRef.current += 1;
+      setScrollToSegment(segIdx + scrollTriggerRef.current * 0.001);
+    }
+  }, [highlights]);
+
   // 播放进度回调
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
@@ -83,7 +167,6 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   // 视频时长回调
   const handleDuration = useCallback((duration: number) => {
     durationRef.current = duration;
-    // 如果数据库中没有 duration，更新一下
     if (article && !article.duration) {
       setArticle(prev => prev ? { ...prev, duration } : prev);
     }
@@ -139,6 +222,9 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     );
   }
 
+  // scrollToSegment 转为整数给 TranscriptView
+  const scrollToSegmentInt = scrollToSegment != null ? Math.floor(scrollToSegment) : null;
+
   return (
     <div className="flex flex-col h-full bg-[#0f0f0f]">
       {/* 顶部工具栏 */}
@@ -183,6 +269,12 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
               currentTime={currentTime}
               onSegmentClick={handleSegmentClick}
               loading={transcriptLoading}
+              highlights={highlights}
+              onCreateHighlight={handleCreateHighlight}
+              onDeleteHighlight={handleDeleteHighlight}
+              onUpdateHighlight={handleUpdateHighlight}
+              highlightTagsMap={highlightTagsMap}
+              scrollToSegment={scrollToSegmentInt}
             />
           </div>
         </div>
@@ -191,6 +283,9 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
         <DetailPanel
           articleId={articleId}
           collapsed={detailCollapsed}
+          externalHighlights={highlights}
+          onExternalDeleteHighlight={handleDeleteHighlight}
+          onHighlightClick={handleHighlightClick}
         />
       </div>
     </div>
