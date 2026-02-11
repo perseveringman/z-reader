@@ -17,6 +17,7 @@ export const feeds = sqliteTable('feeds', {
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
   pinned: integer('pinned').default(0),
+  feedType: text('feed_type').default('rss'),
 });
 
 // ==================== articles 表 ====================
@@ -41,6 +42,9 @@ export const articles = sqliteTable('articles', {
   isShortlisted: integer('is_shortlisted').default(0),
   source: text('source').default('feed'),
   domain: text('domain'),
+  mediaType: text('media_type').default('article'),
+  videoId: text('video_id'),
+  duration: integer('duration'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
@@ -119,4 +123,13 @@ export const books = sqliteTable('books', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
+});
+
+// ==================== transcripts 表 ====================
+export const transcripts = sqliteTable('transcripts', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').references(() => articles.id),
+  segments: text('segments'), // JSON: [{start, end, text}]
+  language: text('language'),
+  createdAt: text('created_at').notNull(),
 });

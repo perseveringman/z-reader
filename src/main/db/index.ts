@@ -225,6 +225,35 @@ function initTables(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_highlight_tags_tag_id ON highlight_tags(tag_id);
   `);
+
+  // Migration: articles 表新增 YouTube 相关字段
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN media_type TEXT DEFAULT 'article'`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN video_id TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN duration INTEGER`);
+  } catch { /* Column already exists */ }
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_articles_media_type ON articles(media_type)`);
+
+  // Migration: feeds 表新增 feed_type 字段
+  try {
+    sqlite.exec(`ALTER TABLE feeds ADD COLUMN feed_type TEXT DEFAULT 'rss'`);
+  } catch { /* Column already exists */ }
+
+  // Migration: transcripts 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS transcripts (
+      id TEXT PRIMARY KEY,
+      article_id TEXT REFERENCES articles(id),
+      segments TEXT,
+      language TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_transcripts_article_id ON transcripts(article_id);
+  `);
 }
 
 export { schema };
