@@ -80,6 +80,20 @@ const electronAPI: ElectronAPI = {
   youtubeLogin: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_LOGIN),
   youtubeLogout: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_LOGOUT),
   youtubeAuthStatus: () => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_AUTH_STATUS),
+
+  // Podcast
+  podcastSearch: (query) => ipcRenderer.invoke(IPC_CHANNELS.PODCAST_SEARCH, query),
+  podcastResolveUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.PODCAST_RESOLVE_URL, url),
+
+  // Download
+  downloadStart: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_START, articleId),
+  downloadCancel: (downloadId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_CANCEL, downloadId),
+  downloadList: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_LIST),
+  downloadStatus: (downloadId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_STATUS, downloadId),
+
+  // Settings
+  settingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
+  settingsSet: (settings) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, settings),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

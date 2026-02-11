@@ -68,6 +68,12 @@ export interface Article {
   mediaType: string;
   videoId: string | null;
   duration: number | null;
+  audioUrl: string | null;
+  audioMime: string | null;
+  audioBytes: number | null;
+  audioDuration: number | null;
+  episodeNumber: number | null;
+  seasonNumber: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -230,6 +236,46 @@ export interface VideoStreamData {
   bestAudio: VideoFormat | null; // 最佳音频流（给 adaptive 纯视频配对用）
 }
 
+// ==================== Podcast 相关类型 ====================
+export interface PodcastSearchResult {
+  title: string;
+  author: string | null;
+  image: string | null;
+  feedUrl: string | null;
+  website: string | null;
+  source: 'itunes' | 'podcastindex';
+  id: string;
+}
+
+export type PodcastSearchType = 'show' | 'episode';
+
+export interface PodcastSearchQuery {
+  query: string;
+  type?: PodcastSearchType;
+  limit?: number;
+}
+
+// ==================== Download 相关类型 ====================
+export type DownloadStatus = 'queued' | 'downloading' | 'ready' | 'failed';
+
+export interface DownloadRecord {
+  id: string;
+  articleId: string;
+  filePath: string | null;
+  bytes: number | null;
+  status: DownloadStatus;
+  addedAt: string;
+  lastAccessedAt: string | null;
+}
+
+// ==================== Settings 相关类型 ====================
+export interface AppSettings {
+  podcastIndexApiKey?: string;
+  podcastIndexApiSecret?: string;
+  downloadDirectory?: string;
+  downloadCapacityMb?: number;
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
@@ -309,4 +355,18 @@ export interface ElectronAPI {
   youtubeLogin: () => Promise<boolean>;
   youtubeLogout: () => Promise<void>;
   youtubeAuthStatus: () => Promise<boolean>;
+
+  // Podcast 操作
+  podcastSearch: (query: PodcastSearchQuery) => Promise<PodcastSearchResult[]>;
+  podcastResolveUrl: (url: string) => Promise<{ feedUrl: string; title?: string; author?: string; image?: string } | null>;
+
+  // Download 操作
+  downloadStart: (articleId: string) => Promise<DownloadRecord>;
+  downloadCancel: (downloadId: string) => Promise<void>;
+  downloadList: () => Promise<DownloadRecord[]>;
+  downloadStatus: (downloadId: string) => Promise<DownloadRecord | null>;
+
+  // Settings 操作
+  settingsGet: () => Promise<AppSettings>;
+  settingsSet: (settings: Partial<AppSettings>) => Promise<AppSettings>;
 }

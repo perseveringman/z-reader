@@ -9,9 +9,18 @@ const parser = new Parser({
     'User-Agent': 'Z-Reader/1.0',
   },
   customFields: {
+    feed: [
+      ['itunes:author', 'itunesAuthor'] as unknown as string,
+      ['itunes:image', 'itunesImage'] as unknown as string,
+    ],
     item: [
-      ['content:encoded', 'contentEncoded'],
-      ['yt:videoId', 'ytVideoId'],
+      ['content:encoded', 'contentEncoded'] as unknown as string,
+      ['yt:videoId', 'ytVideoId'] as unknown as string,
+      ['itunes:duration', 'itunesDuration'] as unknown as string,
+      ['itunes:episode', 'itunesEpisode'] as unknown as string,
+      ['itunes:season', 'itunesSeason'] as unknown as string,
+      ['itunes:image', 'itunesImage'] as unknown as string,
+      ['itunes:author', 'itunesAuthor'] as unknown as string,
     ],
   },
 });
@@ -29,10 +38,26 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-type RssItem = Parser.Item & { contentEncoded?: string; id?: string; author?: string; ytVideoId?: string };
+type RssItem = Parser.Item & {
+  contentEncoded?: string;
+  id?: string;
+  author?: string;
+  ytVideoId?: string;
+  itunesDuration?: string;
+  itunesEpisode?: string;
+  itunesSeason?: string;
+  itunesImage?: string | { $: { href: string } };
+  itunesAuthor?: string;
+};
 
-function extractThumbnail(item: RssItem): string | null {
-  if (item.enclosure?.url) return item.enclosure.url;
+function extractThumbnail(item: RssItem, isPodcast: boolean): string | null {
+  // For podcasts, prefer itunes:image
+  if (isPodcast && item.itunesImage) {
+    if (typeof item.itunesImage === 'string') return item.itunesImage;
+    if (item.itunesImage.$?.href) return item.itunesImage.$.href;
+  }
+  // For non-podcasts, enclosure is often an image thumbnail
+  if (!isPodcast && item.enclosure?.url) return item.enclosure.url;
   const content = item.contentEncoded ?? item.content ?? '';
   const match = content.match(/<img[^>]+src=["']([^"']+)["']/);
   return match?.[1] ?? null;
@@ -41,6 +66,33 @@ function extractThumbnail(item: RssItem): string | null {
 function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
+}
+
+/**
+ * Detect if a parsed RSS feed is a podcast feed.
+ * A feed is a podcast if any item has an audio enclosure or if the feed uses iTunes namespace.
+ */
+function isPodcastFeed(parsed: { items: Parser.Item[] }, xml: string): boolean {
+  // Check for iTunes namespace in XML
+  if (xml.includes('xmlns:itunes') || xml.includes('itunes:')) return true;
+  // Check for audio enclosures in items
+  return parsed.items.some((item) => {
+    const enc = item.enclosure;
+    return enc?.url && enc.type?.startsWith('audio/');
+  });
+}
+
+/** Parse itunes:duration string to seconds. Supports HH:MM:SS, MM:SS, or raw seconds. */
+function parseDuration(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  // Pure numeric: treat as seconds
+  if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+  const parts = trimmed.split(':').map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return null;
 }
 
 export interface FetchResult {
@@ -87,6 +139,12 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
     const newEtag = response.headers.get('etag') ?? null;
     const newLastModified = response.headers.get('last-modified') ?? null;
 
+    // Detect podcast feeds and auto-set feedType
+    const isPodcast = feedType === 'podcast' || isPodcastFeed(parsed, xml);
+    if (isPodcast && feedType !== 'podcast') {
+      await db.update(schema.feeds).set({ feedType: 'podcast' }).where(eq(schema.feeds.id, feedId));
+    }
+
     let newArticles = 0;
 
     for (const rawItem of parsed.items) {
@@ -116,19 +174,40 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
       const wordCount = contentText.split(/\s+/).filter(Boolean).length;
       const readingTime = Math.max(1, Math.round(wordCount / 200));
 
+      // Podcast-specific fields
+      const enclosure = item.enclosure;
+      const isAudioEnclosure = enclosure?.url && enclosure.type?.startsWith('audio/');
+      const audioUrl = isPodcast && isAudioEnclosure ? enclosure.url : null;
+      const audioMime = isPodcast && isAudioEnclosure ? (enclosure.type ?? null) : null;
+      const audioBytes = isPodcast && isAudioEnclosure && enclosure.length
+        ? parseInt(String(enclosure.length), 10) || null
+        : null;
+      const audioDuration = isPodcast ? parseDuration(item.itunesDuration) : null;
+      const episodeNumber = isPodcast && item.itunesEpisode
+        ? parseInt(item.itunesEpisode, 10) || null
+        : null;
+      const seasonNumber = isPodcast && item.itunesSeason
+        ? parseInt(item.itunesSeason, 10) || null
+        : null;
+
+      // Determine media type
+      let mediaType = 'article';
+      if (isYouTubeFeed) mediaType = 'video';
+      else if (isPodcast) mediaType = 'podcast';
+
       await db.insert(schema.articles).values({
         id: randomUUID(),
         feedId,
         guid,
         url: articleUrl,
         title: item.title ?? null,
-        author: item.creator ?? (item.author as string | undefined) ?? null,
+        author: item.creator ?? (item.author as string | undefined) ?? item.itunesAuthor ?? null,
         summary,
         content: rawContent || null,
         contentText: contentText || null,
         thumbnail: isYouTubeFeed && (item as RssItem).ytVideoId
           ? `https://i.ytimg.com/vi/${(item as RssItem).ytVideoId}/hqdefault.jpg`
-          : extractThumbnail(item),
+          : extractThumbnail(item, isPodcast),
         wordCount,
         readingTime,
         publishedAt: item.isoDate ?? null,
@@ -136,8 +215,15 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
         readStatus: 'unseen',
         source: 'feed',
         domain: isYouTubeFeed ? 'youtube.com' : extractDomain(articleUrl ?? undefined),
-        mediaType: isYouTubeFeed ? 'video' : 'article',
+        mediaType,
         videoId: isYouTubeFeed ? (item as RssItem).ytVideoId ?? null : null,
+        duration: audioDuration ?? null,
+        audioUrl,
+        audioMime,
+        audioBytes,
+        audioDuration,
+        episodeNumber,
+        seasonNumber,
         createdAt: now,
         updatedAt: now,
       });

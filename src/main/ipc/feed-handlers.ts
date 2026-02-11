@@ -6,7 +6,25 @@ import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { fetchFeed, fetchAllFeeds, importOpml } from '../services/rss-service';
 import { isYouTubeUrl, resolveYouTubeChannelFeed } from '../services/youtube-service';
+import { resolvePodcastUrl } from '../services/podcast-resolver';
 import type { CreateFeedInput, UpdateFeedInput } from '../../shared/types';
+
+/** Check if a URL is from a known podcast platform. */
+function isPodcastPlatformUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return (
+      hostname.includes('podcasts.apple.com') ||
+      hostname.includes('itunes.apple.com') ||
+      hostname.includes('open.spotify.com') ||
+      hostname.includes('spotify.com') ||
+      hostname.includes('xiaoyuzhoufm.com') ||
+      hostname.includes('xyzfm.link')
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function registerFeedHandlers() {
   const {
@@ -23,18 +41,26 @@ export function registerFeedHandlers() {
     // YouTube URL 自动转换
     let feedUrl = input.url;
     let feedType = 'rss';
+    let resolvedTitle = input.title ?? null;
 
     if (isYouTubeUrl(input.url)) {
       const resolved = await resolveYouTubeChannelFeed(input.url);
       if (!resolved) throw new Error('无法解析 YouTube 频道的 RSS 地址');
       feedUrl = resolved;
       feedType = 'youtube';
+    } else if (isPodcastPlatformUrl(input.url)) {
+      // Podcast platform URL (Apple Podcasts, Spotify, 小宇宙)
+      const resolved = await resolvePodcastUrl(input.url);
+      if (!resolved?.feedUrl) throw new Error('无法解析播客 RSS 地址，请直接输入 RSS URL');
+      feedUrl = resolved.feedUrl;
+      feedType = 'podcast';
+      if (!resolvedTitle && resolved.title) resolvedTitle = resolved.title;
     }
 
     const values = {
       id,
       url: feedUrl,
-      title: input.title ?? null,
+      title: resolvedTitle,
       category: input.category ?? null,
       feedType,
       createdAt: now,
