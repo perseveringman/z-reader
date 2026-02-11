@@ -64,6 +64,10 @@ const electronAPI: ElectronAPI = {
   // Book Highlight
   bookHighlightList: (bookId) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_HIGHLIGHT_LIST, bookId),
   bookHighlightCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_HIGHLIGHT_CREATE, input),
+
+  // Transcript
+  transcriptGet: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_GET, articleId),
+  transcriptFetch: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_FETCH, articleId),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

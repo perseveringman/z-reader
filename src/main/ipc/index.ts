@@ -5,6 +5,7 @@ import { registerTagHandlers } from './tag-handlers';
 import { registerExportHandlers } from './export-handlers';
 import { registerBookHandlers } from './book-handlers';
 import { registerHighlightTagHandlers } from './highlight-tag-handlers';
+import { registerTranscriptHandlers } from './transcript-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -14,4 +15,5 @@ export function registerAllIpcHandlers() {
   registerExportHandlers();
   registerBookHandlers();
   registerHighlightTagHandlers();
+  registerTranscriptHandlers();
 }
