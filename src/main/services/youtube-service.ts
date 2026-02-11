@@ -77,9 +77,9 @@ export async function fetchTranscript(videoId: string): Promise<{ segments: Tran
     const segments: TranscriptSegment[] = [];
     for (const seg of body.initial_segments) {
       if (seg.type === 'TranscriptSegment') {
-        const startMs = (seg as Record<string, unknown>).start_ms;
-        const endMs = (seg as Record<string, unknown>).end_ms;
-        const snippet = (seg as Record<string, unknown>).snippet as { text?: string } | undefined;
+        const startMs = (seg as unknown as Record<string, unknown>).start_ms;
+        const endMs = (seg as unknown as Record<string, unknown>).end_ms;
+        const snippet = (seg as unknown as Record<string, unknown>).snippet as { text?: string } | undefined;
         const start = Number(startMs) / 1000;
         const end = Number(endMs) / 1000;
         const text = snippet?.text ?? '';
