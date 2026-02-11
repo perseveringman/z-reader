@@ -200,6 +200,21 @@ function initTables(sqlite: Database.Database) {
     // Column already exists — no-op
   }
 
+  // Migration: add file_type column to books
+  try {
+    sqlite.exec(`ALTER TABLE books ADD COLUMN file_type TEXT DEFAULT 'epub'`);
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add book_id column to highlights for book highlighting
+  try {
+    sqlite.exec(`ALTER TABLE highlights ADD COLUMN book_id TEXT REFERENCES books(id)`);
+  } catch {
+    // Column already exists
+  }
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_highlights_book_id ON highlights(book_id)`);
+
   // Migration: highlight_tags 关联表
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS highlight_tags (

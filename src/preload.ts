@@ -60,6 +60,10 @@ const electronAPI: ElectronAPI = {
   bookGetContent: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_CONTENT, id),
   bookPermanentDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_PERMANENT_DELETE, id),
   bookRestore: (id) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_RESTORE, id),
+
+  // Book Highlight
+  bookHighlightList: (bookId) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_HIGHLIGHT_LIST, bookId),
+  bookHighlightCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BOOK_HIGHLIGHT_CREATE, input),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

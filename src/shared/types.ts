@@ -124,6 +124,17 @@ export interface UpdateHighlightInput {
   color?: string;
 }
 
+export interface CreateBookHighlightInput {
+  bookId: string;
+  text: string;
+  note?: string;
+  color?: string;
+  startOffset?: number;
+  endOffset?: number;
+  anchorPath?: string;
+  paragraphIndex?: number;
+}
+
 // ==================== Tag 相关类型 ====================
 export interface Tag {
   id: string;
@@ -148,6 +159,7 @@ export interface Book {
   author: string | null;
   cover: string | null;
   filePath: string;
+  fileType: string;
   fileSize: number | null;
   language: string | null;
   publisher: string | null;
@@ -237,4 +249,8 @@ export interface ElectronAPI {
   bookGetContent: (id: string) => Promise<string>;
   bookPermanentDelete: (id: string) => Promise<void>;
   bookRestore: (id: string) => Promise<Book>;
+
+  // Book Highlight 操作
+  bookHighlightList: (bookId: string) => Promise<Highlight[]>;
+  bookHighlightCreate: (input: CreateBookHighlightInput) => Promise<Highlight>;
 }

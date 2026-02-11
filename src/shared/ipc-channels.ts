@@ -56,4 +56,8 @@ export const IPC_CHANNELS = {
   BOOK_GET_CONTENT: 'book:getContent',
   BOOK_PERMANENT_DELETE: 'book:permanentDelete',
   BOOK_RESTORE: 'book:restore',
+
+  // Book Highlight
+  BOOK_HIGHLIGHT_LIST: 'bookHighlight:list',
+  BOOK_HIGHLIGHT_CREATE: 'bookHighlight:create',
 } as const;

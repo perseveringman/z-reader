@@ -50,6 +50,7 @@ export const articles = sqliteTable('articles', {
 export const highlights = sqliteTable('highlights', {
   id: text('id').primaryKey(),
   articleId: text('article_id').references(() => articles.id),
+  bookId: text('book_id').references(() => books.id),
   text: text('text'),
   note: text('note'),
   color: text('color').default('yellow'),
@@ -105,6 +106,7 @@ export const books = sqliteTable('books', {
   author: text('author'),
   cover: text('cover'), // base64 或文件路径
   filePath: text('file_path').notNull(), // EPUB 文件存储路径
+  fileType: text('file_type').default('epub'), // epub | pdf
   fileSize: integer('file_size'),
   language: text('language'),
   publisher: text('publisher'),

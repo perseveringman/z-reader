@@ -147,9 +147,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   // ==================== 阅读进度追踪 ====================
 
   const flushProgress = useCallback(() => {
-    if (readProgressRef.current > 0) {
-      window.electronAPI.articleUpdate({ id: articleId, readProgress: readProgressRef.current });
-    }
+    window.electronAPI.articleUpdate({ id: articleId, readProgress: readProgressRef.current });
   }, [articleId]);
 
   useEffect(() => {
@@ -161,10 +159,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       const maxScroll = scrollHeight - clientHeight;
       if (maxScroll <= 0) return;
       const progress = Math.min(scrollTop / maxScroll, 1);
-      // 只允许进度前进
-      const next = Math.max(progress, readProgressRef.current);
-      readProgressRef.current = next;
-      setReadProgress(next);
+      // 进度可以前进或后退
+      readProgressRef.current = progress;
+      setReadProgress(progress);
 
       // debounce 写入数据库
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -539,6 +536,17 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         return;
       }
 
+      // Shift + R: 重置阅读进度
+      if (e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        if (article && article.readProgress && article.readProgress > 0) {
+          window.electronAPI.articleUpdate({ id: article.id, readProgress: 0 });
+          readProgressRef.current = 0;
+          setReadProgress(0);
+        }
+        return;
+      }
+
       if (inInput) return;
       if (!contentRef.current) return;
       const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
@@ -827,6 +835,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           onDeleteHighlight={handleDeleteHighlight}
           onHighlightClick={handleHighlightNavigate}
           forceTab={forceTab}
+          readProgress={readProgress}
         />
       </div>
     </div>

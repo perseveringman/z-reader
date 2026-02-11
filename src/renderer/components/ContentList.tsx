@@ -452,6 +452,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           }
           break;
         }
+        case 'r':
+        case 'R': {
+          if (e.shiftKey && selectedArticleId) {
+            e.preventDefault();
+            const article = articles.find((a) => a.id === selectedArticleId);
+            if (article && article.readProgress && article.readProgress > 0) {
+              window.electronAPI.articleUpdate({ id: selectedArticleId, readProgress: 0 });
+              // 实时更新本地状态
+              setArticles((prev) => prev.map((a) => a.id === selectedArticleId ? { ...a, readProgress: 0 } : a));
+            }
+          }
+          break;
+        }
         case 'j':
         case 'ArrowDown': {
           e.preventDefault();
@@ -535,7 +548,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [articles, selectedArticleId, onSelectArticle, onOpenReader, fetchArticles, undoStack, selectedIds, isFeedView, isLibraryView, markAsSeen]);
+  }, [articles, selectedArticleId, onOpenReader, fetchArticles, undoStack, selectedIds, isFeedView, isLibraryView, markAsSeen]);
 
   useEffect(() => {
     if (!selectedArticleId || !listRef.current) return;

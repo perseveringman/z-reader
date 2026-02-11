@@ -562,3 +562,42 @@
   color: #8b5e3c;
   border-color: rgba(139, 94, 60, 0.2);
 }
+
+/* ==================== PDF Text Layer ==================== */
+.pdf-text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+}
+
+.pdf-text-layer span,
+.pdf-text-layer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0% 0%;
+}
+
+.pdf-text-layer ::selection {
+  background: rgba(0, 100, 255, 0.35);
+}
+
+.pdf-text-layer mark {
+  padding: 1px 0;
+  border-radius: 2px;
+}
+
+.pdf-page-label {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: rgba(150, 150, 150, 0.5);
+  pointer-events: none;
+  user-select: none;
+}

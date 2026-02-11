@@ -15,6 +15,7 @@ import { FeedDetailPanel } from './components/FeedDetailPanel';
 import { BookList } from './components/BookList';
 import { BookDetailPanel } from './components/BookDetailPanel';
 import { BookUploadPanel } from './components/BookUploadPanel';
+import { BookReaderView } from './components/BookReaderView';
 import type { Feed, ArticleSource } from '../shared/types';
 
 export function App() {
@@ -183,7 +184,7 @@ export function App() {
       <div className="flex flex-col h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
         {/* macOS title bar drag region */}
         <div className="h-[38px] shrink-0 drag-region flex items-center" />
-        {!readerMode ? (
+        {!readerMode && !bookReaderMode ? (
           <div className="flex flex-1 min-h-0">
             <Sidebar
               collapsed={sidebarCollapsed}
@@ -279,6 +280,16 @@ export function App() {
                 <DetailPanel articleId={selectedArticleId} collapsed={detailPanelCollapsed} />
               </>
             )}
+          </div>
+        ) : bookReaderMode && bookReaderId ? (
+          <div className="flex-1 min-h-0">
+            <BookReaderView
+              bookId={bookReaderId}
+              onClose={() => {
+                setBookReaderMode(false);
+                setBookReaderId(null);
+              }}
+            />
           </div>
         ) : (
           <div className="flex-1 min-h-0">

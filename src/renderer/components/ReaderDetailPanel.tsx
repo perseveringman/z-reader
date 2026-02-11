@@ -12,6 +12,8 @@ interface ReaderDetailPanelProps {
   onHighlightClick?: (highlightId: string) => void;
   /** 外部指定切换到的 tab，变化时触发切换 */
   forceTab?: { tab: DetailTab; ts: number };
+  /** 外部传入的阅读进度，实时更新 */
+  readProgress?: number;
 }
 
 interface MetaRow {
@@ -52,7 +54,7 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab }: ReaderDetailPanelProps) {
+export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0 }: ReaderDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
         { label: 'Domain', value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
         { label: 'Published', value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
         { label: 'Length', value: article.readingTime ? `${article.readingTime} min` : null, icon: <Clock className="w-3.5 h-3.5" /> },
-        { label: 'Progress', value: `${Math.round(article.readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> },
+        { label: 'Progress', value: `${Math.round(readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> },
         { label: 'Saved', value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
         { label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> },
       ]

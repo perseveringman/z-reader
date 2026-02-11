@@ -46,8 +46,8 @@ export function registerBookHandlers() {
   // 导入 EPUB 文件
   ipcMain.handle(BOOK_IMPORT, async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: '选择 EPUB 文件',
-      filters: [{ name: 'EPUB', extensions: ['epub'] }],
+      title: '选择书籍文件',
+      filters: [{ name: 'Books', extensions: ['epub', 'pdf'] }],
       properties: ['openFile', 'multiSelections'],
     });
     if (canceled || filePaths.length === 0) return [];
@@ -62,8 +62,9 @@ export function registerBookHandlers() {
     for (const srcPath of filePaths) {
       const id = randomUUID();
       const fileName = basename(srcPath);
-      const title = basename(fileName, extname(fileName));
-      const destPath = join(booksDir, `${id}${extname(fileName)}`);
+      const ext = extname(fileName).toLowerCase();
+      const title = basename(fileName, ext);
+      const destPath = join(booksDir, `${id}${ext}`);
 
       // 复制文件到应用数据目录
       await copyFile(srcPath, destPath);
@@ -77,6 +78,7 @@ export function registerBookHandlers() {
         author: null,
         cover: null,
         filePath: destPath,
+        fileType: ext === '.epub' ? 'epub' : 'pdf',
         fileSize: fileStat.size,
         language: null,
         publisher: null,
