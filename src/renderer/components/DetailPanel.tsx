@@ -54,6 +54,15 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
+function formatDuration(seconds: number | null): string | null {
+  if (!seconds) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
@@ -110,13 +119,20 @@ export function DetailPanel({ articleId, collapsed }: DetailPanelProps) {
     }
   }, [articleId]);
 
+  const isVideo = article?.mediaType === 'video';
   const metaRows: MetaRow[] = article
     ? [
         { label: 'Published', value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
-        { label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> },
+        ...(!isVideo ? [{ label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> }] : []),
         { label: 'Domain', value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
-        { label: 'Reading Time', value: article.readingTime ? `${article.readingTime} min` : null, icon: <Clock className="w-3.5 h-3.5" /> },
-        { label: 'Word Count', value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> },
+        ...(isVideo && article.duration
+          ? [{ label: 'Length', value: formatDuration(article.duration), icon: <Clock className="w-3.5 h-3.5" /> }]
+          : []),
+        ...(isVideo
+          ? [{ label: 'Progress', value: `${Math.round(article.readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> }]
+          : []),
+        ...(!isVideo ? [{ label: 'Reading Time', value: article.readingTime ? `${article.readingTime} min` : null, icon: <Clock className="w-3.5 h-3.5" /> }] : []),
+        ...(!isVideo ? [{ label: 'Word Count', value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> }] : []),
         { label: 'Saved', value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
       ]
     : [];
