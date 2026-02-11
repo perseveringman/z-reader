@@ -20,7 +20,7 @@ import type { Feed, ArticleSource } from '../shared/types';
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<string>('library-inbox');
+  const [activeView, setActiveView] = useState<string>('library-articles');
   const [readerArticleId, setReaderArticleId] = useState<string | null>(null);
   const [readerMode, setReaderMode] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -45,9 +45,7 @@ export function App() {
     : undefined;
 
   const initialTab =
-    activeView === 'library-inbox' ? 'inbox'
-    : activeView === 'library-later' ? 'later'
-    : activeView === 'library-archive' ? 'archive'
+    activeView.startsWith('library-') ? 'inbox'
     : activeView === 'feed-unseen' ? 'unseen'
     : activeView === 'feed-seen' ? 'seen'
     : activeView === 'feeds' ? 'unseen'
@@ -141,7 +139,7 @@ export function App() {
 
   const handleSearchSelect = useCallback((articleId: string) => {
     setSelectedArticleId(articleId);
-    setActiveView('library-inbox');
+    setActiveView('library-articles');
   }, []);
 
   const handleSaveFeed = useCallback(async (feed: Feed) => {

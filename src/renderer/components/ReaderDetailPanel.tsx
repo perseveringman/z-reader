@@ -9,6 +9,7 @@ interface ReaderDetailPanelProps {
   highlights: Highlight[];
   onHighlightsChange: (highlights: Highlight[]) => void;
   onDeleteHighlight: (id: string) => void;
+  onHighlightClick?: (highlightId: string) => void;
   /** 外部指定切换到的 tab，变化时触发切换 */
   forceTab?: { tab: DetailTab; ts: number };
 }
@@ -51,7 +52,7 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, forceTab }: ReaderDetailPanelProps) {
+export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab }: ReaderDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
@@ -214,10 +215,11 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                         </button>
                       </div>
                     </div>
-                    {highlights.map((hl) => (
+                    {[...highlights].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((hl) => (
                       <div
                         key={hl.id}
-                        className="group relative flex rounded-lg bg-[#1a1a1a] border border-white/5 overflow-hidden"
+                        className="group relative flex rounded-lg bg-[#1a1a1a] border border-white/5 overflow-hidden cursor-pointer hover:border-white/15 transition-colors"
+                        onClick={() => onHighlightClick?.(hl.id)}
                       >
                         <div
                           className="w-[3px] shrink-0"

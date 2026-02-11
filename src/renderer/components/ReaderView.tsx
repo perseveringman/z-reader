@@ -263,6 +263,24 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     applyHighlights();
   }, [highlights, loading, article?.content, applyHighlights]);
 
+  // ==================== 高亮导航 ====================
+
+  const handleHighlightNavigate = useCallback((highlightId: string) => {
+    if (!contentRef.current) return;
+    const mark = contentRef.current.querySelector(`mark[data-highlight-id="${highlightId}"]`);
+    if (!mark) return;
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 闪烁动画提示
+    const el = mark as HTMLElement;
+    el.style.transition = 'outline 0.2s';
+    el.style.outline = '2px solid rgba(251,191,36,0.8)';
+    el.style.outlineOffset = '2px';
+    setTimeout(() => {
+      el.style.outline = 'none';
+      el.style.outlineOffset = '0';
+    }, 1500);
+  }, []);
+
   // ==================== 段落焦点 ====================
 
   useEffect(() => {
@@ -807,6 +825,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           highlights={highlights}
           onHighlightsChange={setHighlights}
           onDeleteHighlight={handleDeleteHighlight}
+          onHighlightClick={handleHighlightNavigate}
           forceTab={forceTab}
         />
       </div>

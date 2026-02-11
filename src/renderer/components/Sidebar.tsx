@@ -20,6 +20,12 @@ import {
   Pin,
   Keyboard,
   BookOpen,
+  FileText,
+  Mail,
+  FileType,
+  Twitter,
+  Video,
+  Podcast,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -202,25 +208,53 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         {(collapsed || sections.library) && (
           <>
             <NavItem
-              icon={<Inbox size={iconSize} />}
-              label="Inbox"
-              active={activeView === 'library-inbox'}
+              icon={<FileText size={iconSize} />}
+              label="Articles"
+              active={activeView === 'library-articles'}
               collapsed={collapsed}
-              onClick={() => onViewChange('library-inbox')}
+              onClick={() => onViewChange('library-articles')}
             />
             <NavItem
-              icon={<Clock size={iconSize} />}
-              label="Later"
-              active={activeView === 'library-later'}
+              icon={<BookOpen size={iconSize} />}
+              label="Books"
+              active={activeView === 'books'}
               collapsed={collapsed}
-              onClick={() => onViewChange('library-later')}
+              onClick={() => onViewChange('books')}
             />
             <NavItem
-              icon={<Archive size={iconSize} />}
-              label="Archive"
-              active={activeView === 'library-archive'}
+              icon={<Mail size={iconSize} />}
+              label="Emails"
+              active={activeView === 'library-emails'}
               collapsed={collapsed}
-              onClick={() => onViewChange('library-archive')}
+              onClick={() => onViewChange('library-emails')}
+            />
+            <NavItem
+              icon={<FileType size={iconSize} />}
+              label="PDFs"
+              active={activeView === 'library-pdfs'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-pdfs')}
+            />
+            <NavItem
+              icon={<Twitter size={iconSize} />}
+              label="Tweets"
+              active={activeView === 'library-tweets'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-tweets')}
+            />
+            <NavItem
+              icon={<Video size={iconSize} />}
+              label="Videos"
+              active={activeView === 'library-videos'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-videos')}
+            />
+            <NavItem
+              icon={<Podcast size={iconSize} />}
+              label="Podcasts"
+              active={activeView === 'library-podcasts'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('library-podcasts')}
             />
             <NavItem
               icon={<Tag size={iconSize} />}
@@ -259,13 +293,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                 )}
               </button>
             ))}
-            <NavItem
-              icon={<BookOpen size={iconSize} />}
-              label="Books"
-              active={activeView === 'books'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('books')}
-            />
           </>
         )}
 
