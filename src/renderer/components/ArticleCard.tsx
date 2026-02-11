@@ -45,6 +45,15 @@ function getDomainInitial(domain: string | null): string {
   return domain.replace(/^www\./, '').charAt(0).toUpperCase();
 }
 
+function formatDuration(seconds: number | null): string | null {
+  if (!seconds) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function ArticleCard({ article, isSelected, onHover, onClick, onStatusChange, onToggleShortlist, trashMode, onRestore, onPermanentDelete, compact, multiSelect, isChecked, onToggleCheck, onContextMenu: onCtxMenu, source, onSaveToLibrary }: ArticleCardProps) {
   const [hovered, setHovered] = useState(false);
 
@@ -121,13 +130,20 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
 
       {/* 缩略图 / 域名首字母 */}
       {!compact && (
-        <div className="shrink-0">
+        <div className="shrink-0 relative">
           {article.thumbnail ? (
-            <img
-              src={article.thumbnail}
-              alt=""
-              className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
-            />
+            <>
+              <img
+                src={article.thumbnail}
+                alt=""
+                className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
+              />
+              {article.mediaType === 'video' && article.duration && (
+                <span className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/80 text-white text-[10px] font-medium rounded">
+                  {formatDuration(article.duration)}
+                </span>
+              )}
+            </>
           ) : (
             <div className={`w-14 h-14 rounded-md bg-white/[0.06] flex items-center justify-center text-base font-semibold ${isRead ? 'text-gray-600' : 'text-gray-500'}`}>
               {domainInitial}
