@@ -115,13 +115,12 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
             <input
               ref={inputRef}
               id="feed-url"
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com/feed.xml"
+              placeholder="https://example.com/feed.xml 或 YouTube 频道 URL"
               className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
-              required
             />
           </div>
 
@@ -191,7 +190,7 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
         {/* 提示信息 */}
         <div className="px-6 pb-6 pt-0">
           <p className="text-xs text-gray-500">
-            提示: 可以直接输入网站首页 URL，系统会自动查找 RSS 地址
+            提示: 可以直接输入 RSS URL、网站首页或 YouTube 频道链接
           </p>
         </div>
       </div>
