@@ -16,6 +16,7 @@ import { BookList } from './components/BookList';
 import { BookDetailPanel } from './components/BookDetailPanel';
 import { BookUploadPanel } from './components/BookUploadPanel';
 import { BookReaderView } from './components/BookReaderView';
+import { VideoReaderView } from './components/VideoReaderView';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
 
 export function App() {
@@ -38,6 +39,7 @@ export function App() {
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [bookReaderMode, setBookReaderMode] = useState(false);
   const [bookReaderId, setBookReaderId] = useState<string | null>(null);
+  const [readerMediaType, setReaderMediaType] = useState<string>('article');
 
   // Derive source and sub-view from activeView
   const contentSource: ArticleSource | undefined =
@@ -134,7 +136,9 @@ export function App() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  const handleOpenReader = useCallback((articleId: string) => {
+  const handleOpenReader = useCallback(async (articleId: string) => {
+    const article = await window.electronAPI.articleGet(articleId);
+    setReaderMediaType(article?.mediaType ?? 'article');
     setReaderArticleId(articleId);
     setReaderMode(true);
   }, []);
@@ -296,6 +300,13 @@ export function App() {
                 setBookReaderMode(false);
                 setBookReaderId(null);
               }}
+            />
+          </div>
+        ) : readerMediaType === 'video' ? (
+          <div className="flex-1 min-h-0">
+            <VideoReaderView
+              articleId={readerArticleId!}
+              onClose={handleCloseReader}
             />
           </div>
         ) : (
