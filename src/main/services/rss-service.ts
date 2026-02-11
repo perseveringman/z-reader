@@ -9,7 +9,10 @@ const parser = new Parser({
     'User-Agent': 'Z-Reader/1.0',
   },
   customFields: {
-    item: [['content:encoded', 'contentEncoded']],
+    item: [
+      ['content:encoded', 'contentEncoded'],
+      ['yt:videoId', 'ytVideoId'],
+    ],
   },
 });
 
@@ -26,7 +29,7 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-type RssItem = Parser.Item & { contentEncoded?: string; id?: string; author?: string };
+type RssItem = Parser.Item & { contentEncoded?: string; id?: string; author?: string; ytVideoId?: string };
 
 function extractThumbnail(item: RssItem): string | null {
   if (item.enclosure?.url) return item.enclosure.url;
@@ -53,6 +56,9 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
 
   const [feed] = await db.select().from(schema.feeds).where(eq(schema.feeds.id, feedId));
   if (!feed) throw new Error(`Feed not found: ${feedId}`);
+
+  const feedType = feed.feedType ?? 'rss';
+  const isYouTubeFeed = feedType === 'youtube';
 
   try {
     const requestHeaders: Record<string, string> = {};
@@ -120,14 +126,18 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
         summary,
         content: rawContent || null,
         contentText: contentText || null,
-        thumbnail: extractThumbnail(item),
+        thumbnail: isYouTubeFeed && (item as RssItem).ytVideoId
+          ? `https://i.ytimg.com/vi/${(item as RssItem).ytVideoId}/hqdefault.jpg`
+          : extractThumbnail(item),
         wordCount,
         readingTime,
         publishedAt: item.isoDate ?? null,
         savedAt: now,
         readStatus: 'unseen',
         source: 'feed',
-        domain: extractDomain(articleUrl ?? undefined),
+        domain: isYouTubeFeed ? 'youtube.com' : extractDomain(articleUrl ?? undefined),
+        mediaType: isYouTubeFeed ? 'video' : 'article',
+        videoId: isYouTubeFeed ? (item as RssItem).ytVideoId ?? null : null,
         createdAt: now,
         updatedAt: now,
       });

@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { fetchFeed, fetchAllFeeds, importOpml } from '../services/rss-service';
+import { isYouTubeUrl, resolveYouTubeChannelFeed } from '../services/youtube-service';
 import type { CreateFeedInput, UpdateFeedInput } from '../../shared/types';
 
 export function registerFeedHandlers() {
@@ -18,11 +19,24 @@ export function registerFeedHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     const id = randomUUID();
+
+    // YouTube URL 自动转换
+    let feedUrl = input.url;
+    let feedType = 'rss';
+
+    if (isYouTubeUrl(input.url)) {
+      const resolved = await resolveYouTubeChannelFeed(input.url);
+      if (!resolved) throw new Error('无法解析 YouTube 频道的 RSS 地址');
+      feedUrl = resolved;
+      feedType = 'youtube';
+    }
+
     const values = {
       id,
-      url: input.url,
+      url: feedUrl,
       title: input.title ?? null,
       category: input.category ?? null,
+      feedType,
       createdAt: now,
       updatedAt: now,
     };
