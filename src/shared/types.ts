@@ -10,6 +10,7 @@ export interface Feed {
   lastFetchedAt: string | null;
   errorCount: number;
   pinned: number;
+  feedType: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,7 @@ export interface UpdateFeedInput {
 }
 
 export type ArticleSource = 'library' | 'feed';
+export type MediaType = 'article' | 'video' | 'podcast';
 export type ReadStatus = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen';
 
 export interface SaveUrlInput {
@@ -63,6 +65,9 @@ export interface Article {
   isShortlisted: number;
   source: ArticleSource;
   domain: string | null;
+  mediaType: string;
+  videoId: string | null;
+  duration: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +82,7 @@ export interface ArticleListQuery {
   sortOrder?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
+  mediaType?: MediaType;
 }
 
 export interface ArticleSearchQuery {
@@ -148,6 +154,21 @@ export interface Tag {
 // ==================== Highlight-Tag 相关类型 ====================
 export interface HighlightTagsMap {
   [highlightId: string]: Tag[];
+}
+
+// ==================== Transcript 相关类型 ====================
+export interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Transcript {
+  id: string;
+  articleId: string;
+  segments: TranscriptSegment[];
+  language: string | null;
+  createdAt: string;
 }
 
 // ==================== Book 相关类型 ====================
@@ -253,4 +274,8 @@ export interface ElectronAPI {
   // Book Highlight 操作
   bookHighlightList: (bookId: string) => Promise<Highlight[]>;
   bookHighlightCreate: (input: CreateBookHighlightInput) => Promise<Highlight>;
+
+  // Transcript 操作
+  transcriptGet: (articleId: string) => Promise<Transcript | null>;
+  transcriptFetch: (articleId: string) => Promise<Transcript | null>;
 }

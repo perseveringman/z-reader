@@ -60,4 +60,8 @@ export const IPC_CHANNELS = {
   // Book Highlight
   BOOK_HIGHLIGHT_LIST: 'bookHighlight:list',
   BOOK_HIGHLIGHT_CREATE: 'bookHighlight:create',
+
+  // Transcript
+  TRANSCRIPT_GET: 'transcript:get',
+  TRANSCRIPT_FETCH: 'transcript:fetch',
 } as const;
