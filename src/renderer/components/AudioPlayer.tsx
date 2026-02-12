@@ -2,13 +2,12 @@ import { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHand
 import {
   Play,
   Pause,
-  SkipBack,
-  SkipForward,
   Volume2,
   VolumeX,
   Loader2,
   Download,
   RotateCcw,
+  RotateCw,
 } from 'lucide-react';
 
 export interface AudioPlayerRef {
@@ -65,7 +64,6 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
     const [playbackRate, setPlaybackRate] = useState(1);
     const [volume, setVolume] = useState(1);
     const [muted, setMuted] = useState(false);
-    const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
     // Expose imperative methods
     useImperativeHandle(ref, () => ({
@@ -331,7 +329,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
               className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer relative"
               title={`前进 ${SKIP_FORWARD_SECONDS} 秒`}
             >
-              <SkipForward size={20} />
+              <RotateCw size={20} />
               <span className="absolute bottom-0 right-0 text-[8px] font-bold">
                 {SKIP_FORWARD_SECONDS}
               </span>
@@ -339,31 +337,25 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
           </div>
 
           {/* Right: volume */}
-          <div className="flex items-center gap-1 relative">
+          <div className="flex items-center justify-end gap-2 w-28 shrink-0">
             <button
               onClick={toggleMute}
-              onMouseEnter={() => setShowVolumeSlider(true)}
               className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
               title={muted ? '取消静音' : '静音'}
             >
               {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </button>
-            {showVolumeSlider && (
-              <div
-                className="flex items-center"
-                onMouseLeave={() => setShowVolumeSlider(false)}
-              >
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={muted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="w-16 h-1 accent-blue-500 cursor-pointer"
-                />
-              </div>
-            )}
+            <div className="flex items-center">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={muted ? 0 : volume}
+                onChange={handleVolumeChange}
+                className="w-16 h-1 accent-blue-500 cursor-pointer"
+              />
+            </div>
           </div>
         </div>
       </div>
