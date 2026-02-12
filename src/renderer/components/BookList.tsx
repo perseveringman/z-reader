@@ -281,8 +281,10 @@ function BookCard({ book, isSelected, onSelect, onOpen }: BookCardProps) {
 
   return (
     <div
-      onClick={() => onSelect(book.id)}
-      onDoubleClick={() => onOpen(book.id)}
+      onClick={() => {
+        onSelect(book.id);
+        onOpen(book.id);
+      }}
       onMouseEnter={() => {
         setHovered(true);
         onSelect(book.id);
