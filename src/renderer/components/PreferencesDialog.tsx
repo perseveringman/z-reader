@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle } from 'lucide-react';
 import { useToast } from './Toast';
-import type { AgentGraphSnapshotItem, AgentResumePreviewResult, AppSettings } from '../../shared/types';
+import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
 
 interface PreferencesDialogProps {
   open: boolean;
@@ -37,6 +37,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [staleBeforeLocal, setStaleBeforeLocal] = useState('');
 
   const [resumeSnapshotId, setResumeSnapshotId] = useState('');
+  const [resumeMode, setResumeMode] = useState<AgentResumeMode>('safe');
   const [resumePreview, setResumePreview] = useState<AgentResumePreviewResult | null>(null);
   const [resumePreviewLoading, setResumePreviewLoading] = useState(false);
   const [resumeExecuting, setResumeExecuting] = useState(false);
@@ -54,6 +55,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setMaxSnapshotsPerTask(5);
       setStaleBeforeLocal('');
       setResumeSnapshotId('');
+      setResumeMode('safe');
       setResumePreview(null);
       setResumeConfirmed(false);
 
@@ -172,7 +174,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     setAgentError(null);
 
     try {
-      const preview = await window.electronAPI.agentResumePreview({ snapshotId });
+      const preview = await window.electronAPI.agentResumePreview({ snapshotId, mode: resumeMode });
       setResumePreview(preview);
       setResumeConfirmed(false);
     } catch (err) {
@@ -191,9 +193,9 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       return;
     }
 
-    const requiresConfirm = resumePreview?.riskLevel === 'high' || resumePreview?.riskLevel === 'critical';
+    const requiresConfirm = resumePreview?.requiresConfirmation ?? false;
     if (requiresConfirm && !resumeConfirmed) {
-      setAgentError('高风险恢复请先勾选确认');
+      setAgentError('当前恢复模式需要人工确认');
       return;
     }
 
@@ -203,6 +205,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     try {
       const result = await window.electronAPI.agentResumeExecute({
         snapshotId,
+        mode: resumeMode,
         confirmed: resumeConfirmed,
       });
 
@@ -519,8 +522,22 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
                 <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-gray-400 break-all">
-                      当前恢复快照：{resumeSnapshotId || '未选择'}
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-400 break-all">
+                        当前恢复快照：{resumeSnapshotId || '未选择'}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-gray-500" htmlFor="resume-mode">恢复模式</label>
+                        <select
+                          id="resume-mode"
+                          value={resumeMode}
+                          onChange={(e) => setResumeMode(e.target.value === 'delegate' ? 'delegate' : 'safe')}
+                          className="px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="safe">safe（无副作用）</option>
+                          <option value="delegate">delegate（真实执行器）</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -545,6 +562,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   {resumePreview ? (
                     <div className="text-xs space-y-1">
                       <div className="text-gray-400">
+                        模式：
+                        <span className="text-indigo-300 ml-1">{resumePreview.mode}</span>
+                      </div>
+                      <div className="text-gray-400">
                         可恢复：
                         <span className={resumePreview.canResume ? 'text-green-300 ml-1' : 'text-red-300 ml-1'}>
                           {String(resumePreview.canResume)}
@@ -560,13 +581,19 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                       <div className="text-gray-500 break-all">
                         failed: {resumePreview.failedNodeIds.join(', ') || '(none)'}
                       </div>
+                      <div className="text-gray-400">
+                        需要确认：
+                        <span className={resumePreview.requiresConfirmation ? 'text-yellow-300 ml-1' : 'text-green-300 ml-1'}>
+                          {String(resumePreview.requiresConfirmation)}
+                        </span>
+                      </div>
                       {resumePreview.reason ? <div className="text-red-300">{resumePreview.reason}</div> : null}
                     </div>
                   ) : (
                     <div className="text-xs text-gray-500">可先执行“恢复预检”查看风险与可恢复性。</div>
                   )}
 
-                  {(resumePreview?.riskLevel === 'high' || resumePreview?.riskLevel === 'critical') && resumePreview.canResume ? (
+                  {resumePreview?.requiresConfirmation && resumePreview.canResume ? (
                     <label className="flex items-center gap-2 text-xs text-yellow-200">
                       <input
                         type="checkbox"
@@ -574,7 +601,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                         onChange={(e) => setResumeConfirmed(e.target.checked)}
                         className="accent-yellow-500"
                       />
-                      <span>我已确认高风险恢复操作，并理解其可能影响</span>
+                      <span>我已确认当前恢复模式可能触发真实执行器副作用</span>
                     </label>
                   ) : null}
                 </div>

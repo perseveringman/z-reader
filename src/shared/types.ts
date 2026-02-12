@@ -377,11 +377,15 @@ export interface AgentSnapshotCleanupResult {
   deletedIds: string[];
 }
 
+export type AgentResumeMode = 'safe' | 'delegate';
+
 export interface AgentResumePreviewInput {
   snapshotId: string;
+  mode?: AgentResumeMode;
 }
 
 export interface AgentResumePreviewResult {
+  mode: AgentResumeMode;
   snapshotId: string;
   taskId: string;
   sessionId: string;
@@ -390,6 +394,7 @@ export interface AgentResumePreviewResult {
   pendingNodeIds: string[];
   failedNodeIds: string[];
   riskLevel: AgentRiskLevel;
+  requiresConfirmation: boolean;
   canResume: boolean;
   reason?: string;
 }
@@ -397,6 +402,7 @@ export interface AgentResumePreviewResult {
 export interface AgentResumeExecuteInput {
   snapshotId: string;
   confirmed: boolean;
+  mode?: AgentResumeMode;
   maxParallel?: number;
 }
 
@@ -409,6 +415,7 @@ export interface AgentResumeExecuteResultNode {
 export interface AgentResumeExecuteResult {
   success: boolean;
   message: string;
+  mode: AgentResumeMode;
   replayTaskId?: string;
   result?: {
     graphId: string;

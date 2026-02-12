@@ -7,10 +7,12 @@ import {
   SqliteGraphSnapshotStore,
   SqliteTaskStore,
   SqliteTraceStore,
+  type GraphExecutorResolver,
 } from '../../core-agent';
 import { getSqlite } from '../db';
 
 const approvalQueue = new InMemoryApprovalQueue();
+let resumeSpecialistResolver: GraphExecutorResolver | undefined;
 
 function getSqliteOrThrow() {
   const sqlite = getSqlite();
@@ -41,6 +43,10 @@ export function createGraphSnapshotStore() {
   return new SqliteGraphSnapshotStore(getSqliteOrThrow());
 }
 
+export function setResumeSpecialistResolver(resolver?: GraphExecutorResolver): void {
+  resumeSpecialistResolver = resolver;
+}
+
 export function createReplayService(): AuditReplayService {
   return new AuditReplayService(createTaskStore(), createTraceStore());
 }
@@ -49,6 +55,7 @@ export function createSnapshotResumeService(): AgentSnapshotResumeService {
   return new AgentSnapshotResumeService({
     snapshotStore: createGraphSnapshotStore(),
     taskStore: createTaskStore(),
+    specialistResolver: resumeSpecialistResolver,
   });
 }
 

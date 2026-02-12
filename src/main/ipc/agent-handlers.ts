@@ -120,14 +120,20 @@ export function registerAgentHandlers() {
   );
 
   ipcMain.handle(AGENT_RESUME_PREVIEW, async (_event, input: AgentResumePreviewInput): Promise<AgentResumePreviewResult> => {
+    const mode = input?.mode === 'delegate' ? 'delegate' : 'safe';
+
     return createSnapshotResumeService().preview({
       snapshotId: input?.snapshotId ?? '',
+      mode,
     });
   });
 
   ipcMain.handle(AGENT_RESUME_EXECUTE, async (_event, input: AgentResumeExecuteInput): Promise<AgentResumeExecuteResult> => {
+    const mode = input?.mode === 'delegate' ? 'delegate' : 'safe';
+
     return createSnapshotResumeService().execute({
       snapshotId: input?.snapshotId ?? '',
+      mode,
       confirmed: Boolean(input?.confirmed),
       maxParallel:
         typeof input?.maxParallel === 'number' && Number.isFinite(input.maxParallel)
