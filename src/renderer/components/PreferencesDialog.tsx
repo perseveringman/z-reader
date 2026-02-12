@@ -1,24 +1,46 @@
 import { useState, useEffect } from 'react';
-import { X, Loader2, Save, Podcast, HardDrive, Compass } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2 } from 'lucide-react';
 import { useToast } from './Toast';
-import type { AppSettings } from '../../shared/types';
+import type { AgentGraphSnapshotItem, AppSettings } from '../../shared/types';
 
 interface PreferencesDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
+const SNAPSHOT_STATUS_CLASS: Record<AgentGraphSnapshotItem['status'], string> = {
+  running: 'text-blue-300',
+  succeeded: 'text-green-300',
+  failed: 'text-red-300',
+  canceled: 'text-yellow-300',
+};
+
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  const [agentTaskId, setAgentTaskId] = useState('');
+  const [agentSnapshots, setAgentSnapshots] = useState<AgentGraphSnapshotItem[]>([]);
+  const [agentSnapshotLoading, setAgentSnapshotLoading] = useState(false);
+  const [agentCleanupLoading, setAgentCleanupLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [maxSnapshotsPerTask, setMaxSnapshotsPerTask] = useState(5);
+  const [staleBeforeLocal, setStaleBeforeLocal] = useState('');
+
   const { showToast } = useToast();
 
   useEffect(() => {
     if (open) {
       setLoading(true);
       setDirty(false);
+      setAgentTaskId('');
+      setAgentSnapshots([]);
+      setAgentError(null);
+      setMaxSnapshotsPerTask(5);
+      setStaleBeforeLocal('');
+
       window.electronAPI
         .settingsGet()
         .then((s) => setSettings(s))
@@ -59,6 +81,70 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     }
   };
 
+  const loadSnapshots = async () => {
+    const taskId = agentTaskId.trim();
+    if (!taskId) {
+      setAgentSnapshots([]);
+      setAgentError('请输入 taskId 后再查询快照');
+      return;
+    }
+
+    setAgentSnapshotLoading(true);
+    setAgentError(null);
+
+    try {
+      const snapshots = await window.electronAPI.agentSnapshotList({ taskId });
+      setAgentSnapshots(snapshots);
+    } catch (err) {
+      console.error('Failed to list agent snapshots:', err);
+      setAgentSnapshots([]);
+      setAgentError('快照查询失败，请稍后重试');
+    } finally {
+      setAgentSnapshotLoading(false);
+    }
+  };
+
+  const handleCleanupSnapshots = async () => {
+    const hasStaleBefore = staleBeforeLocal.trim().length > 0;
+    const staleBeforeDate = hasStaleBefore ? new Date(staleBeforeLocal) : null;
+
+    if (hasStaleBefore && (!staleBeforeDate || Number.isNaN(staleBeforeDate.getTime()))) {
+      showToast('清理时间格式无效');
+      return;
+    }
+
+    setAgentCleanupLoading(true);
+    setAgentError(null);
+
+    try {
+      const result = await window.electronAPI.agentSnapshotCleanup({
+        maxSnapshotsPerTask: Number.isFinite(maxSnapshotsPerTask) ? Math.max(0, maxSnapshotsPerTask) : undefined,
+        staleBefore: staleBeforeDate ? staleBeforeDate.toISOString() : undefined,
+      });
+
+      showToast(`清理完成，删除 ${result.deletedCount} 条快照`);
+
+      if (agentTaskId.trim()) {
+        await loadSnapshots();
+      }
+    } catch (err) {
+      console.error('Failed to cleanup agent snapshots:', err);
+      setAgentError('快照清理失败，请稍后重试');
+      showToast('快照清理失败');
+    } finally {
+      setAgentCleanupLoading(false);
+    }
+  };
+
+  const formatTime = (value: string): string => {
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) {
+      return value;
+    }
+
+    return new Date(timestamp).toLocaleString();
+  };
+
   if (!open) return null;
 
   return (
@@ -68,8 +154,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl">
-        {/* Header */}
+      <div className="relative w-full max-w-3xl bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl max-h-[85vh] overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white">偏好设置</h2>
           <button
@@ -85,8 +170,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
             <Loader2 size={24} className="animate-spin text-gray-500" />
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Podcast Section */}
+          <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(85vh-80px)]">
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Podcast size={16} className="text-blue-400" />
@@ -94,7 +178,6 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               </div>
 
               <div className="space-y-4">
-                {/* Podcast Index API Key */}
                 <div>
                   <label
                     htmlFor="pi-key"
@@ -112,7 +195,6 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   />
                 </div>
 
-                {/* Podcast Index API Secret */}
                 <div>
                   <label
                     htmlFor="pi-secret"
@@ -178,7 +260,6 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               </div>
 
               <div className="space-y-4">
-                {/* Download directory */}
                 <div>
                   <label
                     htmlFor="dl-dir"
@@ -198,7 +279,6 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   />
                 </div>
 
-                {/* Capacity limit */}
                 <div>
                   <label
                     htmlFor="dl-cap"
@@ -213,7 +293,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                     step={100}
                     value={settings.downloadCapacityMb ?? 5120}
                     onChange={(e) =>
-                      updateField('downloadCapacityMb', parseInt(e.target.value) || 5120)
+                      updateField('downloadCapacityMb', parseInt(e.target.value, 10) || 5120)
                     }
                     className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -224,7 +304,114 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               </div>
             </section>
 
-            {/* Save button */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Database size={16} className="text-purple-400" />
+                <h3 className="text-sm font-medium text-white">Agent 运维面板（本地）</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <div className="md:col-span-3">
+                    <label htmlFor="agent-task-id" className="block text-xs font-medium text-gray-400 mb-1.5">
+                      Task ID
+                    </label>
+                    <input
+                      id="agent-task-id"
+                      type="text"
+                      value={agentTaskId}
+                      onChange={(e) => setAgentTaskId(e.target.value)}
+                      placeholder="输入 taskId 后查询关联快照"
+                      className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={loadSnapshots}
+                      disabled={agentSnapshotLoading}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors"
+                    >
+                      {agentSnapshotLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      <span>查询快照</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div>
+                    <label htmlFor="snapshot-retain" className="block text-xs font-medium text-gray-400 mb-1.5">
+                      每任务保留数量
+                    </label>
+                    <input
+                      id="snapshot-retain"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={maxSnapshotsPerTask}
+                      onChange={(e) => setMaxSnapshotsPerTask(parseInt(e.target.value, 10) || 0)}
+                      className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="snapshot-stale" className="block text-xs font-medium text-gray-400 mb-1.5">
+                      清理截止时间（可选）
+                    </label>
+                    <input
+                      id="snapshot-stale"
+                      type="datetime-local"
+                      value={staleBeforeLocal}
+                      onChange={(e) => setStaleBeforeLocal(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleCleanupSnapshots}
+                      disabled={agentCleanupLoading}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors"
+                    >
+                      {agentCleanupLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      <span>执行清理</span>
+                    </button>
+                  </div>
+                </div>
+
+                {agentError ? <p className="text-xs text-red-300">{agentError}</p> : null}
+
+                <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-2">
+                  <div className="text-xs text-gray-400">快照列表（按更新时间倒序）</div>
+
+                  {agentSnapshotLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>加载中...</span>
+                    </div>
+                  ) : agentSnapshots.length === 0 ? (
+                    <div className="text-xs text-gray-500">暂无快照，请输入 taskId 后查询。</div>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {agentSnapshots.map((snapshot) => (
+                        <div key={snapshot.id} className="rounded border border-white/10 bg-[#1a1a1a] p-2 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="text-gray-300 font-medium">{snapshot.id}</span>
+                            <span className={SNAPSHOT_STATUS_CLASS[snapshot.status]}>{snapshot.status}</span>
+                            <span className="text-gray-500">nodes: {snapshot.nodeCount}</span>
+                            <span className="text-gray-500">steps: {snapshot.executionOrder.length}</span>
+                          </div>
+                          <div className="mt-1 text-gray-500 break-all">
+                            task: {snapshot.taskId} · graph: {snapshot.graphId}
+                          </div>
+                          <div className="mt-1 text-gray-500">
+                            updated: {formatTime(snapshot.updatedAt)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
             <div className="pt-2">
               <button
                 onClick={handleSave}

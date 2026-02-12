@@ -107,6 +107,8 @@ const electronAPI: ElectronAPI = {
   agentReplayGet: (taskId) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_REPLAY_GET, taskId),
   agentPolicyGet: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_GET),
   agentPolicySet: (patch) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_SET, patch),
+  agentSnapshotList: (query) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SNAPSHOT_LIST, query),
+  agentSnapshotCleanup: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SNAPSHOT_CLEANUP, input),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -104,4 +104,6 @@ export const IPC_CHANNELS = {
   AGENT_REPLAY_GET: 'agent:replay:get',
   AGENT_POLICY_GET: 'agent:policy:get',
   AGENT_POLICY_SET: 'agent:policy:set',
+  AGENT_SNAPSHOT_LIST: 'agent:snapshot:list',
+  AGENT_SNAPSHOT_CLEANUP: 'agent:snapshot:cleanup',
 } as const;

@@ -1,4 +1,12 @@
-import { AuditReplayService, InMemoryApprovalQueue, InMemoryTraceStore, InteractiveApprovalGateway, SqliteTaskStore, SqliteTraceStore } from '../../core-agent';
+import {
+  AuditReplayService,
+  InMemoryApprovalQueue,
+  InMemoryTraceStore,
+  InteractiveApprovalGateway,
+  SqliteGraphSnapshotStore,
+  SqliteTaskStore,
+  SqliteTraceStore,
+} from '../../core-agent';
 import { getSqlite } from '../db';
 
 const approvalQueue = new InMemoryApprovalQueue();
@@ -26,6 +34,10 @@ export function createTaskStore() {
 
 export function createTraceStore() {
   return new SqliteTraceStore(getSqliteOrThrow());
+}
+
+export function createGraphSnapshotStore() {
+  return new SqliteGraphSnapshotStore(getSqliteOrThrow());
 }
 
 export function createReplayService(): AuditReplayService {

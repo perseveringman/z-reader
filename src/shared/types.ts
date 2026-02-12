@@ -350,6 +350,33 @@ export interface AgentReplayBundle {
   traces: AgentReplayTrace[];
 }
 
+export interface AgentGraphSnapshotItem {
+  id: string;
+  graphId: string;
+  graphSignature?: string;
+  taskId: string;
+  sessionId: string;
+  status: 'running' | 'succeeded' | 'failed' | 'canceled';
+  executionOrder: string[];
+  nodeCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentSnapshotListQuery {
+  taskId: string;
+}
+
+export interface AgentSnapshotCleanupInput {
+  maxSnapshotsPerTask?: number;
+  staleBefore?: string;
+}
+
+export interface AgentSnapshotCleanupResult {
+  deletedCount: number;
+  deletedIds: string[];
+}
+
 // ==================== Settings 相关类型 ====================
 export interface AppSettings {
   podcastIndexApiKey?: string;
@@ -532,4 +559,6 @@ export interface ElectronAPI {
   agentReplayGet: (taskId: string) => Promise<AgentReplayBundle>;
   agentPolicyGet: () => Promise<AgentPolicyConfig>;
   agentPolicySet: (patch: AgentPolicyConfigPatch) => Promise<AgentPolicyConfig>;
+  agentSnapshotList: (query: AgentSnapshotListQuery) => Promise<AgentGraphSnapshotItem[]>;
+  agentSnapshotCleanup: (input: AgentSnapshotCleanupInput) => Promise<AgentSnapshotCleanupResult>;
 }

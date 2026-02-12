@@ -2,12 +2,16 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type {
   AgentApprovalDecisionInput,
+  AgentGraphSnapshotItem,
   AgentPendingApproval,
   AgentPolicyConfig,
   AgentPolicyConfigPatch,
   AgentReplayBundle,
+  AgentSnapshotCleanupInput,
+  AgentSnapshotCleanupResult,
+  AgentSnapshotListQuery,
 } from '../../shared/types';
-import { getAgentApprovalQueue, createReplayService } from '../services/agent-runtime-context';
+import { createGraphSnapshotStore, createReplayService, getAgentApprovalQueue } from '../services/agent-runtime-context';
 import { getAgentPolicyConfig, setAgentPolicyConfig } from '../services/agent-policy-service';
 
 export function registerAgentHandlers() {
@@ -17,6 +21,8 @@ export function registerAgentHandlers() {
     AGENT_REPLAY_GET,
     AGENT_POLICY_GET,
     AGENT_POLICY_SET,
+    AGENT_SNAPSHOT_LIST,
+    AGENT_SNAPSHOT_CLEANUP,
   } = IPC_CHANNELS;
 
   ipcMain.handle(AGENT_APPROVAL_LIST, async (): Promise<AgentPendingApproval[]> => {
@@ -60,4 +66,45 @@ export function registerAgentHandlers() {
   ipcMain.handle(AGENT_POLICY_SET, async (_event, patch: AgentPolicyConfigPatch): Promise<AgentPolicyConfig> => {
     return setAgentPolicyConfig(patch);
   });
+
+  ipcMain.handle(AGENT_SNAPSHOT_LIST, async (_event, query: AgentSnapshotListQuery): Promise<AgentGraphSnapshotItem[]> => {
+    const taskId = query?.taskId?.trim();
+    if (!taskId) {
+      return [];
+    }
+
+    const snapshots = await createGraphSnapshotStore().listByTask(taskId);
+    return snapshots.map((snapshot) => ({
+      id: snapshot.id,
+      graphId: snapshot.graphId,
+      graphSignature: snapshot.graphSignature,
+      taskId: snapshot.taskId,
+      sessionId: snapshot.sessionId,
+      status: snapshot.status,
+      executionOrder: snapshot.executionOrder,
+      nodeCount: snapshot.nodes.length,
+      createdAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+    }));
+  });
+
+  ipcMain.handle(
+    AGENT_SNAPSHOT_CLEANUP,
+    async (_event, input: AgentSnapshotCleanupInput): Promise<AgentSnapshotCleanupResult> => {
+      const normalizedMax =
+        typeof input?.maxSnapshotsPerTask === 'number' && Number.isFinite(input.maxSnapshotsPerTask)
+          ? Math.max(0, Math.floor(input.maxSnapshotsPerTask))
+          : undefined;
+
+      const normalizedStaleBefore =
+        typeof input?.staleBefore === 'string' && input.staleBefore.trim().length > 0
+          ? input.staleBefore
+          : undefined;
+
+      return createGraphSnapshotStore().cleanup({
+        maxSnapshotsPerTask: normalizedMax,
+        staleBefore: normalizedStaleBefore,
+      });
+    },
+  );
 }
