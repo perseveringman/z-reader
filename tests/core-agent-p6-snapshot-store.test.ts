@@ -7,6 +7,7 @@ type SnapshotRow = {
   id: string;
   graph_id: string;
   graph_signature: string | null;
+  graph_definition_json: string | null;
   task_id: string;
   session_id: string;
   status: 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -29,6 +30,7 @@ class FakeSnapshotStatement {
         id,
         graph_id: String(params.graphId),
         graph_signature: params.graphSignature == null ? null : String(params.graphSignature),
+        graph_definition_json: params.graphDefinitionJson == null ? null : String(params.graphDefinitionJson),
         task_id: String(params.taskId),
         session_id: String(params.sessionId),
         status: String(params.status) as SnapshotRow['status'],
@@ -51,6 +53,7 @@ class FakeSnapshotStatement {
       row.nodes_json = String(params.nodesJson);
       row.updated_at = String(params.updatedAt);
       row.graph_signature = params.graphSignature == null ? null : String(params.graphSignature);
+      row.graph_definition_json = params.graphDefinitionJson == null ? null : String(params.graphDefinitionJson);
       return;
     }
 
@@ -114,6 +117,10 @@ describe('p6 sqlite graph snapshot store', () => {
       id: 'snap-1',
       graphId: 'graph-1',
       graphSignature: 'sig-1',
+      graphDefinition: {
+        id: 'graph-1',
+        nodes: [{ id: 'n1', agent: 'a' }],
+      },
       taskId: 'task-1',
       sessionId: 'session-1',
       status: 'running',
@@ -143,6 +150,7 @@ describe('p6 sqlite graph snapshot store', () => {
 
     expect(snapshot?.status).toBe('succeeded');
     expect(snapshot?.graphSignature).toBe('sig-1');
+    expect(snapshot?.graphDefinition?.id).toBe('graph-1');
     expect(snapshot?.executionOrder).toEqual(['n1', 'n2']);
     expect(snapshot?.nodes).toHaveLength(2);
   });

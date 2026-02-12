@@ -1,5 +1,6 @@
 import type { SqliteClientLike } from './sqlite-task-store';
 import type {
+  AgentTaskGraph,
   GraphExecutionSnapshot,
   GraphSnapshotCleanupPolicy,
   GraphSnapshotCleanupResult,
@@ -16,6 +17,7 @@ interface SqliteSnapshotRow {
   id: string;
   graph_id: string;
   graph_signature: string | null;
+  graph_definition_json: string | null;
   task_id: string;
   session_id: string;
   status: 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -37,7 +39,7 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
     this.initTables();
 
     this.selectStmt = this.sqlite.prepare(`
-      SELECT id, graph_id, graph_signature, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
+      SELECT id, graph_id, graph_signature, graph_definition_json, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
       FROM agent_graph_snapshots
       WHERE id = @id
       LIMIT 1
@@ -45,9 +47,9 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
 
     this.insertStmt = this.sqlite.prepare(`
       INSERT INTO agent_graph_snapshots (
-        id, graph_id, graph_signature, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
+        id, graph_id, graph_signature, graph_definition_json, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
       ) VALUES (
-        @id, @graphId, @graphSignature, @taskId, @sessionId, @status, @executionOrderJson, @nodesJson, @createdAt, @updatedAt
+        @id, @graphId, @graphSignature, @graphDefinitionJson, @taskId, @sessionId, @status, @executionOrderJson, @nodesJson, @createdAt, @updatedAt
       )
     `);
 
@@ -55,6 +57,7 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
       UPDATE agent_graph_snapshots
       SET
         graph_signature = @graphSignature,
+        graph_definition_json = @graphDefinitionJson,
         status = @status,
         execution_order_json = @executionOrderJson,
         nodes_json = @nodesJson,
@@ -63,14 +66,14 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
     `);
 
     this.listByTaskStmt = this.sqlite.prepare(`
-      SELECT id, graph_id, graph_signature, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
+      SELECT id, graph_id, graph_signature, graph_definition_json, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
       FROM agent_graph_snapshots
       WHERE task_id = @taskId
       ORDER BY updated_at DESC
     `);
 
     this.listAllStmt = this.sqlite.prepare(`
-      SELECT id, graph_id, graph_signature, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
+      SELECT id, graph_id, graph_signature, graph_definition_json, task_id, session_id, status, execution_order_json, nodes_json, created_at, updated_at
       FROM agent_graph_snapshots
       ORDER BY task_id ASC, updated_at DESC
     `);
@@ -89,6 +92,7 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
         id: snapshot.id,
         graphId: snapshot.graphId,
         graphSignature: snapshot.graphSignature ?? null,
+        graphDefinitionJson: snapshot.graphDefinition ? JSON.stringify(snapshot.graphDefinition) : null,
         taskId: snapshot.taskId,
         sessionId: snapshot.sessionId,
         status: snapshot.status,
@@ -103,6 +107,8 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
     this.updateStmt.run({
       id: snapshot.id,
       graphSignature: snapshot.graphSignature ?? null,
+      graphDefinitionJson:
+        snapshot.graphDefinition ? JSON.stringify(snapshot.graphDefinition) : exists.graph_definition_json,
       status: snapshot.status,
       executionOrderJson: JSON.stringify(snapshot.executionOrder),
       nodesJson: JSON.stringify(snapshot.nodes),
@@ -171,6 +177,7 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
       id: row.id,
       graphId: row.graph_id,
       graphSignature: row.graph_signature ?? undefined,
+      graphDefinition: this.parseGraphDefinition(row.graph_definition_json),
       taskId: row.task_id,
       sessionId: row.session_id,
       status: row.status,
@@ -209,12 +216,42 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
     return [];
   }
 
+  private parseGraphDefinition(value: string | null): AgentTaskGraph | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object') {
+        return undefined;
+      }
+
+      const maybeId = (parsed as { id?: unknown }).id;
+      const maybeNodes = (parsed as { nodes?: unknown }).nodes;
+
+      if (typeof maybeId !== 'string' || !Array.isArray(maybeNodes)) {
+        return undefined;
+      }
+
+      return {
+        id: maybeId,
+        nodes: maybeNodes
+          .filter((item) => item && typeof item === 'object')
+          .map((item) => ({ ...(item as Record<string, unknown>) })) as AgentTaskGraph['nodes'],
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   private initTables(): void {
     this.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS agent_graph_snapshots (
         id TEXT PRIMARY KEY,
         graph_id TEXT NOT NULL,
         graph_signature TEXT,
+        graph_definition_json TEXT,
         task_id TEXT NOT NULL,
         session_id TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -229,6 +266,12 @@ export class SqliteGraphSnapshotStore implements GraphSnapshotStore {
 
     try {
       this.sqlite.exec('ALTER TABLE agent_graph_snapshots ADD COLUMN graph_signature TEXT');
+    } catch {
+      // Column already exists
+    }
+
+    try {
+      this.sqlite.exec('ALTER TABLE agent_graph_snapshots ADD COLUMN graph_definition_json TEXT');
     } catch {
       // Column already exists
     }

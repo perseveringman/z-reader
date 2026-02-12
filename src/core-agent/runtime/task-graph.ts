@@ -116,6 +116,7 @@ export interface GraphExecutionSnapshot {
   id: string;
   graphId: string;
   graphSignature?: string;
+  graphDefinition?: AgentTaskGraph;
   taskId: string;
   sessionId: string;
   status: GraphSnapshotStatus;
@@ -168,6 +169,26 @@ interface GraphFailureSignal {
 const defaultSleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
 };
+
+function cloneGraph(graph: AgentTaskGraph): AgentTaskGraph {
+  return {
+    id: graph.id,
+    nodes: graph.nodes.map((node) => ({
+      ...node,
+      dependsOn: node.dependsOn ? [...node.dependsOn] : undefined,
+      input: node.input ? { ...node.input } : undefined,
+      retry: node.retry ? { ...node.retry } : undefined,
+    })),
+  };
+}
+
+export function buildGraphFromSnapshot(snapshot: GraphExecutionSnapshot): AgentTaskGraph | null {
+  if (!snapshot.graphDefinition) {
+    return null;
+  }
+
+  return cloneGraph(snapshot.graphDefinition);
+}
 
 export class TaskGraphScheduler {
   constructor(private readonly resolver: GraphExecutorResolver) {}
@@ -740,6 +761,7 @@ export class TaskGraphScheduler {
       id: snapshotId,
       graphId: graph.id,
       graphSignature: this.computeGraphSignature(graph),
+      graphDefinition: cloneGraph(graph),
       taskId: context.taskId,
       sessionId: context.sessionId,
       status,

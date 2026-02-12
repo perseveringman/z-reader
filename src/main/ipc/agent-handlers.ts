@@ -7,11 +7,20 @@ import type {
   AgentPolicyConfig,
   AgentPolicyConfigPatch,
   AgentReplayBundle,
+  AgentResumeExecuteInput,
+  AgentResumeExecuteResult,
+  AgentResumePreviewInput,
+  AgentResumePreviewResult,
   AgentSnapshotCleanupInput,
   AgentSnapshotCleanupResult,
   AgentSnapshotListQuery,
 } from '../../shared/types';
-import { createGraphSnapshotStore, createReplayService, getAgentApprovalQueue } from '../services/agent-runtime-context';
+import {
+  createGraphSnapshotStore,
+  createReplayService,
+  createSnapshotResumeService,
+  getAgentApprovalQueue,
+} from '../services/agent-runtime-context';
 import { getAgentPolicyConfig, setAgentPolicyConfig } from '../services/agent-policy-service';
 
 export function registerAgentHandlers() {
@@ -23,6 +32,8 @@ export function registerAgentHandlers() {
     AGENT_POLICY_SET,
     AGENT_SNAPSHOT_LIST,
     AGENT_SNAPSHOT_CLEANUP,
+    AGENT_RESUME_PREVIEW,
+    AGENT_RESUME_EXECUTE,
   } = IPC_CHANNELS;
 
   ipcMain.handle(AGENT_APPROVAL_LIST, async (): Promise<AgentPendingApproval[]> => {
@@ -107,4 +118,21 @@ export function registerAgentHandlers() {
       });
     },
   );
+
+  ipcMain.handle(AGENT_RESUME_PREVIEW, async (_event, input: AgentResumePreviewInput): Promise<AgentResumePreviewResult> => {
+    return createSnapshotResumeService().preview({
+      snapshotId: input?.snapshotId ?? '',
+    });
+  });
+
+  ipcMain.handle(AGENT_RESUME_EXECUTE, async (_event, input: AgentResumeExecuteInput): Promise<AgentResumeExecuteResult> => {
+    return createSnapshotResumeService().execute({
+      snapshotId: input?.snapshotId ?? '',
+      confirmed: Boolean(input?.confirmed),
+      maxParallel:
+        typeof input?.maxParallel === 'number' && Number.isFinite(input.maxParallel)
+          ? Math.max(1, Math.floor(input.maxParallel))
+          : undefined,
+    });
+  });
 }

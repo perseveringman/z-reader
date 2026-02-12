@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2 } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle } from 'lucide-react';
 import { useToast } from './Toast';
-import type { AgentGraphSnapshotItem, AppSettings } from '../../shared/types';
+import type { AgentGraphSnapshotItem, AgentResumePreviewResult, AppSettings } from '../../shared/types';
 
 interface PreferencesDialogProps {
   open: boolean;
@@ -13,6 +13,13 @@ const SNAPSHOT_STATUS_CLASS: Record<AgentGraphSnapshotItem['status'], string> = 
   succeeded: 'text-green-300',
   failed: 'text-red-300',
   canceled: 'text-yellow-300',
+};
+
+const RISK_LEVEL_CLASS: Record<NonNullable<AgentResumePreviewResult['riskLevel']>, string> = {
+  low: 'text-green-300',
+  medium: 'text-yellow-300',
+  high: 'text-red-300',
+  critical: 'text-red-300',
 };
 
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
@@ -29,6 +36,12 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [maxSnapshotsPerTask, setMaxSnapshotsPerTask] = useState(5);
   const [staleBeforeLocal, setStaleBeforeLocal] = useState('');
 
+  const [resumeSnapshotId, setResumeSnapshotId] = useState('');
+  const [resumePreview, setResumePreview] = useState<AgentResumePreviewResult | null>(null);
+  const [resumePreviewLoading, setResumePreviewLoading] = useState(false);
+  const [resumeExecuting, setResumeExecuting] = useState(false);
+  const [resumeConfirmed, setResumeConfirmed] = useState(false);
+
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -40,6 +53,9 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setAgentError(null);
       setMaxSnapshotsPerTask(5);
       setStaleBeforeLocal('');
+      setResumeSnapshotId('');
+      setResumePreview(null);
+      setResumeConfirmed(false);
 
       window.electronAPI
         .settingsGet()
@@ -95,6 +111,15 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     try {
       const snapshots = await window.electronAPI.agentSnapshotList({ taskId });
       setAgentSnapshots(snapshots);
+
+      if (snapshots.length > 0) {
+        setResumeSnapshotId((current) => current || snapshots[0].id);
+      } else {
+        setResumeSnapshotId('');
+      }
+
+      setResumePreview(null);
+      setResumeConfirmed(false);
     } catch (err) {
       console.error('Failed to list agent snapshots:', err);
       setAgentSnapshots([]);
@@ -133,6 +158,75 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       showToast('快照清理失败');
     } finally {
       setAgentCleanupLoading(false);
+    }
+  };
+
+  const loadResumePreview = async () => {
+    const snapshotId = resumeSnapshotId.trim();
+    if (!snapshotId) {
+      setAgentError('请先选择快照再执行恢复预检');
+      return;
+    }
+
+    setResumePreviewLoading(true);
+    setAgentError(null);
+
+    try {
+      const preview = await window.electronAPI.agentResumePreview({ snapshotId });
+      setResumePreview(preview);
+      setResumeConfirmed(false);
+    } catch (err) {
+      console.error('Failed to preview snapshot resume:', err);
+      setAgentError('恢复预检失败，请稍后重试');
+      setResumePreview(null);
+    } finally {
+      setResumePreviewLoading(false);
+    }
+  };
+
+  const executeResume = async () => {
+    const snapshotId = resumeSnapshotId.trim();
+    if (!snapshotId) {
+      setAgentError('请先选择快照再执行恢复');
+      return;
+    }
+
+    const requiresConfirm = resumePreview?.riskLevel === 'high' || resumePreview?.riskLevel === 'critical';
+    if (requiresConfirm && !resumeConfirmed) {
+      setAgentError('高风险恢复请先勾选确认');
+      return;
+    }
+
+    setResumeExecuting(true);
+    setAgentError(null);
+
+    try {
+      const result = await window.electronAPI.agentResumeExecute({
+        snapshotId,
+        confirmed: resumeConfirmed,
+      });
+
+      if (!result.success) {
+        setAgentError(result.message);
+        showToast('恢复执行失败');
+        return;
+      }
+
+      showToast('恢复执行完成');
+      if (result.replayTaskId) {
+        showToast(`可通过任务 ${result.replayTaskId} 查看回放`);
+      }
+
+      await loadResumePreview();
+      if (agentTaskId.trim()) {
+        await loadSnapshots();
+      }
+    } catch (err) {
+      console.error('Failed to execute snapshot resume:', err);
+      setAgentError('恢复执行失败，请稍后重试');
+      showToast('恢复执行失败');
+    } finally {
+      setResumeExecuting(false);
     }
   };
 
@@ -391,7 +485,20 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   ) : (
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {agentSnapshots.map((snapshot) => (
-                        <div key={snapshot.id} className="rounded border border-white/10 bg-[#1a1a1a] p-2 text-xs">
+                        <button
+                          key={snapshot.id}
+                          type="button"
+                          onClick={() => {
+                            setResumeSnapshotId(snapshot.id);
+                            setResumePreview(null);
+                            setResumeConfirmed(false);
+                          }}
+                          className={`w-full rounded border p-2 text-left text-xs transition-colors ${
+                            resumeSnapshotId === snapshot.id
+                              ? 'border-purple-400 bg-purple-500/10'
+                              : 'border-white/10 bg-[#1a1a1a] hover:border-white/20'
+                          }`}
+                        >
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span className="text-gray-300 font-medium">{snapshot.id}</span>
                             <span className={SNAPSHOT_STATUS_CLASS[snapshot.status]}>{snapshot.status}</span>
@@ -404,10 +511,72 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                           <div className="mt-1 text-gray-500">
                             updated: {formatTime(snapshot.updatedAt)}
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
+                </div>
+
+                <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs text-gray-400 break-all">
+                      当前恢复快照：{resumeSnapshotId || '未选择'}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={loadResumePreview}
+                        disabled={!resumeSnapshotId || resumePreviewLoading}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-xs"
+                      >
+                        {resumePreviewLoading ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />}
+                        <span>恢复预检</span>
+                      </button>
+                      <button
+                        onClick={executeResume}
+                        disabled={!resumeSnapshotId || resumeExecuting}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-xs"
+                      >
+                        {resumeExecuting ? <Loader2 size={12} className="animate-spin" /> : <PlayCircle size={12} />}
+                        <span>执行恢复</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {resumePreview ? (
+                    <div className="text-xs space-y-1">
+                      <div className="text-gray-400">
+                        可恢复：
+                        <span className={resumePreview.canResume ? 'text-green-300 ml-1' : 'text-red-300 ml-1'}>
+                          {String(resumePreview.canResume)}
+                        </span>
+                      </div>
+                      <div className="text-gray-400">
+                        风险等级：
+                        <span className={`${RISK_LEVEL_CLASS[resumePreview.riskLevel]} ml-1`}>{resumePreview.riskLevel}</span>
+                      </div>
+                      <div className="text-gray-500 break-all">
+                        pending: {resumePreview.pendingNodeIds.join(', ') || '(none)'}
+                      </div>
+                      <div className="text-gray-500 break-all">
+                        failed: {resumePreview.failedNodeIds.join(', ') || '(none)'}
+                      </div>
+                      {resumePreview.reason ? <div className="text-red-300">{resumePreview.reason}</div> : null}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500">可先执行“恢复预检”查看风险与可恢复性。</div>
+                  )}
+
+                  {(resumePreview?.riskLevel === 'high' || resumePreview?.riskLevel === 'critical') && resumePreview.canResume ? (
+                    <label className="flex items-center gap-2 text-xs text-yellow-200">
+                      <input
+                        type="checkbox"
+                        checked={resumeConfirmed}
+                        onChange={(e) => setResumeConfirmed(e.target.checked)}
+                        className="accent-yellow-500"
+                      />
+                      <span>我已确认高风险恢复操作，并理解其可能影响</span>
+                    </label>
+                  ) : null}
                 </div>
               </div>
             </section>

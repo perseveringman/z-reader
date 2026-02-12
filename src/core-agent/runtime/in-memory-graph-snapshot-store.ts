@@ -81,6 +81,17 @@ export class InMemoryGraphSnapshotStore implements GraphSnapshotStore {
   private cloneSnapshot(snapshot: GraphExecutionSnapshot): GraphExecutionSnapshot {
     return {
       ...snapshot,
+      graphDefinition: snapshot.graphDefinition
+        ? {
+            id: snapshot.graphDefinition.id,
+            nodes: snapshot.graphDefinition.nodes.map((node) => ({
+              ...node,
+              dependsOn: node.dependsOn ? [...node.dependsOn] : undefined,
+              input: node.input ? { ...node.input } : undefined,
+              retry: node.retry ? { ...node.retry } : undefined,
+            })),
+          }
+        : undefined,
       executionOrder: [...snapshot.executionOrder],
       nodes: snapshot.nodes.map((node) => ({ ...node })),
     };

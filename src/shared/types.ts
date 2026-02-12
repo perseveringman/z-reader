@@ -377,6 +377,47 @@ export interface AgentSnapshotCleanupResult {
   deletedIds: string[];
 }
 
+export interface AgentResumePreviewInput {
+  snapshotId: string;
+}
+
+export interface AgentResumePreviewResult {
+  snapshotId: string;
+  taskId: string;
+  sessionId: string;
+  graphId: string;
+  snapshotStatus: 'running' | 'succeeded' | 'failed' | 'canceled';
+  pendingNodeIds: string[];
+  failedNodeIds: string[];
+  riskLevel: AgentRiskLevel;
+  canResume: boolean;
+  reason?: string;
+}
+
+export interface AgentResumeExecuteInput {
+  snapshotId: string;
+  confirmed: boolean;
+  maxParallel?: number;
+}
+
+export interface AgentResumeExecuteResultNode {
+  nodeId: string;
+  status: string;
+  error?: string;
+}
+
+export interface AgentResumeExecuteResult {
+  success: boolean;
+  message: string;
+  replayTaskId?: string;
+  result?: {
+    graphId: string;
+    status: 'succeeded' | 'failed' | 'canceled';
+    executionOrder: string[];
+    nodes: AgentResumeExecuteResultNode[];
+  };
+}
+
 // ==================== Settings 相关类型 ====================
 export interface AppSettings {
   podcastIndexApiKey?: string;
@@ -561,4 +602,6 @@ export interface ElectronAPI {
   agentPolicySet: (patch: AgentPolicyConfigPatch) => Promise<AgentPolicyConfig>;
   agentSnapshotList: (query: AgentSnapshotListQuery) => Promise<AgentGraphSnapshotItem[]>;
   agentSnapshotCleanup: (input: AgentSnapshotCleanupInput) => Promise<AgentSnapshotCleanupResult>;
+  agentResumePreview: (input: AgentResumePreviewInput) => Promise<AgentResumePreviewResult>;
+  agentResumeExecute: (input: AgentResumeExecuteInput) => Promise<AgentResumeExecuteResult>;
 }

@@ -204,6 +204,7 @@ export const agentGraphSnapshots = sqliteTable('agent_graph_snapshots', {
   id: text('id').primaryKey(),
   graphId: text('graph_id').notNull(),
   graphSignature: text('graph_signature'),
+  graphDefinitionJson: text('graph_definition_json'),
   taskId: text('task_id').notNull(),
   sessionId: text('session_id').notNull(),
   status: text('status').notNull(),

@@ -106,4 +106,6 @@ export const IPC_CHANNELS = {
   AGENT_POLICY_SET: 'agent:policy:set',
   AGENT_SNAPSHOT_LIST: 'agent:snapshot:list',
   AGENT_SNAPSHOT_CLEANUP: 'agent:snapshot:cleanup',
+  AGENT_RESUME_PREVIEW: 'agent:resume:preview',
+  AGENT_RESUME_EXECUTE: 'agent:resume:execute',
 } as const;

@@ -1,4 +1,5 @@
 import {
+  AgentSnapshotResumeService,
   AuditReplayService,
   InMemoryApprovalQueue,
   InMemoryTraceStore,
@@ -42,6 +43,13 @@ export function createGraphSnapshotStore() {
 
 export function createReplayService(): AuditReplayService {
   return new AuditReplayService(createTaskStore(), createTraceStore());
+}
+
+export function createSnapshotResumeService(): AgentSnapshotResumeService {
+  return new AgentSnapshotResumeService({
+    snapshotStore: createGraphSnapshotStore(),
+    taskStore: createTaskStore(),
+  });
 }
 
 export function createInMemoryTraceStore(): InMemoryTraceStore {

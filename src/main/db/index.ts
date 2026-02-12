@@ -357,6 +357,7 @@ function initTables(sqlite: Database.Database) {
       id TEXT PRIMARY KEY,
       graph_id TEXT NOT NULL,
       graph_signature TEXT,
+      graph_definition_json TEXT,
       task_id TEXT NOT NULL,
       session_id TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -371,6 +372,12 @@ function initTables(sqlite: Database.Database) {
 
   try {
     sqlite.exec(`ALTER TABLE agent_graph_snapshots ADD COLUMN graph_signature TEXT`);
+  } catch {
+    // Column already exists
+  }
+
+  try {
+    sqlite.exec(`ALTER TABLE agent_graph_snapshots ADD COLUMN graph_definition_json TEXT`);
   } catch {
     // Column already exists
   }
