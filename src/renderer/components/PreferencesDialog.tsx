@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle } from 'lucide-react';
 import { useToast } from './Toast';
 import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
+import { extractResumeAuditEntries, type ResumeAuditEntry } from '../utils/agent-resume-audit';
 
 interface PreferencesDialogProps {
   open: boolean;
@@ -44,6 +45,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [resumeConfirmed, setResumeConfirmed] = useState(false);
   const [delegateSpecialists, setDelegateSpecialists] = useState<string[]>([]);
   const [delegateSpecialistsLoading, setDelegateSpecialistsLoading] = useState(false);
+  const [resumeAuditEntries, setResumeAuditEntries] = useState<ResumeAuditEntry[]>([]);
+  const [resumeAuditLoading, setResumeAuditLoading] = useState(false);
 
   const { showToast } = useToast();
 
@@ -61,6 +64,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumePreview(null);
       setResumeConfirmed(false);
       setDelegateSpecialists([]);
+      setResumeAuditEntries([]);
 
       window.electronAPI
         .settingsGet()
@@ -199,6 +203,29 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     }
   };
 
+  const loadResumeAudit = async () => {
+    const taskId = agentTaskId.trim();
+    if (!taskId) {
+      setResumeAuditEntries([]);
+      setAgentError('请输入 taskId 后再加载恢复审计');
+      return;
+    }
+
+    setResumeAuditLoading(true);
+    setAgentError(null);
+
+    try {
+      const replay = await window.electronAPI.agentReplayGet(taskId);
+      setResumeAuditEntries(extractResumeAuditEntries(replay.events));
+    } catch (err) {
+      console.error('Failed to load resume audit:', err);
+      setResumeAuditEntries([]);
+      setAgentError('恢复审计加载失败，请稍后重试');
+    } finally {
+      setResumeAuditLoading(false);
+    }
+  };
+
   const executeResume = async () => {
     const snapshotId = resumeSnapshotId.trim();
     if (!snapshotId) {
@@ -241,6 +268,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       await loadResumePreview();
       if (agentTaskId.trim()) {
         await loadSnapshots();
+        await loadResumeAudit();
       }
     } catch (err) {
       console.error('Failed to execute snapshot resume:', err);
@@ -426,7 +454,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                   <div className="md:col-span-3">
                     <label htmlFor="agent-task-id" className="block text-xs font-medium text-gray-400 mb-1.5">
                       Task ID
@@ -448,6 +476,16 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                     >
                       {agentSnapshotLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       <span>查询快照</span>
+                    </button>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={loadResumeAudit}
+                      disabled={resumeAuditLoading}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors"
+                    >
+                      {resumeAuditLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      <span>加载审计</span>
                     </button>
                   </div>
                 </div>
@@ -632,6 +670,42 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                       <span>我已确认当前恢复模式可能触发真实执行器副作用</span>
                     </label>
                   ) : null}
+                </div>
+
+                <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs text-gray-400">恢复审计（最近）</div>
+                    <div className="text-[11px] text-gray-500">{resumeAuditEntries.length} 条</div>
+                  </div>
+
+                  {resumeAuditLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>加载中...</span>
+                    </div>
+                  ) : resumeAuditEntries.length === 0 ? (
+                    <div className="text-xs text-gray-500">暂无恢复审计，输入 taskId 后点击“加载审计”。</div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {resumeAuditEntries.slice(0, 8).map((entry) => (
+                        <div key={entry.id} className="rounded border border-white/10 bg-[#1a1a1a] p-2 text-[11px] space-y-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="text-gray-300">{entry.mode}</span>
+                            <span className={entry.status === 'succeeded' ? 'text-green-300' : entry.status === 'failed' ? 'text-red-300' : 'text-yellow-300'}>{entry.status}</span>
+                            <span className="text-gray-500">risk: {entry.riskLevel}</span>
+                            <span className={entry.sideEffectFlag ? 'text-amber-300' : 'text-emerald-300'}>{entry.sideEffectFlag ? 'side-effect' : 'no-side-effect'}</span>
+                          </div>
+                          <div className="text-gray-500">
+                            hitRate: {entry.specialistHitRate.toFixed(2)} · hit/miss: {entry.specialistHitCount}/{entry.specialistMissCount}
+                          </div>
+                          <div className="text-gray-500 break-all">
+                            missing: {entry.missingAgents.join(', ') || '(none)'}
+                          </div>
+                          <div className="text-gray-600">{formatTime(entry.occurredAt)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
