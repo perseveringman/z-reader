@@ -94,6 +94,13 @@ const electronAPI: ElectronAPI = {
   // Settings
   settingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
   settingsSet: (settings) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, settings),
+
+  // Discover
+  discoverSearch: (query) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_SEARCH, query),
+  discoverRsshubCategories: () => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_CATEGORIES),
+  discoverRsshubRoutes: (category) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_ROUTES, category),
+  discoverPreview: (feedUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_PREVIEW, feedUrl),
+  discoverRsshubConfig: (baseUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_CONFIG, baseUrl),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

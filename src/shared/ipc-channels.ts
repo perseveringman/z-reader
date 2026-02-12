@@ -87,6 +87,13 @@ export const IPC_CHANNELS = {
   DOWNLOAD_LIST: 'download:list',
   DOWNLOAD_STATUS: 'download:status',
 
+  // Discover
+  DISCOVER_SEARCH: 'discover:search',
+  DISCOVER_RSSHUB_CATEGORIES: 'discover:rsshubCategories',
+  DISCOVER_RSSHUB_ROUTES: 'discover:rsshubRoutes',
+  DISCOVER_PREVIEW: 'discover:preview',
+  DISCOVER_RSSHUB_CONFIG: 'discover:rsshubConfig',
+
   // Settings
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',

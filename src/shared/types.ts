@@ -274,6 +274,69 @@ export interface AppSettings {
   podcastIndexApiSecret?: string;
   downloadDirectory?: string;
   downloadCapacityMb?: number;
+  rsshubBaseUrl?: string;
+}
+
+// ==================== Discover 相关类型 ====================
+export interface RSSHubRouteParam {
+  name: string;
+  description?: string;
+  optional?: boolean;
+  default?: string;
+}
+
+export interface RSSHubRoute {
+  path: string;
+  name: string;
+  description?: string;
+  example?: string;
+  parameters?: Record<string, string>;
+  categories?: string[];
+  maintainers?: string[];
+}
+
+export interface RSSHubNamespace {
+  name: string;
+  description?: string;
+  url?: string;
+  routes: Record<string, RSSHubRoute>;
+}
+
+export interface RSSHubCategory {
+  name: string;
+  count: number;
+}
+
+export interface DiscoverSearchQuery {
+  query: string;
+}
+
+export type DiscoverResultType = 'podcast' | 'rss' | 'rsshub';
+
+export interface DiscoverSearchResult {
+  type: DiscoverResultType;
+  title: string;
+  description: string | null;
+  image: string | null;
+  feedUrl: string | null;
+  website: string | null;
+  // RSSHub 路由特有
+  rsshubPath?: string;
+  rsshubParams?: Record<string, string>;
+}
+
+export interface DiscoverPreviewResult {
+  title: string | null;
+  description: string | null;
+  favicon: string | null;
+  feedUrl: string;
+  feedType: string;
+  articles: {
+    title: string | null;
+    url: string | null;
+    publishedAt: string | null;
+  }[];
+  alreadySubscribed: boolean;
 }
 
 // ==================== IPC Channel 定义 ====================
@@ -369,4 +432,11 @@ export interface ElectronAPI {
   // Settings 操作
   settingsGet: () => Promise<AppSettings>;
   settingsSet: (settings: Partial<AppSettings>) => Promise<AppSettings>;
+
+  // Discover 操作
+  discoverSearch: (query: DiscoverSearchQuery) => Promise<DiscoverSearchResult[]>;
+  discoverRsshubCategories: () => Promise<RSSHubCategory[]>;
+  discoverRsshubRoutes: (category?: string) => Promise<Record<string, RSSHubNamespace>>;
+  discoverPreview: (feedUrl: string) => Promise<DiscoverPreviewResult>;
+  discoverRsshubConfig: (baseUrl?: string) => Promise<{ baseUrl: string | null }>;
 }

@@ -27,6 +27,7 @@ import {
   Video,
   Podcast,
   Download,
+  Compass,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -308,6 +309,13 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         />
         {(collapsed || sections.feed) && (
           <>
+            <NavItem
+              icon={<Compass size={iconSize} />}
+              label="Discover"
+              active={activeView === 'discover'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('discover')}
+            />
             <NavItem
               icon={<Rss size={iconSize} />}
               label="All Feeds"

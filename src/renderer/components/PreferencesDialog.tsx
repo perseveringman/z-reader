@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Loader2, Save, Podcast, HardDrive } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass } from 'lucide-react';
 import { useToast } from './Toast';
 import type { AppSettings } from '../../shared/types';
 
@@ -137,6 +137,36 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   <span className="text-gray-400">podcastindex.org</span>{' '}
                   免费注册即可获取 API 密钥，启用 Podcast Index 作为补充搜索源。
                 </p>
+              </div>
+            </section>
+
+            {/* RSSHub Section */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Compass size={16} className="text-orange-400" />
+                <h3 className="text-sm font-medium text-white">RSSHub 设置</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="rsshub-url"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    RSSHub 实例地址
+                  </label>
+                  <input
+                    id="rsshub-url"
+                    type="text"
+                    value={settings.rsshubBaseUrl || ''}
+                    onChange={(e) => updateField('rsshubBaseUrl', e.target.value || undefined)}
+                    placeholder="https://rsshub.example.com"
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-[11px] text-gray-600 mt-1">
+                    配置自建 RSSHub 实例地址，启用发现页面的分类浏览和路由搜索功能。
+                  </p>
+                </div>
               </div>
             </section>
 

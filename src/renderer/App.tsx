@@ -20,6 +20,7 @@ import { VideoReaderView } from './components/VideoReaderView';
 import { PodcastReaderView } from './components/PodcastReaderView';
 import { DownloadManager } from './components/DownloadManager';
 import { PreferencesDialog } from './components/PreferencesDialog';
+import { DiscoverPage } from './components/discover/DiscoverPage';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
 
 export function App() {
@@ -239,7 +240,9 @@ export function App() {
                 if (tagId) setActiveView('tags');
               }}
             />
-            {activeView === 'manage-feeds' ? (
+            {activeView === 'discover' ? (
+              <DiscoverPage onFeedAdded={handleRefresh} />
+            ) : activeView === 'manage-feeds' ? (
               <>
                 <FeedManager
                   onSelectFeed={setManageFeedSelectedId}

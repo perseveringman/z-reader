@@ -9,6 +9,7 @@ import { registerTranscriptHandlers } from './transcript-handlers';
 import { registerPodcastHandlers } from './podcast-handlers';
 import { registerSettingsHandlers } from './settings-handlers';
 import { registerDownloadHandlers } from './download-handlers';
+import { registerDiscoverHandlers } from './discover-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -22,4 +23,5 @@ export function registerAllIpcHandlers() {
   registerPodcastHandlers();
   registerSettingsHandlers();
   registerDownloadHandlers();
+  registerDiscoverHandlers();
 }
