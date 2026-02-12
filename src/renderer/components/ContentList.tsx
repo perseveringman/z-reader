@@ -524,11 +524,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           if (selectedArticleId && isLibraryView) handleStatusChange(selectedArticleId, 'later');
           break;
         }
-        case 'b':
-        case 'B': {
-          // Save to Library (feed view only)
+        case 'b': {
           e.preventDefault();
           if (selectedArticleId && isFeedView) handleSaveToLibrary(selectedArticleId);
+          break;
+        }
+        case 'B': {
+          if (e.shiftKey && selectedArticleId && selectedIds.size === 0) {
+            e.preventDefault();
+            setSelectedIds(new Set([selectedArticleId]));
+          } else if (!e.shiftKey) {
+            e.preventDefault();
+            if (selectedArticleId && isFeedView) handleSaveToLibrary(selectedArticleId);
+          }
           break;
         }
         case 'd':
@@ -547,6 +555,33 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         case 'S': {
           e.preventDefault();
           if (selectedArticleId) handleToggleShortlist(selectedArticleId);
+          break;
+        }
+        case 'f': {
+          if (!e.shiftKey) {
+            e.preventDefault();
+            if (selectedArticleId) handleToggleShortlist(selectedArticleId);
+          }
+          break;
+        }
+        case 'o':
+        case 'O': {
+          e.preventDefault();
+          if (selectedArticleId) {
+            const article = articles.find(a => a.id === selectedArticleId);
+            if (article?.url) window.open(article.url, '_blank');
+          }
+          break;
+        }
+        case 'C': {
+          if (e.shiftKey && selectedArticleId) {
+            e.preventDefault();
+            const article = articles.find(a => a.id === selectedArticleId);
+            if (article?.url) {
+              navigator.clipboard.writeText(article.url);
+              showToast('链接已复制', 'success');
+            }
+          }
           break;
         }
       }

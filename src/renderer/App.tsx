@@ -84,6 +84,18 @@ export function App() {
         return;
       }
 
+      if (e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setAddFeedDialogOpen(true);
+        return;
+      }
+
+      if (e.shiftKey && (e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+
       // / 键: 搜索
       if (e.key === '/') {
         e.preventDefault();

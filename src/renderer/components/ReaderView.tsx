@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter } from 'lucide-react';
 import type { Article, Highlight, Tag } from '../../shared/types';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
-import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP } from './ReaderSettings';
+import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP, FONTS, LINE_HEIGHTS, saveReaderSettings } from './ReaderSettings';
 import { AnnotationLayer, type EditingAnnotation } from './AnnotationLayer';
 import {
   BLOCK_SELECTOR,
@@ -68,9 +68,14 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
   const [readProgress, setReadProgress] = useState(0);
-  const [forceTab, setForceTab] = useState<{ tab: 'notebook'; ts: number } | undefined>();
+  const [forceTab, setForceTab] = useState<{ tab: 'info' | 'notebook' | 'chat'; ts: number } | undefined>();
   const [editingAnnotation, setEditingAnnotation] = useState<EditingAnnotation | null>(null);
+  const [currentDetailTab, setCurrentDetailTab] = useState<'info' | 'notebook' | 'chat'>('info');
   const [highlightTagsMap, setHighlightTagsMap] = useState<Record<string, Tag[]>>({});
+
+  useEffect(() => {
+    if (forceTab) setCurrentDetailTab(forceTab.tab);
+  }, [forceTab]);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -548,6 +553,155 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       }
 
       if (inInput) return;
+
+      // N — 为聚焦段落的高亮添加笔记
+      if (e.key === 'n' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        if (focusedParagraphIndex >= 0 && contentRef.current) {
+          const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
+          const block = blocks[focusedParagraphIndex] as HTMLElement | undefined;
+          if (block) {
+            const mark = block.querySelector('mark[data-highlight-id]') as HTMLElement | null;
+            if (mark?.dataset.highlightId) {
+              e.preventDefault();
+              setEditingAnnotation({ highlightId: mark.dataset.highlightId, type: 'note' });
+              return;
+            }
+          }
+        }
+      }
+
+      // T — 为聚焦段落的高亮添加标签
+      if (e.key === 't' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        if (focusedParagraphIndex >= 0 && contentRef.current) {
+          const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
+          const block = blocks[focusedParagraphIndex] as HTMLElement | undefined;
+          if (block) {
+            const mark = block.querySelector('mark[data-highlight-id]') as HTMLElement | null;
+            if (mark?.dataset.highlightId) {
+              e.preventDefault();
+              setEditingAnnotation({ highlightId: mark.dataset.highlightId, type: 'tag' });
+              return;
+            }
+          }
+        }
+      }
+
+      // Shift+T — 为文档添加标签
+      if (e.shiftKey && (e.key === 'T') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setDetailCollapsed(false);
+        localStorage.setItem('reader-detail-collapsed', 'false');
+        setForceTab({ tab: 'info', ts: Date.now() });
+        return;
+      }
+
+      // Shift+N — 添加文档笔记
+      if (e.shiftKey && (e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setDetailCollapsed(false);
+        localStorage.setItem('reader-detail-collapsed', 'false');
+        setForceTab({ tab: 'notebook', ts: Date.now() });
+        return;
+      }
+
+      // Shift+C — 复制原文链接到剪贴板
+      if (e.shiftKey && (e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (article?.url) {
+          navigator.clipboard.writeText(article.url);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+F — 循环切换字体
+      if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        const fontKeys = FONTS.map((f) => f.key);
+        const idx = fontKeys.indexOf(readerSettings.font);
+        const nextFont = fontKeys[(idx + 1) % fontKeys.length];
+        const next = { ...readerSettings, font: nextFont };
+        setReaderSettings(next);
+        saveReaderSettings(next);
+        return;
+      }
+
+      // Shift+- (即 _) — 减小字号
+      if (e.key === '_') {
+        e.preventDefault();
+        const nextSize = Math.max(14, readerSettings.fontSize - 1);
+        const next = { ...readerSettings, fontSize: nextSize };
+        setReaderSettings(next);
+        saveReaderSettings(next);
+        return;
+      }
+
+      // Shift+= (即 +) — 增大字号
+      if (e.key === '+') {
+        e.preventDefault();
+        const nextSize = Math.min(22, readerSettings.fontSize + 1);
+        const next = { ...readerSettings, fontSize: nextSize };
+        setReaderSettings(next);
+        saveReaderSettings(next);
+        return;
+      }
+
+      // Shift+; (即 :) — 减小行距
+      if (e.key === ':') {
+        e.preventDefault();
+        const idx = LINE_HEIGHTS.indexOf(readerSettings.lineHeight);
+        const prevIdx = idx <= 0 ? LINE_HEIGHTS.length - 1 : idx - 1;
+        const next = { ...readerSettings, lineHeight: LINE_HEIGHTS[prevIdx] };
+        setReaderSettings(next);
+        saveReaderSettings(next);
+        return;
+      }
+
+      // Shift+' (即 ") — 增大行距
+      if (e.key === '"') {
+        e.preventDefault();
+        const idx = LINE_HEIGHTS.indexOf(readerSettings.lineHeight);
+        const nextIdx = (idx + 1) % LINE_HEIGHTS.length;
+        const next = { ...readerSettings, lineHeight: LINE_HEIGHTS[nextIdx] };
+        setReaderSettings(next);
+        saveReaderSettings(next);
+        return;
+      }
+
+      // O — 在浏览器中打开原文
+      if (e.key === 'o' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (article?.url) {
+          window.open(article.url, '_blank');
+        }
+        return;
+      }
+
+      // ` — 向前循环切换右侧详情面板 tab
+      if (e.key === '`' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const tabs: ('info' | 'notebook' | 'chat')[] = ['info', 'notebook', 'chat'];
+        const idx = tabs.indexOf(currentDetailTab);
+        const nextTab = tabs[(idx + 1) % tabs.length];
+        setCurrentDetailTab(nextTab);
+        setDetailCollapsed(false);
+        localStorage.setItem('reader-detail-collapsed', 'false');
+        setForceTab({ tab: nextTab, ts: Date.now() });
+        return;
+      }
+
+      // Shift+` (即 ~) — 向后循环切换右侧详情面板 tab
+      if (e.key === '~') {
+        e.preventDefault();
+        const tabs: ('info' | 'notebook' | 'chat')[] = ['info', 'notebook', 'chat'];
+        const idx = tabs.indexOf(currentDetailTab);
+        const prevTab = tabs[(idx - 1 + tabs.length) % tabs.length];
+        setCurrentDetailTab(prevTab);
+        setDetailCollapsed(false);
+        localStorage.setItem('reader-detail-collapsed', 'false');
+        setForceTab({ tab: prevTab, ts: Date.now() });
+        return;
+      }
+
       if (!contentRef.current) return;
       const blocks = contentRef.current.querySelectorAll(BLOCK_SELECTOR);
       const total = blocks.length;
@@ -595,7 +749,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbar, editingAnnotation, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight]);
+  }, [onClose, toolbar, editingAnnotation, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight, readerSettings, currentDetailTab]);
 
   const isLoading = loading || parsing;
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';

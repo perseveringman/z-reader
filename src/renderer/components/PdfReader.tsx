@@ -36,6 +36,9 @@ const THEME_BG: Record<BookReaderSettingsValues['theme'], string> = {
 };
 
 const RENDER_BUFFER = 2;
+const MIN_PINCH_ZOOM = 0.6;
+const MAX_PINCH_ZOOM = 2.5;
+const PINCH_ZOOM_SENSITIVITY = 0.002;
 
 interface PdfReaderProps {
   bookId: string;
@@ -120,6 +123,10 @@ function getHighlightBg(color: string): string {
   return found ? found.bg : HIGHLIGHT_COLORS[0].bg;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function applyTextLayerTypography(textLayerDiv: HTMLDivElement, settings: BookReaderSettingsValues) {
   textLayerDiv.style.fontFamily = BOOK_FONT_FAMILY_MAP[settings.font];
   textLayerDiv.style.lineHeight = String(settings.lineHeight);
@@ -163,13 +170,14 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
     startOffset: 0,
     endOffset: 0,
   });
+  const [pinchZoom, setPinchZoom] = useState(1);
 
   const scaleFromSettings = useCallback(
     (baseScale: number) => {
       const fontRatio = settings.fontSize / 16;
-      return baseScale * fontRatio;
+      return baseScale * fontRatio * pinchZoom;
     },
-    [settings.fontSize],
+    [settings.fontSize, pinchZoom],
   );
 
   const getViewportScale = useCallback(
@@ -567,6 +575,23 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+
+  const handlePinchZoom = useCallback((event: WheelEvent) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+
+    setPinchZoom((prev) => {
+      const next = prev * Math.exp(-event.deltaY * PINCH_ZOOM_SENSITIVITY);
+      return clamp(next, MIN_PINCH_ZOOM, MAX_PINCH_ZOOM);
+    });
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener('wheel', handlePinchZoom, { passive: false });
+    return () => container.removeEventListener('wheel', handlePinchZoom);
+  }, [handlePinchZoom]);
 
   const handleMouseUp = useCallback(() => {
     const selection = window.getSelection();

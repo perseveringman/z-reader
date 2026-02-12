@@ -10,14 +10,14 @@ export interface ReaderSettingsValues {
 
 const STORAGE_KEY = 'z-reader-settings';
 
-const FONTS: { key: ReaderSettingsValues['font']; label: string }[] = [
+export const FONTS: { key: ReaderSettingsValues['font']; label: string }[] = [
   { key: 'system', label: 'System' },
   { key: 'serif', label: 'Serif' },
   { key: 'sans-serif', label: 'Sans-serif' },
   { key: 'monospace', label: 'Monospace' },
 ];
 
-const LINE_HEIGHTS = [1.5, 1.75, 2.0];
+export const LINE_HEIGHTS = [1.5, 1.75, 2.0];
 
 const THEMES: { key: ReaderSettingsValues['theme']; label: string; preview: string }[] = [
   { key: 'dark', label: 'Dark', preview: 'bg-[#0f0f0f] border-gray-700' },
@@ -42,7 +42,7 @@ export function loadReaderSettings(): ReaderSettingsValues {
   return DEFAULT_SETTINGS;
 }
 
-function saveReaderSettings(settings: ReaderSettingsValues) {
+export function saveReaderSettings(settings: ReaderSettingsValues) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
