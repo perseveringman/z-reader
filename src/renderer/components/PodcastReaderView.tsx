@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, PanelRightClose, PanelRightOpen, Download } from 'lucide-react';
+import { ArrowLeft, Loader2, PanelRightClose, PanelRightOpen, Download, FileText, Sparkles, Mic } from 'lucide-react';
 import type { Article, Highlight, HighlightTagsMap } from '../../shared/types';
 import { AudioPlayer, type AudioPlayerRef } from './AudioPlayer';
 import { DetailPanel } from './DetailPanel';
@@ -18,6 +18,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     localStorage.getItem('podcast-reader-detail-collapsed') === 'true'
   );
   const [downloaded, setDownloaded] = useState(false);
+  const [contentTab, setContentTab] = useState<'about' | 'summary' | 'transcript'>('about');
 
   // Highlights
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -254,61 +255,103 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
             />
           </div>
 
-          {/* Show notes / content */}
-          <div className="flex-1 min-h-0 mt-4 overflow-y-auto px-6 pb-8">
-            {/* Episode metadata */}
-            <div className="flex items-center gap-3 mb-4">
-              {feedTitle && (
-                <span className="text-xs text-gray-500">{feedTitle}</span>
-              )}
-              {article.publishedAt && (
-                <>
-                  {feedTitle && <span className="text-xs text-gray-600">·</span>}
-                  <span className="text-xs text-gray-500">
-                    {new Date(article.publishedAt).toLocaleDateString()}
-                  </span>
-                </>
-              )}
-              {article.episodeNumber != null && (
-                <>
-                  <span className="text-xs text-gray-600">·</span>
-                  <span className="text-xs text-gray-500">
-                    {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
-                    E{article.episodeNumber}
-                  </span>
-                </>
-              )}
-              {article.audioDuration != null && (
-                <>
-                  <span className="text-xs text-gray-600">·</span>
-                  <span className="text-xs text-gray-500">
-                    {formatDuration(article.audioDuration)}
-                  </span>
-                </>
-              )}
-            </div>
+          {/* Content tabs */}
+          <div className="shrink-0 flex border-b border-white/5 px-6 mt-3">
+            {[
+              { key: 'about' as const, label: '简介', icon: <FileText size={14} /> },
+              { key: 'summary' as const, label: '摘要', icon: <Sparkles size={14} /> },
+              { key: 'transcript' as const, label: '转写', icon: <Mic size={14} /> },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setContentTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+                  contentTab === tab.key
+                    ? 'border-blue-500 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Summary */}
-            {article.summary && (
-              <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                {article.summary}
-              </p>
+          {/* Tab content */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
+            {contentTab === 'about' && (
+              <>
+                {/* Episode metadata */}
+                <div className="flex items-center gap-3 mb-4">
+                  {feedTitle && (
+                    <span className="text-xs text-gray-500">{feedTitle}</span>
+                  )}
+                  {article.publishedAt && (
+                    <>
+                      {feedTitle && <span className="text-xs text-gray-600">·</span>}
+                      <span className="text-xs text-gray-500">
+                        {new Date(article.publishedAt).toLocaleDateString()}
+                      </span>
+                    </>
+                  )}
+                  {article.episodeNumber != null && (
+                    <>
+                      <span className="text-xs text-gray-600">·</span>
+                      <span className="text-xs text-gray-500">
+                        {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
+                        E{article.episodeNumber}
+                      </span>
+                    </>
+                  )}
+                  {article.audioDuration != null && (
+                    <>
+                      <span className="text-xs text-gray-600">·</span>
+                      <span className="text-xs text-gray-500">
+                        {formatDuration(article.audioDuration)}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Summary */}
+                {article.summary && (
+                  <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                    {article.summary}
+                  </p>
+                )}
+
+                {/* Full content (show notes) */}
+                {article.content && (
+                  <div
+                    className="prose prose-invert prose-sm max-w-none text-gray-300
+                      prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                      prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
+                    dangerouslySetInnerHTML={{ __html: article.content }}
+                  />
+                )}
+
+                {/* Fallback: plaintext content */}
+                {!article.content && article.contentText && (
+                  <div className="text-sm text-gray-400 whitespace-pre-wrap leading-relaxed">
+                    {article.contentText}
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Full content (show notes) */}
-            {article.content && (
-              <div
-                className="prose prose-invert prose-sm max-w-none text-gray-300
-                  prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                  prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
-                dangerouslySetInnerHTML={{ __html: article.content }}
-              />
+            {contentTab === 'summary' && (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                <Sparkles size={32} className="mb-3 opacity-40" />
+                <p className="text-sm">摘要功能即将上线</p>
+                <p className="text-xs mt-1 text-gray-600">将自动生成播客内容摘要</p>
+              </div>
             )}
 
-            {/* Fallback: plaintext content */}
-            {!article.content && article.contentText && (
-              <div className="text-sm text-gray-400 whitespace-pre-wrap leading-relaxed">
-                {article.contentText}
+            {contentTab === 'transcript' && (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                <Mic size={32} className="mb-3 opacity-40" />
+                <p className="text-sm">转写功能即将上线</p>
+                <p className="text-xs mt-1 text-gray-600">将自动转写播客音频为文本</p>
               </div>
             )}
           </div>
