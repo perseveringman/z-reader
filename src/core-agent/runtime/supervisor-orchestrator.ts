@@ -3,6 +3,7 @@ import type {
   GraphExecutionResult,
   GraphNodeExecutor,
   GraphRunContext,
+  GraphRunOptions,
 } from './task-graph';
 import { TaskGraphScheduler } from './task-graph';
 
@@ -29,7 +30,7 @@ export class SupervisorOrchestrator {
     this.scheduler = new TaskGraphScheduler((agent) => this.registry.get(agent));
   }
 
-  async run(graph: AgentTaskGraph, context: GraphRunContext): Promise<GraphExecutionResult> {
-    return this.scheduler.run(graph, context);
+  async run(graph: AgentTaskGraph, context: GraphRunContext, options?: GraphRunOptions): Promise<GraphExecutionResult> {
+    return this.scheduler.run(graph, context, options);
   }
 }
