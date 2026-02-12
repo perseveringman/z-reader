@@ -285,7 +285,6 @@ function BookCard({ book, isSelected, onSelect, onOpen }: BookCardProps) {
       onDoubleClick={() => onOpen(book.id)}
       onMouseEnter={() => {
         setHovered(true);
-        onSelect(book.id);
       }}
       onMouseLeave={() => setHovered(false)}
       className={`
