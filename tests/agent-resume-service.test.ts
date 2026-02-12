@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AgentSnapshotResumeService,
   InMemoryGraphSnapshotStore,
+  type AgentResumeAuditPayload,
   type AgentTaskEventRecord,
   type AgentTaskPatch,
   type AgentTaskRecord,
@@ -53,7 +54,16 @@ class DelegateExecutor implements GraphNodeExecutor {
   }
 }
 
-describe('p9 agent snapshot resume service', () => {
+function getResumeAuditPayload(events: AgentTaskEventRecord[]): AgentResumeAuditPayload {
+  const event = events.find((item) => item.eventType === 'graph.resume.executed');
+  if (!event) {
+    throw new Error('resume event not found');
+  }
+
+  return event.payloadJson as AgentResumeAuditPayload;
+}
+
+describe('p12 agent snapshot resume service audit', () => {
   it('高风险恢复在未确认时应拒绝执行', async () => {
     const snapshotStore = new InMemoryGraphSnapshotStore();
     const taskStore = new FakeTaskStore();
@@ -106,7 +116,7 @@ describe('p9 agent snapshot resume service', () => {
     expect(execute.message).toContain('需要人工确认');
   });
 
-  it('safe 模式确认后应执行恢复并写入回放事件', async () => {
+  it('safe 模式确认后应执行恢复并写入结构化审计事件', async () => {
     const snapshotStore = new InMemoryGraphSnapshotStore();
     const taskStore = new FakeTaskStore();
 
@@ -149,11 +159,21 @@ describe('p9 agent snapshot resume service', () => {
     expect(execute.replayTaskId).toBe('task-resume-ok');
 
     const events = await taskStore.listEvents('task-resume-ok');
-    expect(events.some((event) => event.eventType === 'graph.resume.executed')).toBe(true);
+    const payload = getResumeAuditPayload(events);
+
+    expect(payload.mode).toBe('safe');
+    expect(payload.sideEffectFlag).toBe(false);
+    expect(payload.resolverSource).toBe('safe-runtime');
+    expect(payload.status).toBe('succeeded');
+    expect(payload.nodeSummary.total).toBe(2);
+    expect(payload.specialist.hitCount).toBe(1);
+    expect(payload.specialist.hitRate).toBe(1);
+    expect(payload.specialist.missingAgents).toEqual([]);
   });
 
-  it('delegate 模式可注入 specialist resolver 执行', async () => {
+  it('delegate 模式可注入 specialist resolver 执行并记录命中率', async () => {
     const snapshotStore = new InMemoryGraphSnapshotStore();
+    const taskStore = new FakeTaskStore();
 
     await snapshotStore.save({
       id: 'resume-snapshot-delegate',
@@ -179,6 +199,7 @@ describe('p9 agent snapshot resume service', () => {
 
     const service = new AgentSnapshotResumeService({
       snapshotStore,
+      taskStore,
       specialistResolver: (agent) => {
         if (agent === 'reader') return new DelegateExecutor('reader');
         if (agent === 'writer') return new DelegateExecutor('writer');
@@ -206,10 +227,22 @@ describe('p9 agent snapshot resume service', () => {
 
     const resumedNode = execute.result?.nodes.find((node) => node.nodeId === 'n2');
     expect(resumedNode?.output?.mode).toBe('delegate');
+
+    const events = await taskStore.listEvents('task-resume-delegate');
+    const payload = getResumeAuditPayload(events);
+
+    expect(payload.mode).toBe('delegate');
+    expect(payload.sideEffectFlag).toBe(true);
+    expect(payload.resolverSource).toBe('delegate-resolver');
+    expect(payload.specialist.requestedAgents).toEqual(['writer']);
+    expect(payload.specialist.resolvedAgents).toEqual(['writer']);
+    expect(payload.specialist.missingAgents).toEqual([]);
+    expect(payload.specialist.hitRate).toBe(1);
   });
 
-  it('delegate 模式缺失 specialist 时应失败', async () => {
+  it('delegate 模式缺失 specialist 时应失败并记录 miss 统计', async () => {
     const snapshotStore = new InMemoryGraphSnapshotStore();
+    const taskStore = new FakeTaskStore();
 
     await snapshotStore.save({
       id: 'resume-snapshot-delegate-fail',
@@ -229,6 +262,7 @@ describe('p9 agent snapshot resume service', () => {
 
     const service = new AgentSnapshotResumeService({
       snapshotStore,
+      taskStore,
       specialistResolver: () => undefined,
     });
 
@@ -240,5 +274,15 @@ describe('p9 agent snapshot resume service', () => {
 
     expect(execute.success).toBe(false);
     expect(execute.result?.status).toBe('failed');
+
+    const events = await taskStore.listEvents('task-resume-delegate-fail');
+    const payload = getResumeAuditPayload(events);
+
+    expect(payload.status).toBe('failed');
+    expect(payload.error).toBeUndefined();
+    expect(payload.specialist.requestedAgents).toEqual(['missing-specialist']);
+    expect(payload.specialist.missingAgents).toEqual(['missing-specialist']);
+    expect(payload.specialist.hitRate).toBe(0);
+    expect(payload.sideEffectFlag).toBe(true);
   });
 });

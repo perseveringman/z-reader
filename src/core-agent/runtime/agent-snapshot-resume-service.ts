@@ -8,6 +8,7 @@ import {
   type GraphNodeExecutor,
   type GraphExecutionSnapshot,
   type GraphNodeExecutionOutput,
+  type GraphNodeStatus,
   type GraphSnapshotStore,
 } from './task-graph';
 
@@ -48,6 +49,42 @@ export interface AgentSnapshotResumeExecuteResult {
   result?: GraphExecutionResult;
 }
 
+export interface AgentResumeSpecialistAudit {
+  requestedAgents: string[];
+  resolvedAgents: string[];
+  missingAgents: string[];
+  totalRequests: number;
+  hitCount: number;
+  missCount: number;
+  hitRate: number;
+}
+
+export interface AgentResumeNodeSummary {
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface AgentResumeAuditPayload {
+  snapshotId: string;
+  graphId: string;
+  mode: AgentResumeMode;
+  resolverSource: 'safe-runtime' | 'delegate-resolver';
+  sideEffectFlag: boolean;
+  riskLevel: RiskLevel;
+  requiresConfirmation: boolean;
+  pendingNodeIds: string[];
+  failedNodeIds: string[];
+  status: GraphExecutionSnapshot['status'];
+  executionOrder: string[];
+  nodeSummary: AgentResumeNodeSummary;
+  specialist: AgentResumeSpecialistAudit;
+  error?: string;
+}
+
 export interface AgentSnapshotResumeServiceDeps {
   snapshotStore: GraphSnapshotStore;
   taskStore?: ITaskStore;
@@ -55,6 +92,20 @@ export interface AgentSnapshotResumeServiceDeps {
 }
 
 const CANCEL_SKIP_ERRORS = new Set(['Graph canceled', 'Graph timeout']);
+
+interface ResolverAuditState {
+  requested: Set<string>;
+  resolved: Set<string>;
+  missing: Set<string>;
+  totalRequests: number;
+  hitCount: number;
+  missCount: number;
+}
+
+interface ResolverAuditOutput {
+  resolver: GraphExecutorResolver;
+  summarize: () => AgentResumeSpecialistAudit;
+}
 
 export class AgentSnapshotResumeService {
   constructor(private readonly deps: AgentSnapshotResumeServiceDeps) {}
@@ -165,7 +216,8 @@ export class AgentSnapshotResumeService {
       };
     }
 
-    const scheduler = new TaskGraphScheduler(this.createResolver(mode));
+    const resolverAudit = this.createResolverWithAudit(mode);
+    const scheduler = new TaskGraphScheduler(resolverAudit.resolver);
 
     try {
       const result = await scheduler.resume(
@@ -182,14 +234,18 @@ export class AgentSnapshotResumeService {
         },
       );
 
-      await this.appendResumeEvent(snapshot.taskId, {
-        snapshotId: snapshot.id,
-        graphId: snapshot.graphId,
-        mode,
-        riskLevel: preview.riskLevel,
-        status: result.status,
-        executionOrder: result.executionOrder,
-      });
+      await this.appendResumeEvent(
+        snapshot.taskId,
+        this.buildAuditPayload({
+          snapshot,
+          preview,
+          mode,
+          status: result.status,
+          executionOrder: result.executionOrder,
+          nodeSummary: this.summarizeNodeStatuses(result.nodes.map((node) => node.status)),
+          specialist: resolverAudit.summarize(),
+        }),
+      );
 
       const success = result.status === 'succeeded';
 
@@ -201,14 +257,19 @@ export class AgentSnapshotResumeService {
         result,
       };
     } catch (error) {
-      await this.appendResumeEvent(snapshot.taskId, {
-        snapshotId: snapshot.id,
-        graphId: snapshot.graphId,
-        mode,
-        riskLevel: preview.riskLevel,
-        status: 'failed',
-        error: error instanceof Error ? error.message : '恢复执行失败',
-      });
+      await this.appendResumeEvent(
+        snapshot.taskId,
+        this.buildAuditPayload({
+          snapshot,
+          preview,
+          mode,
+          status: 'failed',
+          executionOrder: [],
+          nodeSummary: this.summarizeNodeStatuses(snapshot.nodes.map((node) => node.status)),
+          specialist: resolverAudit.summarize(),
+          error: error instanceof Error ? error.message : '恢复执行失败',
+        }),
+      );
 
       return {
         success: false,
@@ -239,12 +300,97 @@ export class AgentSnapshotResumeService {
     return 'low';
   }
 
-  private createResolver(mode: AgentResumeMode): GraphExecutorResolver {
-    if (mode === 'delegate') {
-      return (agent) => this.deps.specialistResolver?.(agent);
+  private createResolverWithAudit(mode: AgentResumeMode): ResolverAuditOutput {
+    const state: ResolverAuditState = {
+      requested: new Set<string>(),
+      resolved: new Set<string>(),
+      missing: new Set<string>(),
+      totalRequests: 0,
+      hitCount: 0,
+      missCount: 0,
+    };
+
+    const resolve = mode === 'delegate'
+      ? (agent: string) => this.deps.specialistResolver?.(agent)
+      : (agent: string) => this.createSafeExecutor(agent);
+
+    const resolver: GraphExecutorResolver = (agent) => {
+      state.totalRequests += 1;
+      state.requested.add(agent);
+
+      const executor = resolve(agent);
+      if (executor) {
+        state.hitCount += 1;
+        state.resolved.add(agent);
+      } else {
+        state.missCount += 1;
+        state.missing.add(agent);
+      }
+
+      return executor;
+    };
+
+    return {
+      resolver,
+      summarize: () => {
+        const hitRate = state.totalRequests > 0 ? Number((state.hitCount / state.totalRequests).toFixed(4)) : 0;
+
+        return {
+          requestedAgents: Array.from(state.requested).sort(),
+          resolvedAgents: Array.from(state.resolved).sort(),
+          missingAgents: Array.from(state.missing).sort(),
+          totalRequests: state.totalRequests,
+          hitCount: state.hitCount,
+          missCount: state.missCount,
+          hitRate,
+        };
+      },
+    };
+  }
+
+  private buildAuditPayload(input: {
+    snapshot: GraphExecutionSnapshot;
+    preview: AgentSnapshotResumePreviewResult;
+    mode: AgentResumeMode;
+    status: GraphExecutionSnapshot['status'];
+    executionOrder: string[];
+    nodeSummary: AgentResumeNodeSummary;
+    specialist: AgentResumeSpecialistAudit;
+    error?: string;
+  }): AgentResumeAuditPayload {
+    return {
+      snapshotId: input.snapshot.id,
+      graphId: input.snapshot.graphId,
+      mode: input.mode,
+      resolverSource: input.mode === 'delegate' ? 'delegate-resolver' : 'safe-runtime',
+      sideEffectFlag: input.mode === 'delegate',
+      riskLevel: input.preview.riskLevel,
+      requiresConfirmation: input.preview.requiresConfirmation,
+      pendingNodeIds: input.preview.pendingNodeIds,
+      failedNodeIds: input.preview.failedNodeIds,
+      status: input.status,
+      executionOrder: input.executionOrder,
+      nodeSummary: input.nodeSummary,
+      specialist: input.specialist,
+      error: input.error,
+    };
+  }
+
+  private summarizeNodeStatuses(statuses: GraphNodeStatus[]): AgentResumeNodeSummary {
+    const summary: AgentResumeNodeSummary = {
+      total: statuses.length,
+      pending: 0,
+      running: 0,
+      succeeded: 0,
+      failed: 0,
+      skipped: 0,
+    };
+
+    for (const status of statuses) {
+      summary[status] += 1;
     }
 
-    return (agent) => this.createSafeExecutor(agent);
+    return summary;
   }
 
   private createSafeExecutor(agent: string): GraphNodeExecutor {
@@ -265,7 +411,7 @@ export class AgentSnapshotResumeService {
     };
   }
 
-  private async appendResumeEvent(taskId: string, payloadJson: Record<string, unknown>): Promise<void> {
+  private async appendResumeEvent(taskId: string, payloadJson: AgentResumeAuditPayload): Promise<void> {
     if (!this.deps.taskStore) {
       return;
     }
