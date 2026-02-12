@@ -318,6 +318,38 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_agent_task_events_task_id ON agent_task_events(task_id);
     CREATE INDEX IF NOT EXISTS idx_agent_task_events_occurred_at ON agent_task_events(occurred_at);
   `);
+
+  // Migration: agent_memories / agent_traces 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS agent_memories (
+      id TEXT PRIMARY KEY,
+      scope TEXT NOT NULL,
+      namespace TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_memories_namespace ON agent_memories(namespace);
+    CREATE INDEX IF NOT EXISTS idx_agent_memories_scope ON agent_memories(scope);
+    CREATE INDEX IF NOT EXISTS idx_agent_memories_namespace_key ON agent_memories(namespace, key);
+
+    CREATE TABLE IF NOT EXISTS agent_traces (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      span TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      latency_ms INTEGER NOT NULL,
+      token_in INTEGER,
+      token_out INTEGER,
+      cost_usd REAL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES agent_tasks(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_traces_task_id ON agent_traces(task_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_traces_created_at ON agent_traces(created_at);
+  `);
 }
 
 export { schema };

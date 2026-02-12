@@ -173,3 +173,28 @@ export const agentTaskEvents = sqliteTable('agent_task_events', {
   payloadJson: text('payload_json').notNull(),
   occurredAt: text('occurred_at').notNull(),
 });
+
+// ==================== agent_memories 表 ====================
+export const agentMemories = sqliteTable('agent_memories', {
+  id: text('id').primaryKey(),
+  scope: text('scope').notNull(),
+  namespace: text('namespace').notNull(),
+  key: text('key').notNull(),
+  valueJson: text('value_json').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// ==================== agent_traces 表 ====================
+export const agentTraces = sqliteTable('agent_traces', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull().references(() => agentTasks.id),
+  span: text('span').notNull(),
+  kind: text('kind').notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  tokenIn: integer('token_in'),
+  tokenOut: integer('token_out'),
+  costUsd: real('cost_usd'),
+  payloadJson: text('payload_json').notNull(),
+  createdAt: text('created_at').notNull(),
+});

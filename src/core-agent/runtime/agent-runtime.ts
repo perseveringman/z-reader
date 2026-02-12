@@ -8,6 +8,7 @@ import type {
   IPlanner,
   IStrategyRouter,
   ITaskStore,
+  ITraceStore,
   RiskLevel,
   TaskStatus,
 } from '../contracts';
@@ -21,9 +22,11 @@ export class AgentRuntime {
     private readonly executor: IExecutor,
     private readonly eventBus?: IEventBus,
     private readonly taskStore?: ITaskStore,
+    private readonly traceStore?: ITraceStore,
   ) {}
 
   async run(request: AgentTaskRequest): Promise<AgentTaskResult> {
+    const startedAt = Date.now();
     const queuedAt = nowIso();
 
     await this.taskStore?.createTask({
@@ -44,9 +47,21 @@ export class AgentRuntime {
       instruction: request.instruction,
     });
 
+    await this.appendTrace(request, 'runtime.queued', {
+      latencyMs: 0,
+    });
+
+    const classifyStartedAt = Date.now();
     const signal = await this.router.classify(request);
     const strategy = await this.router.chooseMode(request, signal);
     const riskLevel = this.estimateRisk(signal.risk);
+
+    await this.appendTrace(request, 'runtime.classified', {
+      latencyMs: Date.now() - classifyStartedAt,
+    }, {
+      strategy,
+      signal,
+    });
 
     const context: AgentTaskContext = {
       request,
@@ -70,8 +85,29 @@ export class AgentRuntime {
       signal,
     });
 
+    await this.appendTrace(request, 'runtime.running', {
+      latencyMs: Date.now() - startedAt,
+    }, {
+      strategy,
+      riskLevel,
+    });
+
+    const planStartedAt = Date.now();
     const plan = await this.planner.createPlan(context);
+    await this.appendTrace(request, 'runtime.planned', {
+      latencyMs: Date.now() - planStartedAt,
+    }, {
+      stepCount: plan.steps.length,
+      mode: plan.mode,
+    });
+
+    const executeStartedAt = Date.now();
     const result = await this.executor.execute(plan, context);
+    await this.appendTrace(request, 'runtime.executed', {
+      latencyMs: Date.now() - executeStartedAt,
+    }, {
+      status: result.status,
+    });
 
     const finalEventType = this.mapStatusToEvent(result.status);
     await this.taskStore?.updateTask(request.id, {
@@ -93,7 +129,31 @@ export class AgentRuntime {
       error: result.error,
     });
 
+    await this.appendTrace(request, 'runtime.completed', {
+      latencyMs: Date.now() - startedAt,
+    }, {
+      status: result.status,
+      strategy,
+    });
+
     return result;
+  }
+
+  private async appendTrace(
+    request: AgentTaskRequest,
+    span: string,
+    metric: { latencyMs: number; tokenIn?: number; tokenOut?: number; costUsd?: number },
+    payload?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.traceStore?.append({
+      id: randomUUID(),
+      taskId: request.id,
+      span,
+      kind: 'system',
+      metric,
+      payload,
+      createdAt: nowIso(),
+    });
   }
 
   private async emitEvent(type: string, request: AgentTaskRequest, payload: Record<string, unknown>): Promise<void> {
