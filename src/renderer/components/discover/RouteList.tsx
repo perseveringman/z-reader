@@ -1,10 +1,10 @@
 import { Loader2, ExternalLink } from 'lucide-react';
-import type { RSSHubNamespace } from '../../../shared/types';
+import type { RSSHubNamespace, RSSHubParamValue } from '../../../shared/types';
 
 interface RouteListProps {
   routes: Record<string, RSSHubNamespace>;
   loading: boolean;
-  onSelectRoute: (namespace: string, route: { path: string; name: string; example?: string; parameters?: Record<string, string> }) => void;
+  onSelectRoute: (namespace: string, route: { path: string; name: string; example?: string; parameters?: Record<string, RSSHubParamValue> }) => void;
 }
 
 export function RouteList({ routes, loading, onSelectRoute }: RouteListProps) {

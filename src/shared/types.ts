@@ -285,12 +285,16 @@ export interface RSSHubRouteParam {
   default?: string;
 }
 
+// RSSHub parameters 值：旧版为字符串，新版为对象 { description, options, default }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RSSHubParamValue = string | Record<string, any>;
+
 export interface RSSHubRoute {
   path: string;
   name: string;
   description?: string;
   example?: string;
-  parameters?: Record<string, string>;
+  parameters?: Record<string, RSSHubParamValue>;
   categories?: string[];
   maintainers?: string[];
 }
@@ -322,7 +326,7 @@ export interface DiscoverSearchResult {
   website: string | null;
   // RSSHub 路由特有
   rsshubPath?: string;
-  rsshubParams?: Record<string, string>;
+  rsshubParams?: Record<string, RSSHubParamValue>;
 }
 
 export interface DiscoverPreviewResult {

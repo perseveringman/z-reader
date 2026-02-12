@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, Loader2, ChevronLeft, Settings2 } from 'lucide-react';
-import type { RSSHubCategory, RSSHubNamespace, DiscoverSearchResult } from '../../../shared/types';
+import type { RSSHubCategory, RSSHubNamespace, RSSHubParamValue, DiscoverSearchResult } from '../../../shared/types';
 import { useToast } from '../Toast';
 import { CategoryGrid } from './CategoryGrid';
 import { RouteList } from './RouteList';
@@ -40,7 +40,7 @@ export function DiscoverPage({ onFeedAdded }: DiscoverPageProps) {
   // 路由参数表单
   const [activeRoute, setActiveRoute] = useState<{
     namespace: string;
-    route: { path: string; name: string; example?: string; parameters?: Record<string, string> };
+    route: { path: string; name: string; example?: string; parameters?: Record<string, RSSHubParamValue> };
   } | null>(null);
 
   // 面包屑
@@ -150,7 +150,7 @@ export function DiscoverPage({ onFeedAdded }: DiscoverPageProps) {
   }, [selectedCategory]);
 
   // 选择路由
-  const handleSelectRoute = useCallback((namespace: string, route: { path: string; name: string; example?: string; parameters?: Record<string, string> }) => {
+  const handleSelectRoute = useCallback((namespace: string, route: { path: string; name: string; example?: string; parameters?: Record<string, RSSHubParamValue> }) => {
     // 如果没有参数（除了 path 中的 :param 部分），检查 example 是否可以直接订阅
     const pathParams = route.path.match(/:(\w+)/g);
     if (!pathParams || pathParams.length === 0) {
