@@ -1,6 +1,6 @@
 /**
  * RSSHub 路由缓存管理服务
- * - 从 RSSHub 实例拉取 /api/routes
+ * - 从 RSSHub 实例拉取路由数据（兼容新版 /api/namespace 和旧版 /api/routes）
  * - 缓存路由数据到内存
  * - 提供分类查询、模糊搜索、URL 拼接
  */
@@ -33,15 +33,25 @@ export async function setRSSHubBaseUrl(baseUrl: string): Promise<void> {
 
 /**
  * 从 RSSHub 实例拉取路由数据
+ * 兼容新版（/api/namespace）和旧版（/api/routes）API
  */
 async function fetchRoutes(baseUrl: string): Promise<Record<string, RSSHubNamespace>> {
-  const res = await fetch(`${baseUrl}/api/routes`);
-  if (!res.ok) {
-    throw new Error(`RSSHub API 请求失败: ${res.status}`);
+  // 先尝试新版 API（/api/namespace）
+  const newRes = await fetch(`${baseUrl}/api/namespace`);
+  if (newRes.ok) {
+    const json = await newRes.json();
+    // 新版直接返回 { nsKey: { name, routes, url, categories, ... } }
+    return json;
   }
-  const json = await res.json();
-  // RSSHub /api/routes 返回 { data: { namespace: { routes: {...} } } }
-  return json.data || {};
+
+  // 回退到旧版 API（/api/routes）
+  const oldRes = await fetch(`${baseUrl}/api/routes`);
+  if (!oldRes.ok) {
+    throw new Error(`RSSHub API 请求失败: ${oldRes.status}`);
+  }
+  const oldJson = await oldRes.json();
+  // 旧版返回 { data: { namespace: { routes: {...} } } }
+  return oldJson.data || {};
 }
 
 /**
