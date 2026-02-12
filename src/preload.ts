@@ -101,6 +101,12 @@ const electronAPI: ElectronAPI = {
   discoverRsshubRoutes: (category) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_ROUTES, category),
   discoverPreview: (feedUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_PREVIEW, feedUrl),
   discoverRsshubConfig: (baseUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_CONFIG, baseUrl),
+  // Agent
+  agentApprovalList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_LIST),
+  agentApprovalDecide: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_DECIDE, input),
+  agentReplayGet: (taskId) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_REPLAY_GET, taskId),
+  agentPolicyGet: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_GET),
+  agentPolicySet: (patch) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_SET, patch),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

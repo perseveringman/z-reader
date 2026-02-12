@@ -269,6 +269,87 @@ export interface DownloadRecord {
   lastAccessedAt: string | null;
 }
 
+// ==================== Agent 相关类型 ====================
+export type AgentRiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export interface AgentToolPolicyRule {
+  toolName: string;
+  blocked?: boolean;
+  overrideRiskLevel?: AgentRiskLevel;
+  forceApproval?: boolean;
+}
+
+export interface AgentPolicyConfig {
+  approvalRiskThreshold: AgentRiskLevel;
+  blockedRiskLevels: AgentRiskLevel[];
+  toolRules: AgentToolPolicyRule[];
+}
+
+export interface AgentPolicyConfigPatch {
+  approvalRiskThreshold?: AgentRiskLevel;
+  blockedRiskLevels?: AgentRiskLevel[];
+  toolRules?: AgentToolPolicyRule[];
+}
+
+export interface AgentPendingApproval {
+  id: string;
+  taskId: string;
+  riskLevel: AgentRiskLevel;
+  operation: string;
+  reason: string;
+  payload?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentApprovalDecisionInput {
+  id: string;
+  approved: boolean;
+  reviewer?: string;
+  comment?: string;
+}
+
+export interface AgentReplayTask {
+  id: string;
+  sessionId: string;
+  status: string;
+  strategy: string;
+  riskLevel: AgentRiskLevel;
+  inputJson: Record<string, unknown>;
+  outputJson?: Record<string, unknown>;
+  errorText?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentReplayEvent {
+  id: string;
+  taskId: string;
+  eventType: string;
+  payloadJson: Record<string, unknown>;
+  occurredAt: string;
+}
+
+export interface AgentReplayTrace {
+  id: string;
+  taskId: string;
+  span: string;
+  kind: string;
+  metric: {
+    latencyMs: number;
+    tokenIn?: number;
+    tokenOut?: number;
+    costUsd?: number;
+  };
+  payload?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentReplayBundle {
+  task: AgentReplayTask | null;
+  events: AgentReplayEvent[];
+  traces: AgentReplayTrace[];
+}
+
 // ==================== Settings 相关类型 ====================
 export interface AppSettings {
   podcastIndexApiKey?: string;
@@ -342,6 +423,7 @@ export interface DiscoverPreviewResult {
     publishedAt: string | null;
   }[];
   alreadySubscribed: boolean;
+  agentPolicy?: AgentPolicyConfig;
 }
 
 // ==================== IPC Channel 定义 ====================
@@ -444,4 +526,10 @@ export interface ElectronAPI {
   discoverRsshubRoutes: (category?: string) => Promise<Record<string, RSSHubNamespace>>;
   discoverPreview: (feedUrl: string) => Promise<DiscoverPreviewResult>;
   discoverRsshubConfig: (baseUrl?: string) => Promise<{ baseUrl: string | null }>;
+  // Agent 操作
+  agentApprovalList: () => Promise<AgentPendingApproval[]>;
+  agentApprovalDecide: (input: AgentApprovalDecisionInput) => Promise<boolean>;
+  agentReplayGet: (taskId: string) => Promise<AgentReplayBundle>;
+  agentPolicyGet: () => Promise<AgentPolicyConfig>;
+  agentPolicySet: (patch: AgentPolicyConfigPatch) => Promise<AgentPolicyConfig>;
 }

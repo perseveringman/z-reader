@@ -97,4 +97,11 @@ export const IPC_CHANNELS = {
   // Settings
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
+
+  // Agent
+  AGENT_APPROVAL_LIST: 'agent:approval:list',
+  AGENT_APPROVAL_DECIDE: 'agent:approval:decide',
+  AGENT_REPLAY_GET: 'agent:replay:get',
+  AGENT_POLICY_GET: 'agent:policy:get',
+  AGENT_POLICY_SET: 'agent:policy:set',
 } as const;
