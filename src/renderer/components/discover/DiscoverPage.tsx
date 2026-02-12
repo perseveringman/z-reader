@@ -7,6 +7,7 @@ import { RouteList } from './RouteList';
 import { SearchResults } from './SearchResults';
 import { FeedPreview } from './FeedPreview';
 import { RouteParamForm } from './RouteParamForm';
+import { PopularSites } from './PopularSites';
 
 interface DiscoverPageProps {
   onFeedAdded?: () => void;
@@ -119,6 +120,19 @@ export function DiscoverPage({ onFeedAdded }: DiscoverPageProps) {
       setLoadingRoutes(false);
     }
   }, [showToast]);
+
+  // 选择热门站点（直接展示该站点的路由）
+  const handleSelectPopularSite = useCallback((nsKey: string, ns: RSSHubNamespace) => {
+    const displayName = ns.name || nsKey;
+    setSelectedCategory(nsKey);
+    setCategoryRoutes({ [nsKey]: ns });
+    setLoadingRoutes(false);
+    setBreadcrumb([
+      { label: '发现', type: 'home' },
+      { label: displayName, type: 'category' },
+    ]);
+    setSearchResults(null);
+  }, []);
 
   // 面包屑导航
   const handleBreadcrumbClick = useCallback((item: BreadcrumbItem) => {
@@ -343,10 +357,13 @@ export function DiscoverPage({ onFeedAdded }: DiscoverPageProps) {
                 onSelectRoute={handleSelectRoute}
               />
             ) : (
-              <CategoryGrid
-                categories={categories}
-                onSelect={handleSelectCategory}
-              />
+              <>
+                <PopularSites onSelectSite={handleSelectPopularSite} />
+                <CategoryGrid
+                  categories={categories}
+                  onSelect={handleSelectCategory}
+                />
+              </>
             )}
           </>
         )}
