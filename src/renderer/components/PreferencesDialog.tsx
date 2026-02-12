@@ -42,6 +42,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [resumePreviewLoading, setResumePreviewLoading] = useState(false);
   const [resumeExecuting, setResumeExecuting] = useState(false);
   const [resumeConfirmed, setResumeConfirmed] = useState(false);
+  const [delegateSpecialists, setDelegateSpecialists] = useState<string[]>([]);
+  const [delegateSpecialistsLoading, setDelegateSpecialistsLoading] = useState(false);
 
   const { showToast } = useToast();
 
@@ -58,12 +60,23 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumeMode('safe');
       setResumePreview(null);
       setResumeConfirmed(false);
+      setDelegateSpecialists([]);
 
       window.electronAPI
         .settingsGet()
         .then((s) => setSettings(s))
         .catch((err) => console.error('Failed to load settings:', err))
         .finally(() => setLoading(false));
+
+      setDelegateSpecialistsLoading(true);
+      window.electronAPI
+        .agentResumeSpecialistsList()
+        .then((list) => setDelegateSpecialists(list))
+        .catch((err) => {
+          console.error('Failed to load resume specialists list:', err);
+          setDelegateSpecialists([]);
+        })
+        .finally(() => setDelegateSpecialistsLoading(false));
     }
   }, [open]);
 
@@ -190,6 +203,11 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     const snapshotId = resumeSnapshotId.trim();
     if (!snapshotId) {
       setAgentError('请先选择快照再执行恢复');
+      return;
+    }
+
+    if (resumeMode === 'delegate' && delegateSpecialists.length === 0) {
+      setAgentError('delegate 模式当前无可用 specialist，请先完成主进程注册');
       return;
     }
 
@@ -537,6 +555,16 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                           <option value="safe">safe（无副作用）</option>
                           <option value="delegate">delegate（真实执行器）</option>
                         </select>
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        delegate 执行器：
+                        {delegateSpecialistsLoading ? (
+                          <span className="text-gray-400 ml-1">加载中...</span>
+                        ) : delegateSpecialists.length === 0 ? (
+                          <span className="text-red-300 ml-1">未注册</span>
+                        ) : (
+                          <span className="text-green-300 ml-1">{delegateSpecialists.join(', ')}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

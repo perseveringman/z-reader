@@ -20,6 +20,7 @@ import {
   createReplayService,
   createSnapshotResumeService,
   getAgentApprovalQueue,
+  listResumeSpecialists,
 } from '../services/agent-runtime-context';
 import { getAgentPolicyConfig, setAgentPolicyConfig } from '../services/agent-policy-service';
 
@@ -34,6 +35,7 @@ export function registerAgentHandlers() {
     AGENT_SNAPSHOT_CLEANUP,
     AGENT_RESUME_PREVIEW,
     AGENT_RESUME_EXECUTE,
+    AGENT_RESUME_SPECIALISTS_LIST,
   } = IPC_CHANNELS;
 
   ipcMain.handle(AGENT_APPROVAL_LIST, async (): Promise<AgentPendingApproval[]> => {
@@ -140,5 +142,9 @@ export function registerAgentHandlers() {
           ? Math.max(1, Math.floor(input.maxParallel))
           : undefined,
     });
+  });
+
+  ipcMain.handle(AGENT_RESUME_SPECIALISTS_LIST, async (): Promise<string[]> => {
+    return listResumeSpecialists();
   });
 }

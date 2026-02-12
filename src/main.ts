@@ -1,8 +1,10 @@
 import { app, BrowserWindow, session } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { createZReaderResumeSpecialists } from './business-adapters/zreader-agent';
 import { getDatabase } from './main/db';
 import { registerAllIpcHandlers } from './main/ipc';
+import { setResumeSpecialists } from './main/services/agent-runtime-context';
 import { startScheduledFetch } from './main/services/rss-service';
 import { startApiServer, stopApiServer } from './main/services/api-server';
 
@@ -30,12 +32,11 @@ const createWindow = () => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
-
-
 };
 
 app.on('ready', () => {
   getDatabase();
+  setResumeSpecialists(createZReaderResumeSpecialists());
   registerAllIpcHandlers();
   startScheduledFetch(15);
   startApiServer();

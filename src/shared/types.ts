@@ -611,4 +611,5 @@ export interface ElectronAPI {
   agentSnapshotCleanup: (input: AgentSnapshotCleanupInput) => Promise<AgentSnapshotCleanupResult>;
   agentResumePreview: (input: AgentResumePreviewInput) => Promise<AgentResumePreviewResult>;
   agentResumeExecute: (input: AgentResumeExecuteInput) => Promise<AgentResumeExecuteResult>;
+  agentResumeSpecialistsList: () => Promise<string[]>;
 }

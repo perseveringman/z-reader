@@ -111,6 +111,7 @@ const electronAPI: ElectronAPI = {
   agentSnapshotCleanup: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SNAPSHOT_CLEANUP, input),
   agentResumePreview: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_PREVIEW, input),
   agentResumeExecute: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_EXECUTE, input),
+  agentResumeSpecialistsList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_SPECIALISTS_LIST),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

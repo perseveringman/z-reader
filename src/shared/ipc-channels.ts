@@ -108,4 +108,5 @@ export const IPC_CHANNELS = {
   AGENT_SNAPSHOT_CLEANUP: 'agent:snapshot:cleanup',
   AGENT_RESUME_PREVIEW: 'agent:resume:preview',
   AGENT_RESUME_EXECUTE: 'agent:resume:execute',
+  AGENT_RESUME_SPECIALISTS_LIST: 'agent:resume:specialists:list',
 } as const;
