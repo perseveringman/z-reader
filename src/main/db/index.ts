@@ -350,6 +350,23 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_agent_traces_task_id ON agent_traces(task_id);
     CREATE INDEX IF NOT EXISTS idx_agent_traces_created_at ON agent_traces(created_at);
   `);
+
+  // Migration: agent_graph_snapshots 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS agent_graph_snapshots (
+      id TEXT PRIMARY KEY,
+      graph_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      execution_order_json TEXT NOT NULL,
+      nodes_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_graph_snapshots_task_id ON agent_graph_snapshots(task_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_graph_snapshots_graph_id ON agent_graph_snapshots(graph_id);
+  `);
 }
 
 export { schema };

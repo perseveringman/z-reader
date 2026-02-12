@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  InMemoryGraphSnapshotStore,
   TaskGraphScheduler,
   type AgentTaskGraph,
   type GraphNodeExecutionContext,
@@ -60,8 +61,9 @@ describe('p5 task graph advanced scheduling', () => {
     expect(elapsedMs).toBeLessThan(150);
   });
 
-  it('失败节点支持重试与补偿', async () => {
+  it('失败节点支持重试backoff与补偿', async () => {
     const attempts = new Map<string, number>();
+    const waits: number[] = [];
     let compensationCalled = 0;
 
     const graph: AgentTaskGraph = {
@@ -127,6 +129,17 @@ describe('p5 task graph advanced scheduling', () => {
       },
       {
         maxParallel: 2,
+        defaultRetry: {
+          maxAttempts: 1,
+          backoff: {
+            baseDelayMs: 10,
+            factor: 2,
+            jitterMs: 0,
+          },
+        },
+        sleep: async (ms) => {
+          waits.push(ms);
+        },
       },
     );
 
@@ -134,6 +147,7 @@ describe('p5 task graph advanced scheduling', () => {
     expect(attempts.get('flaky')).toBe(3);
     expect(attempts.get('always-fail')).toBe(2);
     expect(compensationCalled).toBe(1);
+    expect(waits.sort((left, right) => left - right)).toEqual([10, 10, 20]);
 
     const n1 = result.nodes.find((node) => node.nodeId === 'n1');
     const n2 = result.nodes.find((node) => node.nodeId === 'n2');
@@ -187,5 +201,79 @@ describe('p5 task graph advanced scheduling', () => {
 
     expect(canceledResult.status).toBe('canceled');
     expect(canceledResult.nodes[0].status).toBe('skipped');
+  });
+
+  it('支持快照持久化与恢复执行', async () => {
+    const snapshotStore = new InMemoryGraphSnapshotStore();
+    let shouldStop = false;
+
+    const graph: AgentTaskGraph = {
+      id: 'graph-p5-resume',
+      nodes: [
+        { id: 'n1', agent: 'first' },
+        { id: 'n2', agent: 'second', dependsOn: ['n1'] },
+      ],
+    };
+
+    const scheduler = new TaskGraphScheduler((agent) => {
+      if (agent === 'first') {
+        return {
+          execute: async () => {
+            shouldStop = true;
+            return { success: true, output: { ok: 1 } };
+          },
+        };
+      }
+
+      if (agent === 'second') {
+        return {
+          execute: async () => ({ success: true, output: { ok: 2 } }),
+        };
+      }
+
+      return undefined;
+    });
+
+    const canceled = await scheduler.run(
+      graph,
+      {
+        taskId: 'task-p5-resume',
+        sessionId: 'session-p5-resume',
+      },
+      {
+        maxParallel: 1,
+        shouldCancel: () => shouldStop,
+        snapshotStore,
+        snapshotId: 'snapshot-p5-resume',
+      },
+    );
+
+    expect(canceled.status).toBe('canceled');
+
+    const snapshot = await snapshotStore.get('snapshot-p5-resume');
+    expect(snapshot?.status).toBe('canceled');
+
+    shouldStop = false;
+
+    if (!snapshot) {
+      throw new Error('snapshot should exist');
+    }
+
+    const resumed = await scheduler.resume(
+      graph,
+      {
+        taskId: 'task-p5-resume',
+        sessionId: 'session-p5-resume',
+      },
+      snapshot,
+      {
+        maxParallel: 1,
+        snapshotStore,
+        snapshotId: 'snapshot-p5-resume',
+      },
+    );
+
+    expect(resumed.status).toBe('succeeded');
+    expect(resumed.executionOrder).toEqual(['n1', 'n2']);
   });
 });

@@ -198,3 +198,16 @@ export const agentTraces = sqliteTable('agent_traces', {
   payloadJson: text('payload_json').notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+// ==================== agent_graph_snapshots 表 ====================
+export const agentGraphSnapshots = sqliteTable('agent_graph_snapshots', {
+  id: text('id').primaryKey(),
+  graphId: text('graph_id').notNull(),
+  taskId: text('task_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  status: text('status').notNull(),
+  executionOrderJson: text('execution_order_json').notNull(),
+  nodesJson: text('nodes_json').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
