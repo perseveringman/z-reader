@@ -4,6 +4,48 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function toAbsoluteUrl(rawUrl: string, baseUrl: string): string {
+  const value = rawUrl.trim();
+  if (!value) return rawUrl;
+  if (/^(#|data:|javascript:|mailto:|tel:)/i.test(value)) return rawUrl;
+
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function normalizeSrcset(srcset: string, baseUrl: string): string {
+  return srcset
+    .split(',')
+    .map((candidate) => {
+      const trimmed = candidate.trim();
+      if (!trimmed) return trimmed;
+
+      const parts = trimmed.split(/\s+/);
+      const url = parts.shift() ?? '';
+      const absoluteUrl = toAbsoluteUrl(url, baseUrl);
+      return [absoluteUrl, ...parts].join(' ').trim();
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+function normalizeImageUrls(html: string, baseUrl: string): string {
+  return html.replace(/<(img|source)\b[^>]*>/gi, (tag) => {
+    let updatedTag = tag.replace(/(\s(?:src|data-src|poster)=['"])([^'"]+)(['"])/gi, (_, p1, p2, p3) => {
+      return `${p1}${toAbsoluteUrl(p2, baseUrl)}${p3}`;
+    });
+
+    updatedTag = updatedTag.replace(/(\s(?:srcset|data-srcset)=['"])([^'"]+)(['"])/gi, (_, p1, p2, p3) => {
+      return `${p1}${normalizeSrcset(p2, baseUrl)}${p3}`;
+    });
+
+    return updatedTag;
+  });
+}
+
 function extractDomain(url: string): string | null {
   try {
     return new URL(url).hostname;
@@ -28,7 +70,7 @@ export async function parseArticleContent(url: string): Promise<ParseResult | nu
   try {
     const result = await Parser.parse(url);
 
-    const content = result.content ?? null;
+    const content = result.content ? normalizeImageUrls(result.content, url) : null;
     const contentText = content ? stripHtml(content) : null;
     const wordCount = contentText ? contentText.split(/\s+/).filter(Boolean).length : 0;
     const readingTime = Math.max(1, Math.round(wordCount / 200));
@@ -42,7 +84,7 @@ export async function parseArticleContent(url: string): Promise<ParseResult | nu
       wordCount,
       readingTime,
       excerpt: result.excerpt ?? null,
-      leadImageUrl: result.lead_image_url ?? null,
+      leadImageUrl: result.lead_image_url ? toAbsoluteUrl(result.lead_image_url, url) : null,
     };
   } catch (err) {
     console.error(`Failed to parse article content: ${url}`, err);
