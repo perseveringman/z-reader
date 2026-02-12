@@ -17,7 +17,13 @@ import { loadSettings } from '../services/settings-service';
 import type { DiscoverSearchQuery, DiscoverSearchResult, DiscoverPreviewResult } from '../../shared/types';
 import RSSParser from 'rss-parser';
 
-const rssParser = new RSSParser();
+const rssParser = new RSSParser({
+  timeout: 15000,
+  headers: {
+    'User-Agent': 'Z-Reader/1.0',
+    Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+  },
+});
 
 /**
  * 判断输入是否为 URL
