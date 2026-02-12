@@ -203,6 +203,7 @@ export const agentTraces = sqliteTable('agent_traces', {
 export const agentGraphSnapshots = sqliteTable('agent_graph_snapshots', {
   id: text('id').primaryKey(),
   graphId: text('graph_id').notNull(),
+  graphSignature: text('graph_signature'),
   taskId: text('task_id').notNull(),
   sessionId: text('session_id').notNull(),
   status: text('status').notNull(),

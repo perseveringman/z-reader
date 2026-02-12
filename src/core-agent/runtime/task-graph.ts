@@ -29,6 +29,29 @@ export interface RetryBackoffOptions {
   jitterMs?: number;
 }
 
+export interface GraphFailureRule {
+  retryable: boolean;
+  errorCodes?: string[];
+  messageIncludes?: string[];
+  agents?: string[];
+  nodeIds?: string[];
+}
+
+export interface GraphFailurePolicyTemplate {
+  defaultRetryable?: boolean;
+  rules?: GraphFailureRule[];
+}
+
+export interface GraphSnapshotCleanupPolicy {
+  maxSnapshotsPerTask?: number;
+  staleBefore?: string;
+}
+
+export interface GraphSnapshotCleanupResult {
+  deletedCount: number;
+  deletedIds: string[];
+}
+
 export interface GraphRunOptions {
   maxParallel?: number;
   timeoutMs?: number;
@@ -40,6 +63,7 @@ export interface GraphRunOptions {
   sleep?: (ms: number) => Promise<void>;
   snapshotStore?: GraphSnapshotStore;
   snapshotId?: string;
+  failurePolicy?: GraphFailurePolicyTemplate;
 }
 
 export interface GraphNodeExecutionContext extends GraphRunContext {
@@ -51,6 +75,7 @@ export interface GraphNodeExecutionOutput {
   success: boolean;
   output?: Record<string, unknown>;
   error?: string;
+  errorCode?: string;
 }
 
 export interface GraphNodeExecutor {
@@ -65,13 +90,17 @@ export interface GraphNodeCompensationResult {
   error?: string;
 }
 
+export type GraphFailureClass = 'retryable' | 'non_retryable';
+
 export interface GraphNodeResult {
   nodeId: string;
   status: GraphNodeStatus;
   output?: Record<string, unknown>;
   error?: string;
+  errorCode?: string;
   attempts?: number;
   compensation?: GraphNodeCompensationResult;
+  failureClass?: GraphFailureClass;
 }
 
 export interface GraphExecutionResult {
@@ -86,6 +115,7 @@ export type GraphSnapshotStatus = 'running' | 'succeeded' | 'failed' | 'canceled
 export interface GraphExecutionSnapshot {
   id: string;
   graphId: string;
+  graphSignature?: string;
   taskId: string;
   sessionId: string;
   status: GraphSnapshotStatus;
@@ -98,6 +128,8 @@ export interface GraphExecutionSnapshot {
 export interface GraphSnapshotStore {
   save(snapshot: GraphExecutionSnapshot): Promise<void>;
   get(id: string): Promise<GraphExecutionSnapshot | null>;
+  listByTask(taskId: string): Promise<GraphExecutionSnapshot[]>;
+  cleanup(policy: GraphSnapshotCleanupPolicy): Promise<GraphSnapshotCleanupResult>;
 }
 
 interface InternalNodeResult extends GraphNodeResult {
@@ -121,6 +153,16 @@ interface NormalizedGraphRunOptions {
   sleep: (ms: number) => Promise<void>;
   snapshotStore?: GraphSnapshotStore;
   snapshotId?: string;
+  failurePolicy: {
+    defaultRetryable: boolean;
+    rules: GraphFailureRule[];
+  };
+}
+
+interface GraphFailureSignal {
+  error: string;
+  errorCode?: string;
+  node: AgentTaskGraphNode;
 }
 
 const defaultSleep = async (ms: number): Promise<void> => {
@@ -156,6 +198,7 @@ export class TaskGraphScheduler {
     options: GraphRunOptions = {},
   ): Promise<GraphExecutionResult> {
     this.validateGraph(graph);
+    this.assertSnapshotCompatible(graph, context, snapshot);
 
     const state: InternalRunState = {
       results: new Map<string, GraphNodeResult>(),
@@ -295,12 +338,15 @@ export class TaskGraphScheduler {
         status: 'failed',
         error: `Specialist not found: ${node.agent}`,
         attempts: 1,
+        failureClass: 'non_retryable',
       };
     }
 
     const maxAttempts = Math.max(1, node.retry?.maxAttempts ?? options.defaultRetry.maxAttempts);
     let attempts = 0;
     let lastError = 'Node execution failed';
+    let lastErrorCode: string | undefined;
+    let lastFailureClass: GraphFailureClass = options.failurePolicy.defaultRetryable ? 'retryable' : 'non_retryable';
 
     while (attempts < maxAttempts) {
       attempts += 1;
@@ -325,6 +371,15 @@ export class TaskGraphScheduler {
         }
 
         lastError = execution.error ?? 'Node execution failed';
+        lastErrorCode = execution.errorCode;
+        lastFailureClass = this.classifyFailure(
+          {
+            error: lastError,
+            errorCode: execution.errorCode,
+            node,
+          },
+          options.failurePolicy,
+        );
       } catch (error) {
         if (error instanceof Error && error.message === 'Graph timeout') {
           return {
@@ -333,10 +388,25 @@ export class TaskGraphScheduler {
             error: 'Graph timeout',
             attempts,
             terminalReason: 'timeout',
+            failureClass: 'non_retryable',
           };
         }
 
-        lastError = error instanceof Error ? error.message : 'Node execution failed';
+        const normalizedError = this.normalizeError(error);
+        lastError = normalizedError.message;
+        lastErrorCode = normalizedError.code;
+        lastFailureClass = this.classifyFailure(
+          {
+            error: lastError,
+            errorCode: lastErrorCode,
+            node,
+          },
+          options.failurePolicy,
+        );
+      }
+
+      if (lastFailureClass === 'non_retryable') {
+        break;
       }
 
       if (attempts < maxAttempts) {
@@ -351,9 +421,72 @@ export class TaskGraphScheduler {
       nodeId: node.id,
       status: 'failed',
       error: lastError,
+      errorCode: lastErrorCode,
       attempts,
       compensation,
+      failureClass: lastFailureClass,
     };
+  }
+
+  private normalizeError(error: unknown): { message: string; code?: string } {
+    if (error instanceof Error) {
+      const withCode = error as Error & { code?: unknown };
+      return {
+        message: error.message,
+        code: typeof withCode.code === 'string' ? withCode.code : undefined,
+      };
+    }
+
+    if (error && typeof error === 'object') {
+      const maybe = error as { message?: unknown; code?: unknown };
+      return {
+        message: typeof maybe.message === 'string' ? maybe.message : 'Node execution failed',
+        code: typeof maybe.code === 'string' ? maybe.code : undefined,
+      };
+    }
+
+    return {
+      message: 'Node execution failed',
+    };
+  }
+
+  private classifyFailure(
+    signal: GraphFailureSignal,
+    policy: NormalizedGraphRunOptions['failurePolicy'],
+  ): GraphFailureClass {
+    for (const rule of policy.rules) {
+      if (this.matchFailureRule(rule, signal)) {
+        return rule.retryable ? 'retryable' : 'non_retryable';
+      }
+    }
+
+    return policy.defaultRetryable ? 'retryable' : 'non_retryable';
+  }
+
+  private matchFailureRule(rule: GraphFailureRule, signal: GraphFailureSignal): boolean {
+    if (rule.nodeIds?.length && !rule.nodeIds.includes(signal.node.id)) {
+      return false;
+    }
+
+    if (rule.agents?.length && !rule.agents.includes(signal.node.agent)) {
+      return false;
+    }
+
+    if (rule.errorCodes?.length) {
+      if (!signal.errorCode || !rule.errorCodes.includes(signal.errorCode)) {
+        return false;
+      }
+    }
+
+    if (rule.messageIncludes?.length) {
+      const message = signal.error.toLowerCase();
+      const matched = rule.messageIncludes.some((token) => message.includes(token.toLowerCase()));
+      if (!matched) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private computeBackoffDelay(attempt: number, backoff: Required<RetryBackoffOptions>): number {
@@ -530,6 +663,10 @@ export class TaskGraphScheduler {
       sleep: options.sleep ?? defaultSleep,
       snapshotStore: options.snapshotStore,
       snapshotId: options.snapshotId,
+      failurePolicy: {
+        defaultRetryable: options.failurePolicy?.defaultRetryable ?? true,
+        rules: [...(options.failurePolicy?.rules ?? [])],
+      },
     };
   }
 
@@ -602,6 +739,7 @@ export class TaskGraphScheduler {
     await options.snapshotStore.save({
       id: snapshotId,
       graphId: graph.id,
+      graphSignature: this.computeGraphSignature(graph),
       taskId: context.taskId,
       sessionId: context.sessionId,
       status,
@@ -618,5 +756,58 @@ export class TaskGraphScheduler {
       createdAt: state.createdAt,
       updatedAt: now,
     });
+  }
+
+  private computeGraphSignature(graph: AgentTaskGraph): string {
+    const normalizedNodes = graph.nodes
+      .map((node) => ({
+        id: node.id,
+        agent: node.agent,
+        dependsOn: [...(node.dependsOn ?? [])].sort(),
+        retryMaxAttempts: node.retry?.maxAttempts ?? null,
+        compensationAgent: node.compensationAgent ?? null,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    return JSON.stringify({
+      graphId: graph.id,
+      nodes: normalizedNodes,
+    });
+  }
+
+  private assertSnapshotCompatible(graph: AgentTaskGraph, context: GraphRunContext, snapshot: GraphExecutionSnapshot): void {
+    if (snapshot.graphId !== graph.id) {
+      throw new Error('Snapshot graphId mismatch');
+    }
+
+    if (snapshot.taskId !== context.taskId) {
+      throw new Error('Snapshot taskId mismatch');
+    }
+
+    if (snapshot.sessionId !== context.sessionId) {
+      throw new Error('Snapshot sessionId mismatch');
+    }
+
+    const currentSignature = this.computeGraphSignature(graph);
+
+    if (snapshot.graphSignature) {
+      if (snapshot.graphSignature !== currentSignature) {
+        throw new Error('Snapshot graph structure mismatch');
+      }
+      return;
+    }
+
+    const nodeIds = new Set(graph.nodes.map((node) => node.id));
+    const snapshotNodeIds = new Set(snapshot.nodes.map((node) => node.nodeId));
+
+    if (nodeIds.size !== snapshotNodeIds.size) {
+      throw new Error('Snapshot graph structure mismatch');
+    }
+
+    for (const id of nodeIds) {
+      if (!snapshotNodeIds.has(id)) {
+        throw new Error('Snapshot graph structure mismatch');
+      }
+    }
   }
 }

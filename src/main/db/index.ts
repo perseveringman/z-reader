@@ -356,6 +356,7 @@ function initTables(sqlite: Database.Database) {
     CREATE TABLE IF NOT EXISTS agent_graph_snapshots (
       id TEXT PRIMARY KEY,
       graph_id TEXT NOT NULL,
+      graph_signature TEXT,
       task_id TEXT NOT NULL,
       session_id TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -367,6 +368,12 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_agent_graph_snapshots_task_id ON agent_graph_snapshots(task_id);
     CREATE INDEX IF NOT EXISTS idx_agent_graph_snapshots_graph_id ON agent_graph_snapshots(graph_id);
   `);
+
+  try {
+    sqlite.exec(`ALTER TABLE agent_graph_snapshots ADD COLUMN graph_signature TEXT`);
+  } catch {
+    // Column already exists
+  }
 }
 
 export { schema };
