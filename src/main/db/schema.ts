@@ -150,3 +150,26 @@ export const transcripts = sqliteTable('transcripts', {
   language: text('language'),
   createdAt: text('created_at').notNull(),
 });
+
+// ==================== agent_tasks 表 ====================
+export const agentTasks = sqliteTable('agent_tasks', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  status: text('status').notNull(),
+  strategy: text('strategy').notNull(),
+  riskLevel: text('risk_level').notNull(),
+  inputJson: text('input_json').notNull(),
+  outputJson: text('output_json'),
+  errorText: text('error_text'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// ==================== agent_task_events 表 ====================
+export const agentTaskEvents = sqliteTable('agent_task_events', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull().references(() => agentTasks.id),
+  eventType: text('event_type').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  occurredAt: text('occurred_at').notNull(),
+});
