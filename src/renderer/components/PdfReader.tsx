@@ -13,6 +13,7 @@ import { TextLayer } from 'pdfjs-dist';
 import type { Highlight } from '../../shared/types';
 import type { TocItem } from './BookReaderToc';
 import type { BookReaderSettingsValues } from './BookReaderSettings';
+import { BOOK_FONT_FAMILY_MAP } from './BookReaderSettings';
 import type { BookReaderHandle } from './EpubReader';
 
 // @ts-expect-error Vite ?url import
@@ -117,6 +118,11 @@ async function convertOutlineItems(
 function getHighlightBg(color: string): string {
   const found = HIGHLIGHT_COLORS.find((c) => c.name === color || c.css === color);
   return found ? found.bg : HIGHLIGHT_COLORS[0].bg;
+}
+
+function applyTextLayerTypography(textLayerDiv: HTMLDivElement, settings: BookReaderSettingsValues) {
+  textLayerDiv.style.fontFamily = BOOK_FONT_FAMILY_MAP[settings.font];
+  textLayerDiv.style.lineHeight = String(settings.lineHeight);
 }
 
 export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function PdfReader(
@@ -288,6 +294,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
         textLayerDiv.innerHTML = '';
         textLayerDiv.style.width = `${viewport.width}px`;
         textLayerDiv.style.height = `${viewport.height}px`;
+        applyTextLayerTypography(textLayerDiv, settings);
 
         const textContent = await page.getTextContent();
         const textLayer = new TextLayer({
@@ -307,7 +314,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
         pageStatesRef.current.set(pageNumber, { rendered: false, rendering: false });
       }
     },
-    [getViewportScale, applyHighlightsToPage],
+    [getViewportScale, applyHighlightsToPage, settings],
   );
 
   const clearPage = useCallback((pageNumber: number) => {
@@ -443,6 +450,7 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
 
         const textLayerDiv = document.createElement('div');
         textLayerDiv.className = 'pdf-text-layer';
+        applyTextLayerTypography(textLayerDiv, settings);
         pageDiv.appendChild(textLayerDiv);
 
         const pageLabel = document.createElement('div');
@@ -537,6 +545,12 @@ export const PdfReader = forwardRef<BookReaderHandle, PdfReaderProps>(function P
       }
     }
   }, [settings.fontSize, settings.theme, clearPage, renderPage]);
+
+  useEffect(() => {
+    for (const [, textLayerDiv] of textLayerRefsMap.current) {
+      applyTextLayerTypography(textLayerDiv, settings);
+    }
+  }, [settings.font, settings.lineHeight]);
 
   useEffect(() => {
     for (const [pageNum] of pageStatesRef.current) {

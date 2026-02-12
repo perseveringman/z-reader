@@ -39,6 +39,36 @@ const THEME_STYLES: Record<BookReaderSettingsValues['theme'], { color: string; b
   sepia: { color: '#5b4636', background: '#f4ecd8' },
 };
 
+const TYPOGRAPHY_STYLE_ID = 'z-reader-book-typography-style';
+
+function applyTypographyStyle(doc: Document, settings: BookReaderSettingsValues) {
+  const fontFamily = BOOK_FONT_FAMILY_MAP[settings.font];
+  const lineHeight = String(settings.lineHeight);
+
+  let styleEl = doc.getElementById(TYPOGRAPHY_STYLE_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = doc.createElement('style');
+    styleEl.id = TYPOGRAPHY_STYLE_ID;
+    doc.head?.appendChild(styleEl);
+  }
+
+  styleEl.textContent = `
+    html, body {
+      font-family: ${fontFamily} !important;
+      line-height: ${lineHeight} !important;
+    }
+    body *:not(pre):not(code):not(kbd):not(samp) {
+      font-family: ${fontFamily} !important;
+    }
+    body p, body li, body blockquote, body dd, body dt, body h1, body h2, body h3, body h4, body h5, body h6 {
+      line-height: ${lineHeight} !important;
+    }
+  `;
+
+  doc.body?.style.setProperty('font-family', fontFamily, 'important');
+  doc.body?.style.setProperty('line-height', lineHeight, 'important');
+}
+
 function convertNavItems(items: NavItem[], level = 0): TocItem[] {
   return items.map((item) => ({
     id: item.id,
@@ -56,6 +86,8 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
   const viewerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<Book | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const locationsGeneratedRef = useRef(false);
   const appliedHighlightAnchorsRef = useRef<string[]>([]);
   const highlightsRef = useRef(highlights);
@@ -78,7 +110,16 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
     rendition.themes.override('background', theme.background);
     rendition.themes.fontSize(s.fontSize + 'px');
     rendition.themes.font(BOOK_FONT_FAMILY_MAP[s.font]);
-    rendition.themes.override('line-height', String(s.lineHeight));
+    rendition.themes.override('line-height', String(s.lineHeight), true);
+
+    const rawContents = rendition.getContents() as unknown;
+    const contents = Array.isArray(rawContents) ? rawContents : rawContents ? [rawContents] : [];
+    for (const content of contents) {
+      const doc = (content as { document?: Document } | undefined)?.document;
+      if (doc) {
+        applyTypographyStyle(doc, s);
+      }
+    }
   }, []);
 
   const clearSelectionInRendition = useCallback(() => {
@@ -147,6 +188,14 @@ export const EpubReader = forwardRef<BookReaderHandle, EpubReaderProps>(function
       });
       localRendition = rendition;
       renditionRef.current = rendition;
+
+      const handleContentLoaded = (content: unknown) => {
+        const doc = (content as { document?: Document } | undefined)?.document;
+        if (doc) {
+          applyTypographyStyle(doc, settingsRef.current);
+        }
+      };
+      rendition.hooks.content.register(handleContentLoaded);
 
       applyTheme(rendition, settings);
 
