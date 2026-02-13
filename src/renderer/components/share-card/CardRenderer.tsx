@@ -23,6 +23,14 @@ const CardRenderer = React.forwardRef<HTMLDivElement, CardRendererProps>(
   ({ cardType, theme, highlights, article }, ref) => {
     /** 根据 cardType 渲染对应卡片 */
     const renderCard = () => {
+      if (highlights.length === 0) {
+        return (
+          <div style={{ padding: '40px 20px', textAlign: 'center', opacity: 0.5 }}>
+            请至少选择一条高亮
+          </div>
+        );
+      }
+
       switch (cardType) {
         case 'single':
           return (
