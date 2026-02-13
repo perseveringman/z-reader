@@ -280,8 +280,8 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                   onViewChange('tags');
                 }}
                 className={`
-                  relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
-                  transition-colors duration-150 cursor-pointer outline-none ml-3
+                  relative flex items-center gap-2 w-full pl-6 pr-3 py-1.5 rounded-md text-[12px]
+                  transition-colors duration-150 cursor-pointer outline-none
                   ${selectedTagId === tag.id
                     ? 'text-white bg-white/[0.08]'
                     : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
