@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { getDatabase } from './main/db';
@@ -39,6 +39,16 @@ app.on('ready', () => {
   registerAllIpcHandlers();
   startScheduledFetch(15);
   startApiServer();
+
+  // 移除微信图片防盗链 Referer，解决"此图片来自微信公众平台未经允许不可引用"
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.qpic.cn/*', '*://mmbiz.qpic.cn/*'] },
+    (details, callback) => {
+      delete details.requestHeaders['Referer'];
+      callback({ requestHeaders: details.requestHeaders });
+    },
+  );
+
   createWindow();
 });
 
