@@ -112,4 +112,16 @@ export const IPC_CHANNELS = {
   AI_TRANSLATE: 'ai:translate',
   AI_AUTO_TAG: 'ai:autoTag',
   AI_TASK_LOGS: 'ai:taskLogs',
+
+  // AI Chat
+  AI_CHAT_SEND: 'ai:chat:send',
+  AI_CHAT_STREAM: 'ai:chat:stream',
+  AI_CHAT_SESSION_CREATE: 'ai:chat:session:create',
+  AI_CHAT_SESSION_LIST: 'ai:chat:session:list',
+  AI_CHAT_SESSION_GET: 'ai:chat:session:get',
+  AI_CHAT_SESSION_DELETE: 'ai:chat:session:delete',
+
+  // AI 新增
+  AI_EXTRACT_TOPICS: 'ai:extractTopics',
+  AI_TASK_LOG_DETAIL: 'ai:taskLogDetail',
 } as const;

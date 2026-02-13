@@ -443,6 +443,63 @@ export interface AITaskLogItem {
   createdAt: string;
 }
 
+/** 调试面板：任务日志详情（含完整输入输出和追踪信息） */
+export interface AITaskLogDetail extends AITaskLogItem {
+  inputJson: string | null;
+  outputJson: string | null;
+  tracesJson: string | null;
+  errorText: string | null;
+}
+
+// ==================== AI Chat 类型 ====================
+
+/** Chat 消息 */
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  timestamp: string;
+  toolCalls?: { name: string; args: Record<string, unknown>; result?: string }[];
+}
+
+/** Chat 会话（前端使用的 camelCase 类型） */
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  articleId: string | null;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 流式 Chunk */
+export interface ChatStreamChunk {
+  type: 'text-delta' | 'tool-call' | 'tool-result' | 'done' | 'error';
+  textDelta?: string;
+  toolCall?: { name: string; args: Record<string, unknown> };
+  toolResult?: { name: string; result: string };
+  error?: string;
+  tokenCount?: number;
+  fullText?: string;
+}
+
+/** 发送消息输入 */
+export interface ChatSendInput {
+  sessionId: string;
+  message: string;
+  articleId?: string;
+}
+
+/** 主题提取输入 */
+export interface AIExtractTopicsInput {
+  articleId: string;
+}
+
+/** 主题提取结果 */
+export interface AIExtractTopicsResult {
+  topics: string[];
+  tokenCount: number;
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
