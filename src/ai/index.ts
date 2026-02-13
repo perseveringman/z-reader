@@ -6,5 +6,7 @@ export type { InsertTaskLogInput, TaskLogRow, ChatSessionRow } from './providers
 export type { AISkill, AIContext, AITaskStatus, AITaskLog } from './skills/types';
 export { AITraceCollector } from './services/trace';
 export type { AITraceStep, AIExecutionTrace } from './services/trace';
+export { ChatService } from './services/chat';
+export type { ChatServiceDeps } from './services/chat';
 export { createAllTools, createArticleTools, createTagTools, createFeedTools, createHighlightTools } from './tools';
 export type { ToolContext } from './tools';
