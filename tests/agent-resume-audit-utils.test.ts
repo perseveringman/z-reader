@@ -7,12 +7,13 @@ import {
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  listResumeAuditTaskIds,
   normalizeTaskIdsInput,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
-describe('p17 resume audit utils', () => {
+describe('p19 resume audit utils', () => {
   it('应解析并去重多 taskId 输入', () => {
     expect(normalizeTaskIdsInput('')).toEqual([]);
     expect(
@@ -163,9 +164,19 @@ describe('p17 resume audit utils', () => {
     const filtered = filterResumeAuditEntries(entries, {
       mode: 'delegate',
       status: 'all',
+      taskId: 'all',
     });
 
     expect(filtered).toHaveLength(2);
+
+    const filteredTaskA = filterResumeAuditEntries(entries, {
+      mode: 'all',
+      status: 'all',
+      taskId: 'task-a',
+    });
+    expect(filteredTaskA).toHaveLength(2);
+
+    expect(listResumeAuditTaskIds(entries)).toEqual(['task-a', 'task-b']);
 
     const summary = summarizeResumeAuditEntries(filtered);
     expect(summary.total).toBe(2);

@@ -8,12 +8,14 @@ import {
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  listResumeAuditTaskIds,
   normalizeTaskIdsInput,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
   type ResumeAuditStatusFilter,
+  type ResumeAuditTaskFilter,
 } from '../utils/agent-resume-audit';
 
 interface PreferencesDialogProps {
@@ -67,6 +69,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [resumeAuditLoading, setResumeAuditLoading] = useState(false);
   const [auditModeFilter, setAuditModeFilter] = useState<ResumeAuditModeFilter>('all');
   const [auditStatusFilter, setAuditStatusFilter] = useState<ResumeAuditStatusFilter>('all');
+  const [auditTaskFilter, setAuditTaskFilter] = useState<ResumeAuditTaskFilter>('all');
 
   const { showToast } = useToast();
 
@@ -87,6 +90,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumeAuditEntries([]);
       setAuditModeFilter('all');
       setAuditStatusFilter('all');
+      setAuditTaskFilter('all');
 
       window.electronAPI
         .settingsGet()
@@ -272,6 +276,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
   const drillDownTaskFromRank = async (taskId: string) => {
     setAgentTaskId(taskId);
+    setAuditTaskFilter(taskId);
     await loadSnapshots(taskId);
     await loadResumeAudit(taskId);
     showToast('已定位到任务：' + taskId);
@@ -334,8 +339,9 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     return filterResumeAuditEntries(resumeAuditEntries, {
       mode: auditModeFilter,
       status: auditStatusFilter,
+      taskId: auditTaskFilter,
     });
-  }, [resumeAuditEntries, auditModeFilter, auditStatusFilter]);
+  }, [resumeAuditEntries, auditModeFilter, auditStatusFilter, auditTaskFilter]);
 
   const resumeAuditSummary = useMemo(() => {
     return summarizeResumeAuditEntries(filteredResumeAuditEntries);
@@ -352,6 +358,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const resumeAuditTaskAggregates = useMemo(() => {
     return aggregateResumeAuditByTask(filteredResumeAuditEntries);
   }, [filteredResumeAuditEntries]);
+
+  const resumeAuditTaskOptions = useMemo(() => {
+    return listResumeAuditTaskIds(resumeAuditEntries);
+  }, [resumeAuditEntries]);
 
   const handleCopyResumeAuditSummary = async () => {
     if (filteredResumeAuditEntries.length === 0) {
@@ -777,7 +787,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
                     <label className="text-gray-400 flex items-center gap-2">
                       <span className="w-14">模式</span>
                       <select
@@ -802,6 +812,19 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                         <option value="failed">failed</option>
                         <option value="running">running</option>
                         <option value="canceled">canceled</option>
+                      </select>
+                    </label>
+                    <label className="text-gray-400 flex items-center gap-2">
+                      <span className="w-14">任务</span>
+                      <select
+                        value={auditTaskFilter}
+                        onChange={(e) => setAuditTaskFilter((e.target.value as ResumeAuditTaskFilter) || 'all')}
+                        className="flex-1 px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="all">all</option>
+                        {resumeAuditTaskOptions.map((taskId) => (
+                          <option key={taskId} value={taskId}>{taskId}</option>
+                        ))}
                       </select>
                     </label>
                   </div>

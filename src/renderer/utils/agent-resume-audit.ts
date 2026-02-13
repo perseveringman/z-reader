@@ -18,10 +18,12 @@ export interface ResumeAuditEntry {
 
 export type ResumeAuditModeFilter = 'all' | ResumeAuditEntry['mode'];
 export type ResumeAuditStatusFilter = 'all' | ResumeAuditEntry['status'];
+export type ResumeAuditTaskFilter = 'all' | string;
 
 export interface ResumeAuditFilter {
   mode?: ResumeAuditModeFilter;
   status?: ResumeAuditStatusFilter;
+  taskId?: ResumeAuditTaskFilter;
 }
 
 export interface ResumeAuditSummary {
@@ -57,6 +59,12 @@ export interface ResumeAuditTaskAggregate {
   avgHitRate: number;
   sideEffectFailures: number;
   lastOccurredAt: string;
+}
+
+export interface PrimaryTaskSelection {
+  taskIds: string[];
+  taskId: string | null;
+  hasMultiple: boolean;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -110,19 +118,18 @@ export function normalizeTaskIdsInput(input: string): string[] {
   );
 }
 
-export interface PrimaryTaskSelection {
-  taskIds: string[];
-  taskId: string | null;
-  hasMultiple: boolean;
-}
-
 export function selectPrimaryTaskId(input: string): PrimaryTaskSelection {
   const taskIds = normalizeTaskIdsInput(input);
+
   return {
     taskIds,
     taskId: taskIds.length > 0 ? taskIds[0] : null,
     hasMultiple: taskIds.length > 1,
   };
+}
+
+export function listResumeAuditTaskIds(entries: ResumeAuditEntry[]): string[] {
+  return Array.from(new Set(entries.map((entry) => entry.taskId))).sort((a, b) => a.localeCompare(b));
 }
 
 export function extractResumeAuditEntries(events: AgentReplayEvent[]): ResumeAuditEntry[] {
@@ -168,6 +175,7 @@ export function extractResumeAuditEntries(events: AgentReplayEvent[]): ResumeAud
 export function filterResumeAuditEntries(entries: ResumeAuditEntry[], filter: ResumeAuditFilter = {}): ResumeAuditEntry[] {
   const mode = filter.mode ?? 'all';
   const status = filter.status ?? 'all';
+  const taskId = filter.taskId ?? 'all';
 
   return entries.filter((entry) => {
     if (mode !== 'all' && entry.mode !== mode) {
@@ -175,6 +183,10 @@ export function filterResumeAuditEntries(entries: ResumeAuditEntry[], filter: Re
     }
 
     if (status !== 'all' && entry.status !== status) {
+      return false;
+    }
+
+    if (taskId !== 'all' && entry.taskId !== taskId) {
       return false;
     }
 
