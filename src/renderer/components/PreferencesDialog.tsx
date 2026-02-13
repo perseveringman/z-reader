@@ -8,12 +8,14 @@ import {
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  getResumeAuditPresetFilter,
   listResumeAuditTaskIds,
   normalizeTaskIdsInput,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
+  type ResumeAuditPreset,
   type ResumeAuditStatusFilter,
   type ResumeAuditTaskFilter,
 } from '../utils/agent-resume-audit';
@@ -362,6 +364,13 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const resumeAuditTaskOptions = useMemo(() => {
     return listResumeAuditTaskIds(resumeAuditEntries);
   }, [resumeAuditEntries]);
+
+  const applyAuditPreset = (preset: ResumeAuditPreset) => {
+    const filter = getResumeAuditPresetFilter(preset);
+    setAuditModeFilter(filter.mode ?? 'all');
+    setAuditStatusFilter(filter.status ?? 'all');
+    setAuditTaskFilter(filter.taskId ?? 'all');
+  };
 
   const handleCopyResumeAuditSummary = async () => {
     if (filteredResumeAuditEntries.length === 0) {
@@ -785,6 +794,31 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                         复制摘要
                       </button>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="text-gray-500">预设</span>
+                    <button
+                      type="button"
+                      onClick={() => applyAuditPreset('all')}
+                      className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+                    >
+                      all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyAuditPreset('failed')}
+                      className="px-2 py-1 rounded bg-rose-700 hover:bg-rose-600 text-white"
+                    >
+                      失败优先
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyAuditPreset('delegate')}
+                      className="px-2 py-1 rounded bg-amber-700 hover:bg-amber-600 text-white"
+                    >
+                      delegate
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">

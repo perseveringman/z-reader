@@ -26,6 +26,8 @@ export interface ResumeAuditFilter {
   taskId?: ResumeAuditTaskFilter;
 }
 
+export type ResumeAuditPreset = 'all' | 'failed' | 'delegate';
+
 export interface ResumeAuditSummary {
   total: number;
   succeeded: number;
@@ -192,6 +194,30 @@ export function filterResumeAuditEntries(entries: ResumeAuditEntry[], filter: Re
 
     return true;
   });
+}
+
+export function getResumeAuditPresetFilter(preset: ResumeAuditPreset): ResumeAuditFilter {
+  if (preset === 'failed') {
+    return {
+      mode: 'all',
+      status: 'failed',
+      taskId: 'all',
+    };
+  }
+
+  if (preset === 'delegate') {
+    return {
+      mode: 'delegate',
+      status: 'all',
+      taskId: 'all',
+    };
+  }
+
+  return {
+    mode: 'all',
+    status: 'all',
+    taskId: 'all',
+  };
 }
 
 export function summarizeResumeAuditEntries(entries: ResumeAuditEntry[]): ResumeAuditSummary {

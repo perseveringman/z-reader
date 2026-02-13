@@ -7,13 +7,14 @@ import {
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  getResumeAuditPresetFilter,
   listResumeAuditTaskIds,
   normalizeTaskIdsInput,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
-describe('p19 resume audit utils', () => {
+describe('p20 resume audit utils', () => {
   it('应解析并去重多 taskId 输入', () => {
     expect(normalizeTaskIdsInput('')).toEqual([]);
     expect(
@@ -33,6 +34,26 @@ describe('p19 resume audit utils', () => {
       taskIds: ['task-a', 'task-b'],
       taskId: 'task-a',
       hasMultiple: true,
+    });
+  });
+
+  it('应支持审计筛选预设映射', () => {
+    expect(getResumeAuditPresetFilter('all')).toEqual({
+      mode: 'all',
+      status: 'all',
+      taskId: 'all',
+    });
+
+    expect(getResumeAuditPresetFilter('failed')).toEqual({
+      mode: 'all',
+      status: 'failed',
+      taskId: 'all',
+    });
+
+    expect(getResumeAuditPresetFilter('delegate')).toEqual({
+      mode: 'delegate',
+      status: 'all',
+      taskId: 'all',
     });
   });
 
