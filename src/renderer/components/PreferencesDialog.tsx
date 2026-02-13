@@ -6,6 +6,7 @@ import {
   buildResumeAuditReport,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  normalizeTaskIdsInput,
   summarizeResumeAuditEntries,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
@@ -129,11 +130,16 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   };
 
   const loadSnapshots = async () => {
-    const taskId = agentTaskId.trim();
-    if (!taskId) {
+    const taskIds = normalizeTaskIdsInput(agentTaskId);
+    if (taskIds.length === 0) {
       setAgentSnapshots([]);
       setAgentError('请输入 taskId 后再查询快照');
       return;
+    }
+
+    const taskId = taskIds[0];
+    if (taskIds.length > 1) {
+      showToast('快照查询仅支持单 taskId，已使用第一个：' + taskId);
     }
 
     setAgentSnapshotLoading(true);
@@ -216,8 +222,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   };
 
   const loadResumeAudit = async () => {
-    const taskId = agentTaskId.trim();
-    if (!taskId) {
+    const taskIds = normalizeTaskIdsInput(agentTaskId);
+    if (taskIds.length === 0) {
       setResumeAuditEntries([]);
       setAgentError('请输入 taskId 后再加载恢复审计');
       return;
@@ -227,8 +233,25 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     setAgentError(null);
 
     try {
-      const replay = await window.electronAPI.agentReplayGet(taskId);
-      setResumeAuditEntries(extractResumeAuditEntries(replay.events));
+      const settled = await Promise.allSettled(taskIds.map((taskId) => window.electronAPI.agentReplayGet(taskId)));
+      const entries: ResumeAuditEntry[] = [];
+      const failedTaskIds: string[] = [];
+
+      settled.forEach((item, index) => {
+        if (item.status === 'fulfilled') {
+          entries.push(...extractResumeAuditEntries(item.value.events));
+        } else {
+          failedTaskIds.push(taskIds[index]);
+          console.error('Failed to load resume audit for task:', taskIds[index], item.reason);
+        }
+      });
+
+      entries.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+      setResumeAuditEntries(entries);
+
+      if (failedTaskIds.length > 0) {
+        setAgentError('部分 task 审计加载失败：' + failedTaskIds.join(', '));
+      }
     } catch (err) {
       console.error('Failed to load resume audit:', err);
       setResumeAuditEntries([]);
@@ -300,6 +323,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
   const resumeAuditSummary = useMemo(() => {
     return summarizeResumeAuditEntries(filteredResumeAuditEntries);
+  }, [filteredResumeAuditEntries]);
+
+  const resumeAuditTaskCount = useMemo(() => {
+    return new Set(filteredResumeAuditEntries.map((entry) => entry.taskId)).size;
   }, [filteredResumeAuditEntries]);
 
   const handleCopyResumeAuditSummary = async () => {
@@ -496,14 +523,14 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                   <div className="md:col-span-3">
                     <label htmlFor="agent-task-id" className="block text-xs font-medium text-gray-400 mb-1.5">
-                      Task ID
+                      Task ID(s)
                     </label>
                     <input
                       id="agent-task-id"
                       type="text"
                       value={agentTaskId}
                       onChange={(e) => setAgentTaskId(e.target.value)}
-                      placeholder="输入 taskId 后查询关联快照"
+                      placeholder="输入 taskId（审计支持逗号或空白分隔多个）"
                       className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -756,7 +783,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   </div>
 
                   <div className="text-[11px] text-gray-500 break-all">
-                    total: {resumeAuditSummary.total} · successRate: {(resumeAuditSummary.successRate * 100).toFixed(1)}% · sideEffectRate: {(resumeAuditSummary.sideEffectRate * 100).toFixed(1)}% · avgHitRate: {(resumeAuditSummary.avgHitRate * 100).toFixed(1)}% · topMissing: {resumeAuditSummary.topMissingAgents.join(', ') || '(none)'}
+                    tasks: {resumeAuditTaskCount} · total: {resumeAuditSummary.total} · successRate: {(resumeAuditSummary.successRate * 100).toFixed(1)}% · sideEffectRate: {(resumeAuditSummary.sideEffectRate * 100).toFixed(1)}% · avgHitRate: {(resumeAuditSummary.avgHitRate * 100).toFixed(1)}% · topMissing: {resumeAuditSummary.topMissingAgents.join(', ') || '(none)'}
                   </div>
 
                   {resumeAuditLoading ? (

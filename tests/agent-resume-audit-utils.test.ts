@@ -5,10 +5,19 @@ import {
   buildResumeAuditReport,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
+  normalizeTaskIdsInput,
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
-describe('p14 resume audit utils', () => {
+describe('p15 resume audit utils', () => {
+  it('应解析并去重多 taskId 输入', () => {
+    expect(normalizeTaskIdsInput('')).toEqual([]);
+    expect(
+      normalizeTaskIdsInput(` task-a , task-b
+ task-a；task-c ; task-b `),
+    ).toEqual(['task-a', 'task-b', 'task-c']);
+  });
+
   it('应仅提取并解析 graph.resume.executed 事件', () => {
     const events: AgentReplayEvent[] = [
       {

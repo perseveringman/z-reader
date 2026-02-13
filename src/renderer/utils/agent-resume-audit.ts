@@ -79,6 +79,17 @@ function asStatus(value: unknown): 'running' | 'succeeded' | 'failed' | 'cancele
   return null;
 }
 
+export function normalizeTaskIdsInput(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(/[\s,;，；]+/)
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    ),
+  );
+}
+
 export function extractResumeAuditEntries(events: AgentReplayEvent[]): ResumeAuditEntry[] {
   const entries: ResumeAuditEntry[] = [];
 
