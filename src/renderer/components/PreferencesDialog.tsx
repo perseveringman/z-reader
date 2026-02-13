@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react';
-import { X, Loader2, Save, Podcast, HardDrive, Compass, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Loader2, Save, Podcast, HardDrive, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle, Compass } from 'lucide-react';
 import { useToast } from './Toast';
 import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
-import { extractResumeAuditEntries, type ResumeAuditEntry } from '../utils/agent-resume-audit';
+import {
+  buildResumeAuditReport,
+  extractResumeAuditEntries,
+  filterResumeAuditEntries,
+  summarizeResumeAuditEntries,
+  type ResumeAuditEntry,
+  type ResumeAuditModeFilter,
+  type ResumeAuditStatusFilter,
+} from '../utils/agent-resume-audit';
 
 interface PreferencesDialogProps {
   open: boolean;
@@ -47,6 +55,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [delegateSpecialistsLoading, setDelegateSpecialistsLoading] = useState(false);
   const [resumeAuditEntries, setResumeAuditEntries] = useState<ResumeAuditEntry[]>([]);
   const [resumeAuditLoading, setResumeAuditLoading] = useState(false);
+  const [auditModeFilter, setAuditModeFilter] = useState<ResumeAuditModeFilter>('all');
+  const [auditStatusFilter, setAuditStatusFilter] = useState<ResumeAuditStatusFilter>('all');
 
   const { showToast } = useToast();
 
@@ -65,6 +75,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumeConfirmed(false);
       setDelegateSpecialists([]);
       setResumeAuditEntries([]);
+      setAuditModeFilter('all');
+      setAuditStatusFilter('all');
 
       window.electronAPI
         .settingsGet()
@@ -276,6 +288,33 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       showToast('恢复执行失败');
     } finally {
       setResumeExecuting(false);
+    }
+  };
+
+  const filteredResumeAuditEntries = useMemo(() => {
+    return filterResumeAuditEntries(resumeAuditEntries, {
+      mode: auditModeFilter,
+      status: auditStatusFilter,
+    });
+  }, [resumeAuditEntries, auditModeFilter, auditStatusFilter]);
+
+  const resumeAuditSummary = useMemo(() => {
+    return summarizeResumeAuditEntries(filteredResumeAuditEntries);
+  }, [filteredResumeAuditEntries]);
+
+  const handleCopyResumeAuditSummary = async () => {
+    if (filteredResumeAuditEntries.length === 0) {
+      showToast('暂无可复制的审计数据');
+      return;
+    }
+
+    try {
+      const report = buildResumeAuditReport(filteredResumeAuditEntries, resumeAuditSummary);
+      await navigator.clipboard.writeText(report);
+      showToast('恢复审计摘要已复制');
+    } catch (err) {
+      console.error('Failed to copy resume audit report:', err);
+      showToast('复制审计摘要失败');
     }
   };
 
@@ -675,7 +714,49 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                 <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs text-gray-400">恢复审计（最近）</div>
-                    <div className="text-[11px] text-gray-500">{resumeAuditEntries.length} 条</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] text-gray-500">{filteredResumeAuditEntries.length}/{resumeAuditEntries.length} 条</div>
+                      <button
+                        onClick={handleCopyResumeAuditSummary}
+                        disabled={filteredResumeAuditEntries.length === 0}
+                        className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-[11px] text-white"
+                      >
+                        复制摘要
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                    <label className="text-gray-400 flex items-center gap-2">
+                      <span className="w-14">模式</span>
+                      <select
+                        value={auditModeFilter}
+                        onChange={(e) => setAuditModeFilter((e.target.value as ResumeAuditModeFilter) || 'all')}
+                        className="flex-1 px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="all">all</option>
+                        <option value="safe">safe</option>
+                        <option value="delegate">delegate</option>
+                      </select>
+                    </label>
+                    <label className="text-gray-400 flex items-center gap-2">
+                      <span className="w-14">状态</span>
+                      <select
+                        value={auditStatusFilter}
+                        onChange={(e) => setAuditStatusFilter((e.target.value as ResumeAuditStatusFilter) || 'all')}
+                        className="flex-1 px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="all">all</option>
+                        <option value="succeeded">succeeded</option>
+                        <option value="failed">failed</option>
+                        <option value="running">running</option>
+                        <option value="canceled">canceled</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="text-[11px] text-gray-500 break-all">
+                    total: {resumeAuditSummary.total} · successRate: {(resumeAuditSummary.successRate * 100).toFixed(1)}% · sideEffectRate: {(resumeAuditSummary.sideEffectRate * 100).toFixed(1)}% · avgHitRate: {(resumeAuditSummary.avgHitRate * 100).toFixed(1)}% · topMissing: {resumeAuditSummary.topMissingAgents.join(', ') || '(none)'}
                   </div>
 
                   {resumeAuditLoading ? (
@@ -683,11 +764,11 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                       <Loader2 size={12} className="animate-spin" />
                       <span>加载中...</span>
                     </div>
-                  ) : resumeAuditEntries.length === 0 ? (
-                    <div className="text-xs text-gray-500">暂无恢复审计，输入 taskId 后点击“加载审计”。</div>
+                  ) : filteredResumeAuditEntries.length === 0 ? (
+                    <div className="text-xs text-gray-500">暂无符合筛选条件的恢复审计，输入 taskId 后点击“加载审计”。</div>
                   ) : (
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {resumeAuditEntries.slice(0, 8).map((entry) => (
+                      {filteredResumeAuditEntries.slice(0, 8).map((entry) => (
                         <div key={entry.id} className="rounded border border-white/10 bg-[#1a1a1a] p-2 text-[11px] space-y-1">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="text-gray-300">{entry.mode}</span>

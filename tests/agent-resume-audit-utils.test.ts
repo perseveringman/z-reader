@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AgentReplayEvent } from '../src/shared/types';
-import { extractResumeAuditEntries } from '../src/renderer/utils/agent-resume-audit';
+import {
+  buildResumeAuditReport,
+  extractResumeAuditEntries,
+  filterResumeAuditEntries,
+  summarizeResumeAuditEntries,
+} from '../src/renderer/utils/agent-resume-audit';
 
-describe('p13 resume audit utils', () => {
+describe('p14 resume audit utils', () => {
   it('应仅提取并解析 graph.resume.executed 事件', () => {
     const events: AgentReplayEvent[] = [
       {
@@ -78,5 +83,77 @@ describe('p13 resume audit utils', () => {
     expect(entries[1].mode).toBe('safe');
     expect(entries[1].specialistHitRate).toBe(1);
     expect(entries[1].pendingNodeIds).toEqual(['n2', 'n3']);
+  });
+
+  it('应支持筛选、聚合与摘要导出', () => {
+    const entries = [
+      {
+        id: '1',
+        taskId: 't',
+        occurredAt: '2026-02-12T10:00:03.000Z',
+        mode: 'delegate' as const,
+        status: 'failed' as const,
+        riskLevel: 'high',
+        sideEffectFlag: true,
+        specialistHitRate: 0,
+        specialistHitCount: 0,
+        specialistMissCount: 2,
+        missingAgents: ['writer', 'summarizer'],
+        pendingNodeIds: ['n2'],
+        failedNodeIds: ['n2'],
+      },
+      {
+        id: '2',
+        taskId: 't',
+        occurredAt: '2026-02-12T10:00:02.000Z',
+        mode: 'safe' as const,
+        status: 'succeeded' as const,
+        riskLevel: 'low',
+        sideEffectFlag: false,
+        specialistHitRate: 1,
+        specialistHitCount: 1,
+        specialistMissCount: 0,
+        missingAgents: [],
+        pendingNodeIds: [],
+        failedNodeIds: [],
+      },
+      {
+        id: '3',
+        taskId: 't',
+        occurredAt: '2026-02-12T10:00:01.000Z',
+        mode: 'delegate' as const,
+        status: 'succeeded' as const,
+        riskLevel: 'medium',
+        sideEffectFlag: true,
+        specialistHitRate: 0.5,
+        specialistHitCount: 1,
+        specialistMissCount: 1,
+        missingAgents: ['writer'],
+        pendingNodeIds: [],
+        failedNodeIds: [],
+      },
+    ];
+
+    const filtered = filterResumeAuditEntries(entries, {
+      mode: 'delegate',
+      status: 'all',
+    });
+
+    expect(filtered).toHaveLength(2);
+
+    const summary = summarizeResumeAuditEntries(filtered);
+    expect(summary.total).toBe(2);
+    expect(summary.succeeded).toBe(1);
+    expect(summary.failed).toBe(1);
+    expect(summary.sideEffectRate).toBe(1);
+    expect(summary.avgHitRate).toBe(0.25);
+    expect(summary.totalMissCount).toBe(3);
+    expect(summary.topMissingAgents).toEqual(['writer', 'summarizer']);
+
+    const report = buildResumeAuditReport(filtered, summary);
+    expect(report).toContain('Agent 恢复审计摘要');
+    expect(report).toContain('总量: 2');
+    expect(report).toContain('副作用占比: 100.0%');
+    expect(report).toContain('Top Missing Agents: writer, summarizer');
   });
 });
