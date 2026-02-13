@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowUp, ArrowDown, List, LayoutGrid, Archive, Clock, Trash2, X, Star, BookOpen, ExternalLink, Inbox, BookmarkPlus } from 'lucide-react';
 import type { Article, ArticleListQuery, ArticleSource, ReadStatus as ReadStatusType, MediaType } from '../../shared/types';
 import { ArticleCard } from './ArticleCard';
@@ -6,7 +7,6 @@ import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { ContextMenu, type ContextMenuEntry } from './ContextMenu';
 
-type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all';
 type SortBy = 'saved_at' | 'published_at';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'default' | 'compact';
@@ -26,17 +26,7 @@ interface ContentListProps {
   mediaType?: MediaType;
 }
 
-const LIBRARY_TABS: { key: TabKey; label: string }[] = [
-  { key: 'inbox', label: 'INBOX' },
-  { key: 'later', label: 'LATER' },
-  { key: 'archive', label: 'ARCHIVE' },
-];
-
-const FEED_TABS: { key: TabKey; label: string }[] = [
-  { key: 'unseen', label: 'UNSEEN' },
-  { key: 'seen', label: 'SEEN' },
-  { key: 'all', label: 'ALL' },
-];
+type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all';
 
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'saved_at', label: 'Date saved' },
@@ -44,6 +34,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
 ];
 
 export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType }: ContentListProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab as TabKey || 'inbox');
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -63,9 +54,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const isLibraryView = source === 'library';
 
   // Determine which tabs to show
-  const tabs = isFeedView ? FEED_TABS
-    : isLibraryView ? LIBRARY_TABS
-    : LIBRARY_TABS; // fallback
+  const libraryTabs: { key: TabKey; label: string }[] = [
+    { key: 'inbox', label: t('contentList.inbox').toUpperCase() },
+    { key: 'later', label: t('contentList.later').toUpperCase() },
+    { key: 'archive', label: t('contentList.archive').toUpperCase() },
+  ];
+  const feedTabs: { key: TabKey; label: string }[] = [
+    { key: 'unseen', label: t('contentList.unseen').toUpperCase() },
+    { key: 'seen', label: t('contentList.seen').toUpperCase() },
+    { key: 'all', label: t('contentList.all').toUpperCase() },
+  ];
+  const tabs = isFeedView ? feedTabs
+    : isLibraryView ? libraryTabs
+    : libraryTabs; // fallback
   const showTabs = !isShortlisted && !isTrash && !tagId && (isFeedView || isLibraryView);
 
   // Sync activeTab when initialTab changes (sidebar navigation)
@@ -142,11 +143,11 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   }, [fetchArticles, refreshTrigger]);
 
   const STATUS_TOAST: Record<string, string> = {
-    archive: 'Archived',
-    later: 'Saved for later',
-    inbox: 'Moved to Inbox',
-    seen: 'Marked as seen',
-    unseen: 'Marked as unseen',
+    archive: t('contentList.archiveArticle'),
+    later: t('contentList.addToShortlist'),
+    inbox: t('contentList.markAsRead'),
+    seen: t('detailPanel.seen') || 'Marked as seen',
+    unseen: t('detailPanel.unseen') || 'Marked as unseen',
   };
 
   const handleStatusChange = async (id: string, status: ReadStatusType) => {
@@ -443,13 +444,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
   // Empty state message
   const getEmptyMessage = () => {
-    if (isTrash) return 'Trash is empty';
-    if (isShortlisted) return 'No shortlisted articles';
-    if (isFeedView) return activeTab === 'unseen' ? 'No unseen articles' : 'No seen articles';
-    if (activeView === 'tags' && !tagId) return '请从左侧选择一个标签查看文章';
-    if (activeView === 'tags' && tagId) return '该标签下暂无文章';
-    if (isLibraryView) return 'No articles — save a URL or promote from Feed';
-    return 'No articles found';
+    if (isTrash) return t('contentList.emptyTrash');
+    if (isShortlisted) return t('contentList.emptyShortlist');
+    if (isFeedView) return activeTab === 'unseen' ? t('contentList.noArticles') : t('contentList.noArticles');
+    if (activeView === 'tags' && !tagId) return t('contentList.emptyTag');
+    if (activeView === 'tags' && tagId) return t('contentList.emptyTag');
+    if (isLibraryView) return t('contentList.emptyLibrary');
+    return t('contentList.noArticles');
   };
 
   useEffect(() => {
@@ -587,7 +588,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             const article = articles.find(a => a.id === selectedArticleId);
             if (article?.url) {
               navigator.clipboard.writeText(article.url);
-              showToast('链接已复制', 'success');
+              showToast(t('detailPanel.copyUrl'), 'success');
             }
           }
           break;

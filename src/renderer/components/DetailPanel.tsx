@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Save } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
@@ -15,12 +16,6 @@ interface DetailPanelProps {
   /** 点击高亮条目回调（用于跳转到对应位置） */
   onHighlightClick?: (highlightId: string) => void;
 }
-
-const TABS: { key: DetailTab; label: string }[] = [
-  { key: 'info', label: 'Info' },
-  { key: 'notebook', label: 'Notebook' },
-  { key: 'chat', label: 'Chat' },
-];
 
 interface MetaRow {
   label: string;
@@ -48,15 +43,15 @@ const HIGHLIGHT_COLOR_MAP: Record<string, string> = {
   red: '#ef4444',
 };
 
-function formatRelativeTime(dateStr: string): string {
+function formatRelativeTime(dateStr: string, t: (key: string, options?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 1) return t('time.justNow');
+  if (minutes < 60) return t('time.minutesAgo', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('time.hoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
+  if (days < 30) return t('time.daysAgo', { n: days });
   return formatDate(dateStr) ?? dateStr;
 }
 
@@ -70,7 +65,13 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 export function DetailPanel({ articleId, collapsed, externalHighlights, onExternalDeleteHighlight, onHighlightClick }: DetailPanelProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
+  const TABS: { key: DetailTab; label: string }[] = [
+    { key: 'info', label: t('feedDetail.info') },
+    { key: 'notebook', label: t('detailPanel.highlights') },
+    { key: 'chat', label: 'Chat' },
+  ];
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
   const [internalHighlights, setInternalHighlights] = useState<Highlight[]>([]);
@@ -157,9 +158,9 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
     : [];
 
   const readStatusLabel: Record<string, string> = {
-    inbox: '收件箱',
-    later: '稍后阅读',
-    archive: '已归档',
+    inbox: t('contentList.inbox'),
+    later: t('contentList.later'),
+    archive: t('contentList.archive'),
   };
 
   return (
@@ -195,15 +196,15 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       <div className="flex-1 overflow-y-auto p-4 flex flex-col">
         {!articleId ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
-            选择一篇文章查看详情
+            {t('detailPanel.noSelection')}
           </div>
         ) : loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
-            加载中…
+            {t('common.loading')}
           </div>
         ) : !article ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
-            文章不存在
+            {t('errors.notFound')}
           </div>
         ) : (
           <>
@@ -215,7 +216,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                     Summary
                   </h3>
                   <p className="mt-2 text-[13px] leading-[1.6] text-gray-400">
-                    {article.summary || '暂无摘要'}
+                    {article.summary || t('detailPanel.noHighlights')}
                   </p>
 
                   {/* Metadata */}
@@ -249,14 +250,14 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                 {/* 底部状态卡片 */}
                 <div className="mt-6 rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
                   <div className="flex items-center justify-between text-[12px]">
-                    <span className="text-gray-500">状态</span>
+                    <span className="text-gray-500">{t('books.readStatus')}</span>
                     <span className="text-white font-medium">
                       {readStatusLabel[article.readStatus] ?? article.readStatus}
                     </span>
                   </div>
                   <div className="mt-2">
                     <div className="flex items-center justify-between text-[12px] mb-1">
-                      <span className="text-gray-500">阅读进度</span>
+                      <span className="text-gray-500">{t('books.progress')}</span>
                       <span className="text-white font-medium">
                         {Math.round(article.readProgress * 100)}%
                       </span>
@@ -278,27 +279,27 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center text-gray-500">
                       <Highlighter className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm">暂无高亮笔记</p>
+                      <p className="text-sm">{t('detailPanel.noHighlights')}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                        {highlights.length} 条高亮
+                        {highlights.length} {t('detailPanel.highlights').toLowerCase()}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleExport('clipboard')}
                           className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
-                          title="复制到剪贴板"
+                          title={t('common.copy')}
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleExport('file')}
                           className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
-                          title="保存为文件"
+                          title={t('common.export')}
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
@@ -333,7 +334,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                               }}
                               className="mt-1.5 w-full text-[12px] text-gray-300 bg-white/5 border border-white/10 rounded px-2 py-1.5 resize-none outline-none focus:border-blue-500/50"
                               rows={2}
-                              placeholder="添加笔记…"
+                              placeholder={t('detailPanel.addNote')}
                             />
                           ) : (
                             <button
@@ -343,11 +344,11 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                               }}
                               className="mt-1.5 block text-left text-[12px] text-gray-400 hover:text-gray-300 transition-colors w-full"
                             >
-                              {hl.note || '添加笔记…'}
+                              {hl.note || t('detailPanel.addNote')}
                             </button>
                           )}
                           <span className="mt-2 block text-[11px] text-gray-600">
-                            {formatRelativeTime(hl.createdAt)}
+                            {formatRelativeTime(hl.createdAt, t)}
                           </span>
                         </div>
                         <button
@@ -367,7 +368,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
               <div className="flex items-center justify-center h-full">
                 <div className="text-center text-gray-600">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">AI 对话（二期功能）</p>
+                  <p className="text-sm">AI {t('detailPanel.noHighlights')}（二期功能）</p>
                 </div>
               </div>
             )}

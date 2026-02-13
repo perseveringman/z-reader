@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, Plus, FileUp, Rss, Podcast, Mail, Copy, Check } from 'lucide-react';
 import { useToast } from './Toast';
 import { PodcastSearchPanel } from './PodcastSearchPanel';
@@ -12,6 +13,7 @@ interface AddFeedDialogProps {
 }
 
 export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<DialogTab>('rss');
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -74,12 +76,12 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
         title: title.trim() || undefined,
         category: category.trim() || undefined,
       });
-      showToast('RSS 订阅已添加');
+      showToast(t('dialog.addFeed.addSuccess'));
       onClose();
       onFeedAdded?.();
     } catch (error) {
       console.error('添加订阅失败:', error);
-      showToast('添加订阅失败，请检查 URL 是否正确');
+      showToast(t('dialog.addFeed.addFailed'));
     } finally {
       setLoading(false);
     }
@@ -90,15 +92,15 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
     try {
       const feeds = await window.electronAPI.feedImportOpml();
       if (feeds.length > 0) {
-        showToast(`成功导入 ${feeds.length} 个订阅源`);
+        showToast(t('dialog.addFeed.addSuccess') + `: ${feeds.length} feeds`);
         onClose();
         onFeedAdded?.();
       } else {
-        showToast('未导入任何订阅源');
+        showToast('No feeds imported');
       }
     } catch (error) {
       console.error('导入 OPML 失败:', error);
-      showToast('导入失败，请检查文件格式');
+      showToast('Failed to import OPML');
     } finally {
       setLoading(false);
     }
@@ -122,11 +124,11 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
         email: result.email,
         feedUrl: result.feedUrl,
       });
-      showToast('Newsletter 订阅已创建');
+      showToast('Newsletter created');
       onFeedAdded?.();
     } catch (error) {
       console.error('创建 Newsletter 失败:', error);
-      showToast('创建失败，请稍后重试');
+      showToast('Failed to create newsletter');
     } finally {
       setLoading(false);
     }
@@ -137,10 +139,10 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
     try {
       await navigator.clipboard.writeText(newsletterResult.email);
       setCopied(true);
-      showToast('邮箱地址已复制');
+      showToast(t('common.copy') + ' success');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showToast('复制失败');
+      showToast(t('common.copy') + ' failed');
     }
   };
 
@@ -158,7 +160,7 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
       <div className="relative w-full max-w-lg bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl">
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">添加订阅</h2>
+          <h2 className="text-lg font-semibold text-white">{t('dialog.addFeed.title')}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"

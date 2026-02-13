@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Clock } from 'lucide-react';
 import type { Article } from '../../shared/types';
 
@@ -9,6 +10,7 @@ interface SearchPanelProps {
 }
 
 export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Article[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -158,7 +160,7 @@ export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索文章标题、正文、作者..."
+            placeholder={t('search.placeholder')}
             className="flex-1 bg-transparent text-white text-[14px] placeholder:text-gray-500 outline-none"
           />
         </div>
@@ -167,19 +169,19 @@ export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps
         <div className="max-h-[420px] overflow-y-auto">
           {loading && (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              搜索中...
+              {t('search.searching')}
             </div>
           )}
 
           {!loading && query && results.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              没有找到匹配的文章
+              {t('search.noResults')}
             </div>
           )}
 
           {!loading && !query && (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              输入关键词开始搜索
+              {t('search.placeholder')}
             </div>
           )}
 
@@ -235,12 +237,12 @@ export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps
         {/* 提示 */}
         <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[11px] text-gray-600">
           <div className="flex items-center gap-3">
-            <span>↑↓ 导航</span>
-            <span>Enter 选择</span>
-            <span>Esc 关闭</span>
+            <span>↑↓ {t('common.navigation') || 'Navigate'}</span>
+            <span>Enter {t('common.select') || 'Select'}</span>
+            <span>Esc {t('common.close')}</span>
           </div>
           {results.length > 0 && (
-            <span>{results.length} 个结果</span>
+            <span>{results.length} {t('search.results')}</span>
           )}
         </div>
       </div>

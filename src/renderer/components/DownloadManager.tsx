@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X,
   Download,
@@ -28,36 +29,37 @@ function formatDate(dateStr: string): string {
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return '今天';
-  if (days === 1) return '昨天';
-  if (days < 7) return `${days} 天前`;
-  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const statusConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   queued: {
     icon: <Download size={14} />,
-    label: '排队中',
+    label: 'Queued',
     color: 'text-gray-400',
   },
   downloading: {
     icon: <Loader2 size={14} className="animate-spin" />,
-    label: '下载中',
+    label: 'Downloading',
     color: 'text-blue-400',
   },
   ready: {
     icon: <CheckCircle2 size={14} />,
-    label: '已完成',
+    label: 'Ready',
     color: 'text-green-400',
   },
   failed: {
     icon: <XCircle size={14} />,
-    label: '失败',
+    label: 'Failed',
     color: 'text-red-400',
   },
 };
 
 export function DownloadManager({ open, onClose }: DownloadManagerProps) {
+  const { t } = useTranslation();
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -138,7 +140,7 @@ export function DownloadManager({ open, onClose }: DownloadManagerProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">下载管理</h2>
+            <h2 className="text-lg font-semibold text-white">{t('downloads.title')}</h2>
             <span className="flex items-center gap-1.5 text-xs text-gray-500">
               <HardDrive size={12} />
               {formatBytes(totalBytes)}
@@ -166,8 +168,8 @@ export function DownloadManager({ open, onClose }: DownloadManagerProps) {
           {downloads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
               <Download size={32} className="mb-3 opacity-50" />
-              <p className="text-sm">暂无下载记录</p>
-              <p className="text-xs mt-1">在播客播放器中点击下载按钮开始离线缓存</p>
+              <p className="text-sm">{t('downloads.noDownloads')}</p>
+              <p className="text-xs mt-1">Click download in podcast player to start offline caching</p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">

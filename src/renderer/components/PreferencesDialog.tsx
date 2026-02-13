@@ -223,10 +223,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       const updated = await window.electronAPI.settingsSet(settings);
       setSettings(updated);
       setDirty(false);
-      showToast('设置已保存');
+      showToast(t('preferences.settingsSaved'));
     } catch (err) {
       console.error('Failed to save settings:', err);
-      showToast('保存失败');
+      showToast(t('preferences.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -236,7 +236,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     const selection = selectPrimaryTaskId(taskInput);
     if (!selection.taskId) {
       setAgentSnapshots([]);
-      setAgentError('请输入 taskId 后再查询快照');
+      setAgentError(t('preferences.enterTaskId'));
       return;
     }
 
@@ -263,7 +263,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     } catch (err) {
       console.error('Failed to list agent snapshots:', err);
       setAgentSnapshots([]);
-      setAgentError('快照查询失败，请稍后重试');
+      setAgentError(t('errors.retry'));
     } finally {
       setAgentSnapshotLoading(false);
     }
@@ -274,7 +274,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     const staleBeforeDate = hasStaleBefore ? new Date(staleBeforeLocal) : null;
 
     if (hasStaleBefore && (!staleBeforeDate || Number.isNaN(staleBeforeDate.getTime()))) {
-      showToast('清理时间格式无效');
+      showToast(t('preferences.cleanupInvalidTime'));
       return;
     }
 
@@ -287,14 +287,14 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
         staleBefore: staleBeforeDate ? staleBeforeDate.toISOString() : undefined,
       });
 
-      showToast(`清理完成，删除 ${result.deletedCount} 条快照`);
+      showToast(t('preferences.cleanupComplete', { count: result.deletedCount }));
 
       if (agentTaskId.trim()) {
         await loadSnapshots();
       }
     } catch (err) {
       console.error('Failed to cleanup agent snapshots:', err);
-      setAgentError('快照清理失败，请稍后重试');
+      setAgentError(t('preferences.cleanupFailed'));
       showToast('快照清理失败');
     } finally {
       setAgentCleanupLoading(false);
@@ -304,7 +304,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const loadResumePreview = async () => {
     const snapshotId = resumeSnapshotId.trim();
     if (!snapshotId) {
-      setAgentError('请先选择快照再执行恢复预检');
+      setAgentError(t('preferences.selectSnapshot'));
       return;
     }
 
@@ -317,7 +317,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumeConfirmed(false);
     } catch (err) {
       console.error('Failed to preview snapshot resume:', err);
-      setAgentError('恢复预检失败，请稍后重试');
+      setAgentError(t('errors.retry'));
       setResumePreview(null);
     } finally {
       setResumePreviewLoading(false);
@@ -328,7 +328,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     const taskIds = normalizeTaskIdsInput(taskInput);
     if (taskIds.length === 0) {
       setResumeAuditEntries([]);
-      setAgentError('请输入 taskId 后再加载恢复审计');
+      setAgentError(t('preferences.enterTaskId'));
       return;
     }
 
@@ -358,7 +358,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     } catch (err) {
       console.error('Failed to load resume audit:', err);
       setResumeAuditEntries([]);
-      setAgentError('恢复审计加载失败，请稍后重试');
+      setAgentError(t('errors.retry'));
     } finally {
       setResumeAuditLoading(false);
     }
@@ -369,24 +369,24 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     setAuditTaskFilter(taskId);
     await loadSnapshots(taskId);
     await loadResumeAudit(taskId);
-    showToast('已定位到任务：' + taskId);
+    showToast(t('preferences.drillDownToTask', { taskId }));
   };
 
   const executeResume = async () => {
     const snapshotId = resumeSnapshotId.trim();
     if (!snapshotId) {
-      setAgentError('请先选择快照再执行恢复');
+      setAgentError(t('preferences.selectSnapshot'));
       return;
     }
 
     if (resumeMode === 'delegate' && delegateSpecialists.length === 0) {
-      setAgentError('delegate 模式当前无可用 specialist，请先完成主进程注册');
+      setAgentError('delegate 模式' + t('preferences.delegateExecutorsNone'));
       return;
     }
 
     const requiresConfirm = resumePreview?.requiresConfirmation ?? false;
     if (requiresConfirm && !resumeConfirmed) {
-      setAgentError('当前恢复模式需要人工确认');
+      setAgentError(t('preferences.requiresConfirmation'));
       return;
     }
 
@@ -402,13 +402,13 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
       if (!result.success) {
         setAgentError(result.message);
-        showToast('恢复执行失败');
+      showToast(t('preferences.resumeExecuteFailed'));
         return;
       }
 
-      showToast('恢复执行完成');
+      showToast(t('preferences.resumeExecuteSuccess'));
       if (result.replayTaskId) {
-        showToast(`可通过任务 ${result.replayTaskId} 查看回放`);
+        showToast(t('preferences.resumeTaskId', { taskId: result.replayTaskId }));
       }
 
       await loadResumePreview();
@@ -418,7 +418,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       }
     } catch (err) {
       console.error('Failed to execute snapshot resume:', err);
-      setAgentError('恢复执行失败，请稍后重试');
+      setAgentError(t('preferences.resumeExecuteFailed'));
       showToast('恢复执行失败');
     } finally {
       setResumeExecuting(false);
@@ -465,13 +465,13 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     setAuditModeFilter(filter.mode);
     setAuditStatusFilter(filter.status);
     setAuditTaskFilter(filter.taskId);
-    showToast('已应用预设：' + preset.name);
+      showToast(t('preferences.presetApplied', { name: preset.name }));
   };
 
   const handleSaveCustomAuditPreset = () => {
     const presetName = sanitizeResumeAuditPresetName(customAuditPresetName);
     if (!presetName) {
-      showToast('请输入预设名称');
+      showToast(t('preferences.enterPresetName'));
       return;
     }
 
@@ -486,27 +486,27 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       }),
     );
     setCustomAuditPresetName('');
-    showToast('预设已保存：' + presetName);
+    showToast(t('preferences.presetSaved', { name: presetName }));
   };
 
   const handleRemoveCustomAuditPreset = (presetId: string) => {
     setCustomAuditPresets((current) => removeResumeAuditCustomPreset(current, presetId));
-    showToast('预设已删除');
+    showToast(t('preferences.presetRemoved'));
   };
 
   const handleCopyResumeAuditSummary = async () => {
     if (filteredResumeAuditEntries.length === 0) {
-      showToast('暂无可复制的审计数据');
+      showToast(t('preferences.auditCopyEmpty'));
       return;
     }
 
     try {
       const report = buildResumeAuditReport(filteredResumeAuditEntries, resumeAuditSummary, resumeAuditAlerts);
       await navigator.clipboard.writeText(report);
-      showToast('恢复审计摘要已复制');
+      showToast(t('preferences.auditCopySuccess'));
     } catch (err) {
       console.error('Failed to copy resume audit report:', err);
-      showToast('复制审计摘要失败');
+      showToast(t('preferences.auditCopyFailed'));
     }
   };
 
@@ -530,7 +530,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
       <div className="relative w-full max-w-3xl bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl max-h-[85vh] overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">偏好设置</h2>
+          <h2 className="text-lg font-semibold text-white">{t('preferences.title')}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
