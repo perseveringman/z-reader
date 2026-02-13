@@ -169,7 +169,8 @@ export function App() {
   const handleSearchSelect = useCallback((articleId: string) => {
     setSelectedArticleId(articleId);
     setActiveView('library-articles');
-  }, []);
+    handleOpenReader(articleId);
+  }, [handleOpenReader]);
 
   const handleSaveFeed = useCallback(async (feed: Feed) => {
     try {

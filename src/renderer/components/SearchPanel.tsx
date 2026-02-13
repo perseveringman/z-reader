@@ -121,12 +121,21 @@ export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps
     );
   };
 
-  // 获取摘要片段
-  const getSummarySnippet = (article: Article): string => {
+  // 获取摘要片段，定位到搜索词所在位置
+  const getSummarySnippet = (article: Article, searchTerm: string): string => {
     const text = article.contentText || article.summary || '';
     const maxLength = 120;
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+
+    const lowerText = text.toLowerCase();
+    const idx = lowerText.indexOf(searchTerm.toLowerCase());
+    if (idx === -1) return text.substring(0, maxLength) + '...';
+
+    const start = Math.max(0, idx - 40);
+    const end = Math.min(text.length, start + maxLength);
+    const prefix = start > 0 ? '...' : '';
+    const suffix = end < text.length ? '...' : '';
+    return prefix + text.substring(start, end) + suffix;
   };
 
   if (!open) return null;
@@ -214,7 +223,7 @@ export function SearchPanel({ open, onClose, onSelectArticle }: SearchPanelProps
                   {/* 摘要片段 */}
                   {article.contentText && (
                     <div className="text-[12px] text-gray-500 line-clamp-2">
-                      {highlightMatch(getSummarySnippet(article), query)}
+                      {highlightMatch(getSummarySnippet(article, query), query)}
                     </div>
                   )}
                 </button>

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { eq, and, desc, asc, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, or, like, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
@@ -100,22 +100,25 @@ export function registerArticleHandlers() {
 
   // 全文搜索 handler
   ipcMain.handle(ARTICLE_SEARCH, async (_event, query: ArticleSearchQuery) => {
-    const sqlite = getSqlite();
-    if (!sqlite) return [];
-
+    const db = getDatabase();
     const searchTerm = query.query.trim();
     if (!searchTerm) return [];
 
-    // 使用 FTS5 进行全文搜索
-    const stmt = sqlite.prepare(`
-      SELECT a.* FROM articles a
-      INNER JOIN articles_fts fts ON a.rowid = fts.rowid
-      WHERE articles_fts MATCH ? AND a.deleted_flg = 0
-      ORDER BY rank
-      LIMIT ?
-    `);
+    const limit = query.limit ?? 20;
+    const pattern = `%${searchTerm}%`;
 
-    return stmt.all(searchTerm + '*', query.limit ?? 20);
+    return db
+      .select()
+      .from(schema.articles)
+      .where(and(
+        eq(schema.articles.deletedFlg, 0),
+        or(
+          like(schema.articles.title, pattern),
+          like(schema.articles.contentText, pattern),
+          like(schema.articles.author, pattern),
+        ),
+      ))
+      .limit(limit);
   });
 
   // 恢复已删除文章
