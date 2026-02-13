@@ -1,12 +1,25 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
-import { getSqlite } from '../db';
+import { getDatabase, getSqlite } from '../db';
+import { articles } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { AIDatabase } from '../../ai/providers/db';
 import { createLLMProvider } from '../../ai/providers/llm';
 import { DEFAULT_AI_CONFIG } from '../../ai/providers/config';
+import { ChatService } from '../../ai/services/chat';
+import { createToolContext } from '../ai/tool-context-factory';
 import type { AIProviderConfig } from '../../ai/providers/config';
-import type { AISummarizeInput, AITranslateInput, AIAutoTagInput, AITaskLogItem } from '../../shared/types';
-import type { TaskLogRow } from '../../ai/providers/db';
+import type {
+  AISummarizeInput,
+  AITranslateInput,
+  AIAutoTagInput,
+  AIExtractTopicsInput,
+  AITaskLogItem,
+  AITaskLogDetail,
+  ChatSendInput,
+  ChatSession,
+} from '../../shared/types';
+import type { TaskLogRow, ChatSessionRow } from '../../ai/providers/db';
 
 /** 获取 AI 数据库实例 */
 function getAIDatabase(): AIDatabase {
@@ -33,6 +46,29 @@ function mapTaskLogRow(row: TaskLogRow): AITaskLogItem {
     tokenCount: row.token_count,
     costUsd: row.cost_usd,
     createdAt: row.created_at,
+  };
+}
+
+/** 将 TaskLogRow 转换为包含完整详情的 AITaskLogDetail */
+function mapTaskLogDetail(row: TaskLogRow): AITaskLogDetail {
+  return {
+    ...mapTaskLogRow(row),
+    inputJson: row.input_json,
+    outputJson: row.output_json,
+    tracesJson: row.traces_json,
+    errorText: row.error_text,
+  };
+}
+
+/** 将 snake_case 的 ChatSessionRow 转换为 camelCase 的 ChatSession */
+function mapChatSessionRow(row: ChatSessionRow): ChatSession {
+  return {
+    id: row.id,
+    title: row.title,
+    articleId: row.article_id,
+    messages: JSON.parse(row.messages_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -225,4 +261,147 @@ export function registerAIHandlers() {
     const rows = aiDb.listTaskLogs(limit ?? 20);
     return rows.map(mapTaskLogRow);
   });
+
+  // 任务日志详情
+  ipcMain.handle(IPC_CHANNELS.AI_TASK_LOG_DETAIL, async (_event, logId: string) => {
+    const aiDb = getAIDatabase();
+    const row = aiDb.getTaskLog(logId);
+    return row ? mapTaskLogDetail(row) : null;
+  });
+
+  // ==================== AI Chat 流式通信 ====================
+
+  // 流式 Chat 发送（使用 ipcMain.on 而非 handle，支持持续推送 chunk）
+  ipcMain.on(IPC_CHANNELS.AI_CHAT_SEND, async (event, input: ChatSendInput) => {
+    try {
+      const aiDb = getAIDatabase();
+      const config = loadAIConfig(aiDb);
+      if (!config.apiKey) throw new Error('请先配置 AI API Key');
+
+      const llm = createLLMProvider(config);
+      const toolCtx = createToolContext(getDatabase());
+      const chatService = new ChatService({
+        getModel: llm.getModel.bind(llm),
+        toolContext: toolCtx,
+        aiDb,
+      });
+
+      // 获取文章上下文（如有）
+      let articleContext: string | null = null;
+      if (input.articleId) {
+        const db = getDatabase();
+        const article = await db
+          .select()
+          .from(articles)
+          .where(eq(articles.id, input.articleId))
+          .get();
+        if (article) {
+          articleContext = article.contentText || article.summary || null;
+        }
+      }
+
+      await chatService.sendMessage(
+        input.sessionId,
+        input.message,
+        articleContext,
+        (chunk) => {
+          // 通过 event.sender.send 逐块推送到渲染进程
+          event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, chunk);
+        },
+      );
+    } catch (err) {
+      event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, {
+        type: 'error',
+        error: String(err),
+      });
+    }
+  });
+
+  // Chat Session CRUD（使用 ipcMain.handle，返回 Promise）
+
+  // 创建 Chat 会话
+  ipcMain.handle(
+    IPC_CHANNELS.AI_CHAT_SESSION_CREATE,
+    async (_event, articleId?: string) => {
+      const aiDb = getAIDatabase();
+      // 初始化 chat sessions 表（如尚未创建）
+      aiDb.initTables();
+      const row = aiDb.createChatSession(articleId);
+      return mapChatSessionRow(row);
+    },
+  );
+
+  // 查询 Chat 会话列表
+  ipcMain.handle(IPC_CHANNELS.AI_CHAT_SESSION_LIST, async () => {
+    const aiDb = getAIDatabase();
+    return aiDb.listChatSessions().map(mapChatSessionRow);
+  });
+
+  // 获取单个 Chat 会话
+  ipcMain.handle(
+    IPC_CHANNELS.AI_CHAT_SESSION_GET,
+    async (_event, id: string) => {
+      const aiDb = getAIDatabase();
+      const row = aiDb.getChatSession(id);
+      return row ? mapChatSessionRow(row) : null;
+    },
+  );
+
+  // 删除 Chat 会话
+  ipcMain.handle(
+    IPC_CHANNELS.AI_CHAT_SESSION_DELETE,
+    async (_event, id: string) => {
+      const aiDb = getAIDatabase();
+      aiDb.deleteChatSession(id);
+    },
+  );
+
+  // ==================== AI 主题提取 ====================
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_EXTRACT_TOPICS,
+    async (_event, input: AIExtractTopicsInput) => {
+      const aiDb = getAIDatabase();
+      const config = loadAIConfig(aiDb);
+      if (!config.apiKey) throw new Error('请先配置 AI API Key');
+
+      const { generateObject } = await import('ai');
+      const { z } = await import('zod');
+      const llm = createLLMProvider(config);
+
+      const db = getDatabase();
+      const article = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, input.articleId))
+        .get();
+      if (!article) throw new Error('文章不存在');
+
+      const contentText =
+        article.contentText || article.content || article.summary || '';
+
+      const result = await generateObject({
+        model: llm.getModel('fast'),
+        schema: z.object({
+          topics: z
+            .array(z.string())
+            .describe('文章的 3-5 个核心主题关键词'),
+        }),
+        prompt: `提取以下文章的 3-5 个核心主题关键词，返回简短的词组。\n\n标题：${article.title}\n\n${contentText.slice(0, 4000)}`,
+      });
+
+      const tokenCount = result.usage?.totalTokens ?? 0;
+
+      aiDb.insertTaskLog({
+        taskType: 'extract_topics',
+        status: 'completed',
+        inputJson: JSON.stringify(input),
+        outputJson: JSON.stringify(result.object),
+        tokenCount,
+        costUsd: 0,
+      });
+
+      return { topics: result.object.topics, tokenCount };
+    },
+  );
 }

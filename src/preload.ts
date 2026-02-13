@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -117,6 +118,33 @@ const electronAPI: ElectronAPI = {
   aiTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_TRANSLATE, input),
   aiAutoTag: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_AUTO_TAG, input),
   aiTaskLogs: (limit) => ipcRenderer.invoke(IPC_CHANNELS.AI_TASK_LOGS, limit),
+
+  // AI Chat 流式通信
+  aiChatSend: (input) => ipcRenderer.send(IPC_CHANNELS.AI_CHAT_SEND, input),
+  aiChatOnStream: (callback: (chunk: ChatStreamChunk) => void) => {
+    const handler = (_event: IpcRendererEvent, chunk: ChatStreamChunk) => callback(chunk);
+    ipcRenderer.on(IPC_CHANNELS.AI_CHAT_STREAM, handler);
+    // 返回取消订阅函数，防止内存泄漏
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AI_CHAT_STREAM, handler);
+  },
+
+  // AI Chat Session CRUD
+  aiChatSessionCreate: (articleId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_CREATE, articleId),
+  aiChatSessionList: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_LIST),
+  aiChatSessionGet: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_GET, id),
+  aiChatSessionDelete: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_DELETE, id),
+
+  // AI 主题提取
+  aiExtractTopics: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_EXTRACT_TOPICS, input),
+
+  // AI 任务日志详情
+  aiTaskLogDetail: (logId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_TASK_LOG_DETAIL, logId),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

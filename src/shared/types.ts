@@ -614,4 +614,20 @@ export interface ElectronAPI {
   aiTranslate: (input: AITranslateInput) => Promise<AITranslateResult>;
   aiAutoTag: (input: AIAutoTagInput) => Promise<AIAutoTagResult>;
   aiTaskLogs: (limit?: number) => Promise<AITaskLogItem[]>;
+
+  // AI Chat 流式通信
+  aiChatSend: (input: ChatSendInput) => void;
+  aiChatOnStream: (callback: (chunk: ChatStreamChunk) => void) => () => void;
+
+  // AI Chat Session CRUD
+  aiChatSessionCreate: (articleId?: string) => Promise<ChatSession>;
+  aiChatSessionList: () => Promise<ChatSession[]>;
+  aiChatSessionGet: (id: string) => Promise<ChatSession | null>;
+  aiChatSessionDelete: (id: string) => Promise<void>;
+
+  // AI 主题提取
+  aiExtractTopics: (input: AIExtractTopicsInput) => Promise<AIExtractTopicsResult>;
+
+  // AI 任务日志详情
+  aiTaskLogDetail: (logId: string) => Promise<AITaskLogDetail | null>;
 }
