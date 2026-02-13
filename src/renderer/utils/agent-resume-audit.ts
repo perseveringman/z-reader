@@ -26,6 +26,12 @@ export interface ResumeAuditFilter {
   taskId?: ResumeAuditTaskFilter;
 }
 
+export interface ResolvedResumeAuditFilter {
+  mode: ResumeAuditModeFilter;
+  status: ResumeAuditStatusFilter;
+  taskId: ResumeAuditTaskFilter;
+}
+
 export type ResumeAuditPreset = 'all' | 'failed' | 'delegate';
 
 export interface ResumeAuditSummary {
@@ -109,6 +115,42 @@ function asStatus(value: unknown): 'running' | 'succeeded' | 'failed' | 'cancele
   return null;
 }
 
+const RESUME_AUDIT_MODE_VALUES: ResumeAuditModeFilter[] = ['all', 'safe', 'delegate'];
+const RESUME_AUDIT_STATUS_VALUES: ResumeAuditStatusFilter[] = ['all', 'running', 'succeeded', 'failed', 'canceled'];
+
+function asModeFilter(value: unknown): ResumeAuditModeFilter {
+  if (typeof value === 'string' && RESUME_AUDIT_MODE_VALUES.includes(value as ResumeAuditModeFilter)) {
+    return value as ResumeAuditModeFilter;
+  }
+
+  return 'all';
+}
+
+function asStatusFilter(value: unknown): ResumeAuditStatusFilter {
+  if (typeof value === 'string' && RESUME_AUDIT_STATUS_VALUES.includes(value as ResumeAuditStatusFilter)) {
+    return value as ResumeAuditStatusFilter;
+  }
+
+  return 'all';
+}
+
+function asTaskFilter(value: unknown): ResumeAuditTaskFilter {
+  if (typeof value !== 'string') {
+    return 'all';
+  }
+
+  const taskId = value.trim();
+  return taskId.length > 0 ? taskId : 'all';
+}
+
+export function sanitizeResumeAuditFilter(filter: ResumeAuditFilter = {}): ResolvedResumeAuditFilter {
+  return {
+    mode: asModeFilter(filter.mode),
+    status: asStatusFilter(filter.status),
+    taskId: asTaskFilter(filter.taskId),
+  };
+}
+
 export function normalizeTaskIdsInput(input: string): string[] {
   return Array.from(
     new Set(
@@ -175,9 +217,8 @@ export function extractResumeAuditEntries(events: AgentReplayEvent[]): ResumeAud
 }
 
 export function filterResumeAuditEntries(entries: ResumeAuditEntry[], filter: ResumeAuditFilter = {}): ResumeAuditEntry[] {
-  const mode = filter.mode ?? 'all';
-  const status = filter.status ?? 'all';
-  const taskId = filter.taskId ?? 'all';
+  const resolvedFilter = sanitizeResumeAuditFilter(filter);
+  const { mode, status, taskId } = resolvedFilter;
 
   return entries.filter((entry) => {
     if (mode !== 'all' && entry.mode !== mode) {
@@ -196,7 +237,7 @@ export function filterResumeAuditEntries(entries: ResumeAuditEntry[], filter: Re
   });
 }
 
-export function getResumeAuditPresetFilter(preset: ResumeAuditPreset): ResumeAuditFilter {
+export function getResumeAuditPresetFilter(preset: ResumeAuditPreset): ResolvedResumeAuditFilter {
   if (preset === 'failed') {
     return {
       mode: 'all',

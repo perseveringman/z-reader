@@ -11,10 +11,12 @@ import {
   getResumeAuditPresetFilter,
   listResumeAuditTaskIds,
   normalizeTaskIdsInput,
+  sanitizeResumeAuditFilter,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
+  type ResolvedResumeAuditFilter,
   type ResumeAuditPreset,
   type ResumeAuditStatusFilter,
   type ResumeAuditTaskFilter,
@@ -44,6 +46,40 @@ const ALERT_LEVEL_CLASS = {
   warning: 'text-yellow-300',
   critical: 'text-red-300',
 } as const;
+
+const RESUME_AUDIT_FILTER_STORAGE_KEY = 'z-reader-agent-resume-audit-filter';
+
+const DEFAULT_RESUME_AUDIT_FILTER: ResolvedResumeAuditFilter = {
+  mode: 'all',
+  status: 'all',
+  taskId: 'all',
+};
+
+function readPersistedResumeAuditFilter(): ResolvedResumeAuditFilter {
+  try {
+    const raw = localStorage.getItem(RESUME_AUDIT_FILTER_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_RESUME_AUDIT_FILTER;
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return sanitizeResumeAuditFilter({
+      mode: parsed.mode as ResumeAuditModeFilter | undefined,
+      status: parsed.status as ResumeAuditStatusFilter | undefined,
+      taskId: parsed.taskId as ResumeAuditTaskFilter | undefined,
+    });
+  } catch {
+    return DEFAULT_RESUME_AUDIT_FILTER;
+  }
+}
+
+function persistResumeAuditFilter(filter: ResolvedResumeAuditFilter): void {
+  try {
+    localStorage.setItem(RESUME_AUDIT_FILTER_STORAGE_KEY, JSON.stringify(filter));
+  } catch {
+    return;
+  }
+}
 
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -90,9 +126,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setResumeConfirmed(false);
       setDelegateSpecialists([]);
       setResumeAuditEntries([]);
-      setAuditModeFilter('all');
-      setAuditStatusFilter('all');
-      setAuditTaskFilter('all');
+      const persistedFilter = readPersistedResumeAuditFilter();
+      setAuditModeFilter(persistedFilter.mode);
+      setAuditStatusFilter(persistedFilter.status);
+      setAuditTaskFilter(persistedFilter.taskId);
 
       window.electronAPI
         .settingsGet()
@@ -123,6 +160,18 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    persistResumeAuditFilter(
+      sanitizeResumeAuditFilter({
+        mode: auditModeFilter,
+        status: auditStatusFilter,
+        taskId: auditTaskFilter,
+      }),
+    );
+  }, [open, auditModeFilter, auditStatusFilter, auditTaskFilter]);
 
   const updateField = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
