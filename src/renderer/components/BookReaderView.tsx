@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2 } from 'lucide-react';
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2, BookOpen, FileText } from 'lucide-react';
 import type { Book, Highlight } from '../../shared/types';
 import { BookReaderToc, type TocItem } from './BookReaderToc';
 import { BookReaderDetailPanel, type DetailTab } from './BookReaderDetailPanel';
 import { BookReaderSettings, loadBookReaderSettings, type BookReaderSettingsValues } from './BookReaderSettings';
 import { EpubReader, type BookReaderHandle } from './EpubReader';
 import { PdfReader } from './PdfReader';
+import { PdfTextView } from './PdfTextView';
 
 interface BookReaderViewProps {
   bookId: string;
@@ -20,6 +21,9 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('book-reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('book-reader-detail-collapsed') === 'true');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pdfViewMode, setPdfViewMode] = useState<'pdf' | 'text'>(() =>
+    (localStorage.getItem('z-reader-pdf-view-mode') as 'pdf' | 'text') || 'pdf',
+  );
   const [settings, setSettings] = useState<BookReaderSettingsValues>(loadBookReaderSettings);
   const [readProgress, setReadProgress] = useState(0);
   const [detailActiveTab, setDetailActiveTab] = useState<DetailTab>('info');
@@ -143,6 +147,19 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
             <span className="text-gray-400 truncate">{book?.title ?? '加载中…'}</span>
           </div>
           <div className="flex items-center gap-1">
+            {book?.fileType === 'pdf' && (
+              <button
+                onClick={() => {
+                  const next = pdfViewMode === 'pdf' ? 'text' : 'pdf';
+                  setPdfViewMode(next);
+                  localStorage.setItem('z-reader-pdf-view-mode', next);
+                }}
+                className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+                title={pdfViewMode === 'pdf' ? '切换到文本视图' : '切换到 PDF 视图'}
+              >
+                {pdfViewMode === 'pdf' ? <FileText className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+              </button>
+            )}
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
               className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
@@ -189,6 +206,20 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
             <div className="flex items-center justify-center h-full text-sm text-gray-500">
               书籍不存在
             </div>
+          ) : book.fileType === 'pdf' && pdfViewMode === 'text' ? (
+            <PdfTextView
+              ref={readerRef}
+              bookId={bookId}
+              filePath={book.filePath}
+              highlights={highlights}
+              onHighlightClick={handleHighlightNavigate}
+              onHighlightsChange={setHighlights}
+              onTocLoaded={setTocItems}
+              onProgressChange={handleProgressChange}
+              onLocationChange={handleLocationChange}
+              settings={settings}
+              initialLocation={book.currentLocation}
+            />
           ) : book.fileType === 'pdf' ? (
             <PdfReader
               ref={readerRef}
