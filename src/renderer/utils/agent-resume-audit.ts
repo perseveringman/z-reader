@@ -34,6 +34,13 @@ export interface ResolvedResumeAuditFilter {
 
 export type ResumeAuditPreset = 'all' | 'failed' | 'delegate';
 
+export interface ResumeAuditCustomPreset {
+  id: string;
+  name: string;
+  filter: ResolvedResumeAuditFilter;
+  updatedAt: number;
+}
+
 export interface ResumeAuditSummary {
   total: number;
   succeeded: number;
@@ -149,6 +156,86 @@ export function sanitizeResumeAuditFilter(filter: ResumeAuditFilter = {}): Resol
     status: asStatusFilter(filter.status),
     taskId: asTaskFilter(filter.taskId),
   };
+}
+
+const MAX_RESUME_AUDIT_CUSTOM_PRESETS = 5;
+
+export function sanitizeResumeAuditPresetName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').slice(0, 30);
+}
+
+export function sanitizeResumeAuditCustomPresets(input: unknown): ResumeAuditCustomPreset[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const presets = input
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => {
+      const id = typeof item.id === 'string' ? item.id.trim() : '';
+      const name = sanitizeResumeAuditPresetName(typeof item.name === 'string' ? item.name : '');
+      const updatedAt = typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : 0;
+
+      if (!id || !name) {
+        return null;
+      }
+
+      return {
+        id,
+        name,
+        filter: sanitizeResumeAuditFilter((item.filter ?? {}) as ResumeAuditFilter),
+        updatedAt,
+      } satisfies ResumeAuditCustomPreset;
+    })
+    .filter((item): item is ResumeAuditCustomPreset => item !== null);
+
+  const deduped = new Map<string, ResumeAuditCustomPreset>();
+  for (const preset of presets) {
+    const existed = deduped.get(preset.id);
+    if (!existed || preset.updatedAt >= existed.updatedAt) {
+      deduped.set(preset.id, preset);
+    }
+  }
+
+  return Array.from(deduped.values())
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_RESUME_AUDIT_CUSTOM_PRESETS);
+}
+
+export function upsertResumeAuditCustomPreset(
+  presets: ResumeAuditCustomPreset[],
+  input: { id?: string; name: string; filter: ResumeAuditFilter },
+  now = Date.now(),
+): ResumeAuditCustomPreset[] {
+  const name = sanitizeResumeAuditPresetName(input.name);
+  if (!name) {
+    return presets;
+  }
+
+  const id = typeof input.id === 'string' && input.id.trim().length > 0 ? input.id.trim() : 'preset-' + now;
+  const next = [
+    {
+      id,
+      name,
+      filter: sanitizeResumeAuditFilter(input.filter),
+      updatedAt: now,
+    },
+    ...presets.filter((item) => item.id !== id),
+  ];
+
+  return sanitizeResumeAuditCustomPresets(next);
+}
+
+export function removeResumeAuditCustomPreset(
+  presets: ResumeAuditCustomPreset[],
+  presetId: string,
+): ResumeAuditCustomPreset[] {
+  const id = presetId.trim();
+  if (!id) {
+    return presets;
+  }
+
+  return presets.filter((item) => item.id !== id);
 }
 
 export function normalizeTaskIdsInput(input: string): string[] {

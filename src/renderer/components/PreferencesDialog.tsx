@@ -10,10 +10,15 @@ import {
   filterResumeAuditEntries,
   getResumeAuditPresetFilter,
   listResumeAuditTaskIds,
+  removeResumeAuditCustomPreset,
+  sanitizeResumeAuditCustomPresets,
+  sanitizeResumeAuditPresetName,
+  upsertResumeAuditCustomPreset,
   normalizeTaskIdsInput,
   sanitizeResumeAuditFilter,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
+  type ResumeAuditCustomPreset,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
   type ResolvedResumeAuditFilter,
@@ -48,6 +53,7 @@ const ALERT_LEVEL_CLASS = {
 } as const;
 
 const RESUME_AUDIT_FILTER_STORAGE_KEY = 'z-reader-agent-resume-audit-filter';
+const RESUME_AUDIT_CUSTOM_PRESETS_STORAGE_KEY = 'z-reader-agent-resume-audit-custom-presets';
 
 const DEFAULT_RESUME_AUDIT_FILTER: ResolvedResumeAuditFilter = {
   mode: 'all',
@@ -81,6 +87,28 @@ function persistResumeAuditFilter(filter: ResolvedResumeAuditFilter): void {
   }
 }
 
+function readPersistedResumeAuditCustomPresets(): ResumeAuditCustomPreset[] {
+  try {
+    const raw = localStorage.getItem(RESUME_AUDIT_CUSTOM_PRESETS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    return sanitizeResumeAuditCustomPresets(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function persistResumeAuditCustomPresets(presets: ResumeAuditCustomPreset[]): void {
+  try {
+    localStorage.setItem(RESUME_AUDIT_CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(presets));
+  } catch {
+    return;
+  }
+}
+
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({});
   const [loading, setLoading] = useState(false);
@@ -108,6 +136,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [auditModeFilter, setAuditModeFilter] = useState<ResumeAuditModeFilter>('all');
   const [auditStatusFilter, setAuditStatusFilter] = useState<ResumeAuditStatusFilter>('all');
   const [auditTaskFilter, setAuditTaskFilter] = useState<ResumeAuditTaskFilter>('all');
+  const [customAuditPresets, setCustomAuditPresets] = useState<ResumeAuditCustomPreset[]>([]);
+  const [customAuditPresetName, setCustomAuditPresetName] = useState('');
 
   const { showToast } = useToast();
 
@@ -130,6 +160,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setAuditModeFilter(persistedFilter.mode);
       setAuditStatusFilter(persistedFilter.status);
       setAuditTaskFilter(persistedFilter.taskId);
+      setCustomAuditPresets(readPersistedResumeAuditCustomPresets());
+      setCustomAuditPresetName('');
 
       window.electronAPI
         .settingsGet()
@@ -172,6 +204,12 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       }),
     );
   }, [open, auditModeFilter, auditStatusFilter, auditTaskFilter]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    persistResumeAuditCustomPresets(customAuditPresets);
+  }, [open, customAuditPresets]);
 
   const updateField = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -419,6 +457,40 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     setAuditModeFilter(filter.mode ?? 'all');
     setAuditStatusFilter(filter.status ?? 'all');
     setAuditTaskFilter(filter.taskId ?? 'all');
+  };
+
+  const applyCustomAuditPreset = (preset: ResumeAuditCustomPreset) => {
+    const filter = sanitizeResumeAuditFilter(preset.filter);
+    setAuditModeFilter(filter.mode);
+    setAuditStatusFilter(filter.status);
+    setAuditTaskFilter(filter.taskId);
+    showToast('已应用预设：' + preset.name);
+  };
+
+  const handleSaveCustomAuditPreset = () => {
+    const presetName = sanitizeResumeAuditPresetName(customAuditPresetName);
+    if (!presetName) {
+      showToast('请输入预设名称');
+      return;
+    }
+
+    setCustomAuditPresets((current) =>
+      upsertResumeAuditCustomPreset(current, {
+        name: presetName,
+        filter: {
+          mode: auditModeFilter,
+          status: auditStatusFilter,
+          taskId: auditTaskFilter,
+        },
+      }),
+    );
+    setCustomAuditPresetName('');
+    showToast('预设已保存：' + presetName);
+  };
+
+  const handleRemoveCustomAuditPreset = (presetId: string) => {
+    setCustomAuditPresets((current) => removeResumeAuditCustomPreset(current, presetId));
+    showToast('预设已删除');
   };
 
   const handleCopyResumeAuditSummary = async () => {
@@ -868,6 +940,51 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                     >
                       delegate
                     </button>
+                  </div>
+
+                  <div className="rounded border border-white/10 bg-[#141414] p-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={customAuditPresetName}
+                        onChange={(e) => setCustomAuditPresetName(e.target.value)}
+                        placeholder="保存当前筛选为预设（最多30字）"
+                        className="flex-1 px-2 py-1 bg-[#1a1a1a] border border-white/10 rounded text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveCustomAuditPreset}
+                        className="px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-[11px] text-white"
+                      >
+                        保存视图
+                      </button>
+                    </div>
+
+                    {customAuditPresets.length === 0 ? (
+                      <div className="text-[11px] text-gray-500">暂无自定义预设。</div>
+                    ) : (
+                      <div className="space-y-1">
+                        {customAuditPresets.map((preset) => (
+                          <div key={preset.id} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => applyCustomAuditPreset(preset)}
+                              className="flex-1 text-left px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-[11px] text-white"
+                            >
+                              {preset.name}
+                              <span className="ml-1 text-gray-300">({preset.filter.mode}/{preset.filter.status}/{preset.filter.taskId})</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomAuditPreset(preset.id)}
+                              className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-[11px] text-white"
+                              aria-label="删除预设"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">

@@ -8,14 +8,18 @@ import {
   extractResumeAuditEntries,
   filterResumeAuditEntries,
   getResumeAuditPresetFilter,
+  removeResumeAuditCustomPreset,
+  sanitizeResumeAuditCustomPresets,
   sanitizeResumeAuditFilter,
+  sanitizeResumeAuditPresetName,
+  upsertResumeAuditCustomPreset,
   listResumeAuditTaskIds,
   normalizeTaskIdsInput,
   selectPrimaryTaskId,
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
-describe('p21 resume audit utils', () => {
+describe('p22 resume audit utils', () => {
   it('应解析并去重多 taskId 输入', () => {
     expect(normalizeTaskIdsInput('')).toEqual([]);
     expect(
@@ -82,6 +86,67 @@ describe('p21 resume audit utils', () => {
       status: 'all',
       taskId: 'all',
     });
+  });
+
+  it('应支持自定义预设名称与列表 sanitize', () => {
+    expect(sanitizeResumeAuditPresetName('  失败   排查  视图  ')).toBe('失败 排查 视图');
+
+    const presets = sanitizeResumeAuditCustomPresets([
+      {
+        id: 'p1',
+        name: '  失败视图  ',
+        filter: { mode: 'all', status: 'failed', taskId: 'task-a' },
+        updatedAt: 2,
+      },
+      {
+        id: 'p2',
+        name: 'delegate',
+        filter: { mode: 'delegate', status: 'all', taskId: 'all' },
+        updatedAt: 1,
+      },
+      {
+        id: '',
+        name: 'invalid',
+        filter: { mode: 'all', status: 'all', taskId: 'all' },
+        updatedAt: 3,
+      },
+    ]);
+
+    expect(presets).toHaveLength(2);
+    expect(presets[0].id).toBe('p1');
+    expect(presets[0].name).toBe('失败视图');
+  });
+
+  it('应支持自定义预设增删改', () => {
+    const base = sanitizeResumeAuditCustomPresets([]);
+    const withPreset = upsertResumeAuditCustomPreset(
+      base,
+      {
+        name: '失败优先',
+        filter: { mode: 'all', status: 'failed', taskId: 'all' },
+      },
+      100,
+    );
+
+    expect(withPreset).toHaveLength(1);
+    expect(withPreset[0].name).toBe('失败优先');
+
+    const updated = upsertResumeAuditCustomPreset(
+      withPreset,
+      {
+        id: withPreset[0].id,
+        name: '失败优先 v2',
+        filter: { mode: 'delegate', status: 'failed', taskId: 'task-a' },
+      },
+      200,
+    );
+
+    expect(updated).toHaveLength(1);
+    expect(updated[0].name).toBe('失败优先 v2');
+    expect(updated[0].filter.mode).toBe('delegate');
+
+    const removed = removeResumeAuditCustomPreset(updated, updated[0].id);
+    expect(removed).toHaveLength(0);
   });
 
   it('应仅提取并解析 graph.resume.executed 事件', () => {
