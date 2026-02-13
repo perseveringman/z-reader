@@ -11,6 +11,7 @@ import { registerSettingsHandlers } from './settings-handlers';
 import { registerDownloadHandlers } from './download-handlers';
 import { registerDiscoverHandlers } from './discover-handlers';
 import { registerAgentHandlers } from './agent-handlers';
+import { registerNewsletterHandlers } from './newsletter-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -26,4 +27,5 @@ export function registerAllIpcHandlers() {
   registerDownloadHandlers();
   registerDiscoverHandlers();
   registerAgentHandlers();
+  registerNewsletterHandlers();
 }

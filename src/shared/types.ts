@@ -425,6 +425,23 @@ export interface AgentResumeExecuteResult {
   };
 }
 
+// ==================== Newsletter 相关类型 ====================
+export interface CreateNewsletterInput {
+  name: string;
+  category?: string;
+}
+
+export interface NewsletterCreateResult {
+  /** 用于订阅 newsletter 的专用邮箱地址 */
+  email: string;
+  /** 对应的 Atom feed URL */
+  feedUrl: string;
+  /** newsletter 名称 */
+  name: string;
+  /** 创建的 feed 记录 */
+  feed: Feed;
+}
+
 // ==================== Settings 相关类型 ====================
 export interface AppSettings {
   podcastIndexApiKey?: string;
@@ -499,6 +516,37 @@ export interface DiscoverPreviewResult {
   }[];
   alreadySubscribed: boolean;
   agentPolicy?: AgentPolicyConfig;
+}
+
+// ==================== 分享卡片类型 ====================
+
+export type CardType = 'single' | 'multi' | 'summary';
+export type QuoteStyle = 'border-left' | 'quotation-marks' | 'highlight-bg' | 'minimal';
+export type ThemeCategory = 'classic' | 'retro' | 'digital' | 'artistic';
+
+export interface CardThemeStyles {
+  background: string;
+  textColor: string;
+  accentColor: string;
+  fontFamily: string;
+  quoteStyle: QuoteStyle;
+  cardRadius: string;
+  padding: string;
+}
+
+export interface CardTheme {
+  id: string;
+  name: string;
+  category: ThemeCategory;
+  styles: CardThemeStyles;
+  cssClass: string;
+}
+
+export interface ShareCardData {
+  cardType: CardType;
+  themeId: string;
+  highlights: Highlight[];
+  article: Pick<Article, 'id' | 'title' | 'author' | 'url' | 'domain' | 'publishedAt'>;
 }
 
 // ==================== IPC Channel 定义 ====================
@@ -601,6 +649,9 @@ export interface ElectronAPI {
   discoverRsshubRoutes: (category?: string) => Promise<Record<string, RSSHubNamespace>>;
   discoverPreview: (feedUrl: string) => Promise<DiscoverPreviewResult>;
   discoverRsshubConfig: (baseUrl?: string) => Promise<{ baseUrl: string | null }>;
+  // Newsletter 操作
+  newsletterCreate: (input: CreateNewsletterInput) => Promise<NewsletterCreateResult>;
+
   // Agent 操作
   agentApprovalList: () => Promise<AgentPendingApproval[]>;
   agentApprovalDecide: (input: AgentApprovalDecisionInput) => Promise<boolean>;
@@ -612,4 +663,8 @@ export interface ElectronAPI {
   agentResumePreview: (input: AgentResumePreviewInput) => Promise<AgentResumePreviewResult>;
   agentResumeExecute: (input: AgentResumeExecuteInput) => Promise<AgentResumeExecuteResult>;
   agentResumeSpecialistsList: () => Promise<string[]>;
+
+  // Share Card 操作
+  shareCardExportImage: (dataUrl: string, defaultName: string) => Promise<string>;
+  shareCardCopyClipboard: (dataUrl: string) => Promise<void>;
 }

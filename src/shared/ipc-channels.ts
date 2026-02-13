@@ -77,6 +77,9 @@ export const IPC_CHANNELS = {
   YOUTUBE_LOGOUT: 'youtube:logout',
   YOUTUBE_AUTH_STATUS: 'youtube:authStatus',
 
+  // Newsletter
+  NEWSLETTER_CREATE: 'newsletter:create',
+
   // Podcast
   PODCAST_SEARCH: 'podcast:search',
   PODCAST_RESOLVE_URL: 'podcast:resolveUrl',
@@ -109,4 +112,8 @@ export const IPC_CHANNELS = {
   AGENT_RESUME_PREVIEW: 'agent:resume:preview',
   AGENT_RESUME_EXECUTE: 'agent:resume:execute',
   AGENT_RESUME_SPECIALISTS_LIST: 'agent:resume:specialists:list',
+
+  // Share Card
+  SHARE_CARD_EXPORT_IMAGE: 'shareCard:exportImage',
+  SHARE_CARD_COPY_CLIPBOARD: 'shareCard:copyClipboard',
 } as const;

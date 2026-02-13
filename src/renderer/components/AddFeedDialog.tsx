@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Loader2, Plus, FileUp, Rss, Podcast } from 'lucide-react';
+import { X, Loader2, Plus, FileUp, Rss, Podcast, Mail, Copy, Check } from 'lucide-react';
 import { useToast } from './Toast';
 import { PodcastSearchPanel } from './PodcastSearchPanel';
 
-type DialogTab = 'rss' | 'podcast';
+type DialogTab = 'rss' | 'podcast' | 'newsletter';
 
 interface AddFeedDialogProps {
   open: boolean;
@@ -18,7 +18,17 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const newsletterInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
+  // Newsletter 状态
+  const [newsletterName, setNewsletterName] = useState('');
+  const [newsletterCategory, setNewsletterCategory] = useState('');
+  const [newsletterResult, setNewsletterResult] = useState<{
+    email: string;
+    feedUrl: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -26,9 +36,15 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
       setUrl('');
       setTitle('');
       setCategory('');
+      setNewsletterName('');
+      setNewsletterCategory('');
+      setNewsletterResult(null);
+      setCopied(false);
       // 聚焦输入框
       if (activeTab === 'rss') {
         setTimeout(() => inputRef.current?.focus(), 100);
+      } else if (activeTab === 'newsletter') {
+        setTimeout(() => newsletterInputRef.current?.focus(), 100);
       }
     }
   }, [open, activeTab]);
@@ -92,6 +108,42 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
     onFeedAdded?.();
   };
 
+  const handleNewsletterCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterName.trim()) return;
+
+    setLoading(true);
+    try {
+      const result = await window.electronAPI.newsletterCreate({
+        name: newsletterName.trim(),
+        category: newsletterCategory.trim() || undefined,
+      });
+      setNewsletterResult({
+        email: result.email,
+        feedUrl: result.feedUrl,
+      });
+      showToast('Newsletter 订阅已创建');
+      onFeedAdded?.();
+    } catch (error) {
+      console.error('创建 Newsletter 失败:', error);
+      showToast('创建失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyEmail = async () => {
+    if (!newsletterResult) return;
+    try {
+      await navigator.clipboard.writeText(newsletterResult.email);
+      setCopied(true);
+      showToast('邮箱地址已复制');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('复制失败');
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -139,6 +191,17 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
           >
             <Podcast size={16} />
             播客
+          </button>
+          <button
+            onClick={() => setActiveTab('newsletter')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'newsletter'
+                ? 'border-blue-500 text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <Mail size={16} />
+            Newsletter
           </button>
         </div>
 
@@ -233,11 +296,115 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
               </p>
             </div>
           </>
-        ) : (
+        ) : activeTab === 'podcast' ? (
           /* 播客搜索 Tab */
           <div className="p-6">
             <PodcastSearchPanel onSubscribed={handlePodcastSubscribed} />
           </div>
+        ) : (
+          /* Newsletter Tab */
+          <>
+            {!newsletterResult ? (
+              <form onSubmit={handleNewsletterCreate} className="p-6 space-y-4">
+                <div>
+                  <label htmlFor="newsletter-name" className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Newsletter 名称 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    ref={newsletterInputRef}
+                    id="newsletter-name"
+                    type="text"
+                    value={newsletterName}
+                    onChange={(e) => setNewsletterName(e.target.value)}
+                    placeholder="例如: Morning Brew, The Hustle"
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="newsletter-category" className="block text-sm font-medium text-gray-300 mb-1.5">
+                    分类 (可选)
+                  </label>
+                  <input
+                    id="newsletter-category"
+                    type="text"
+                    value={newsletterCategory}
+                    onChange={(e) => setNewsletterCategory(e.target.value)}
+                    placeholder="例如: 技术、新闻、商业"
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading || !newsletterName.trim()}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>创建中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail size={16} />
+                        <span>创建 Newsletter 订阅</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="pt-0">
+                  <p className="text-xs text-gray-500">
+                    将通过 kill-the-newsletter.com 生成一个专用邮箱地址，用该地址订阅 newsletter 后，内容会自动出现在你的 Feed 中。
+                  </p>
+                </div>
+              </form>
+            ) : (
+              /* 创建成功后展示邮箱地址 */
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+                  <p className="text-sm text-green-400 font-medium">
+                    Newsletter 订阅创建成功
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    请用以下邮箱地址去订阅你的 newsletter：
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-3 py-2 bg-black/30 border border-white/10 rounded text-sm text-white font-mono select-all break-all">
+                      {newsletterResult.email}
+                    </code>
+                    <button
+                      onClick={handleCopyEmail}
+                      className="shrink-0 p-2 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                      title="复制邮箱地址"
+                    >
+                      {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-500">
+                  <p>接下来：</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>复制上面的邮箱地址</li>
+                    <li>去 newsletter 的网站用此地址订阅</li>
+                    <li>收到的 newsletter 会自动出现在 Feed 中</li>
+                  </ol>
+                </div>
+
+                <button
+                  onClick={onClose}
+                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-md transition-colors"
+                >
+                  完成
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

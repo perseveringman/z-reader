@@ -101,6 +101,9 @@ const electronAPI: ElectronAPI = {
   discoverRsshubRoutes: (category) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_ROUTES, category),
   discoverPreview: (feedUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_PREVIEW, feedUrl),
   discoverRsshubConfig: (baseUrl) => ipcRenderer.invoke(IPC_CHANNELS.DISCOVER_RSSHUB_CONFIG, baseUrl),
+  // Newsletter
+  newsletterCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.NEWSLETTER_CREATE, input),
+
   // Agent
   agentApprovalList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_LIST),
   agentApprovalDecide: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_DECIDE, input),
