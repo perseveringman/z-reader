@@ -9,6 +9,7 @@ import {
   extractResumeAuditEntries,
   filterResumeAuditEntries,
   normalizeTaskIdsInput,
+  selectPrimaryTaskId,
   summarizeResumeAuditEntries,
   type ResumeAuditEntry,
   type ResumeAuditModeFilter,
@@ -137,16 +138,16 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     }
   };
 
-  const loadSnapshots = async () => {
-    const taskIds = normalizeTaskIdsInput(agentTaskId);
-    if (taskIds.length === 0) {
+  const loadSnapshots = async (taskInput: string = agentTaskId) => {
+    const selection = selectPrimaryTaskId(taskInput);
+    if (!selection.taskId) {
       setAgentSnapshots([]);
       setAgentError('请输入 taskId 后再查询快照');
       return;
     }
 
-    const taskId = taskIds[0];
-    if (taskIds.length > 1) {
+    const taskId = selection.taskId;
+    if (selection.hasMultiple) {
       showToast('快照查询仅支持单 taskId，已使用第一个：' + taskId);
     }
 
@@ -229,8 +230,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     }
   };
 
-  const loadResumeAudit = async () => {
-    const taskIds = normalizeTaskIdsInput(agentTaskId);
+  const loadResumeAudit = async (taskInput: string = agentTaskId) => {
+    const taskIds = normalizeTaskIdsInput(taskInput);
     if (taskIds.length === 0) {
       setResumeAuditEntries([]);
       setAgentError('请输入 taskId 后再加载恢复审计');
@@ -267,6 +268,13 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     } finally {
       setResumeAuditLoading(false);
     }
+  };
+
+  const drillDownTaskFromRank = async (taskId: string) => {
+    setAgentTaskId(taskId);
+    await loadSnapshots(taskId);
+    await loadResumeAudit(taskId);
+    showToast('已定位到任务：' + taskId);
   };
 
   const executeResume = async () => {
@@ -821,10 +829,17 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                       <div className="text-[11px] text-gray-500">暂无 task 聚合数据。</div>
                     ) : (
                       resumeAuditTaskAggregates.slice(0, 5).map((item) => (
-                        <div key={item.taskId} className="text-[11px] text-gray-500 break-all">
-                          <span className="text-gray-300">{item.taskId}</span>
+                        <button
+                          key={item.taskId}
+                          type="button"
+                          onClick={() => {
+                            void drillDownTaskFromRank(item.taskId);
+                          }}
+                          className="w-full text-left rounded border border-white/10 bg-[#1a1a1a] px-2 py-1 text-[11px] text-gray-500 break-all hover:border-sky-500/50"
+                        >
+                          <span className="text-sky-300">{item.taskId}</span>
                           <span className="ml-1">f={item.failed} · success={(item.successRate * 100).toFixed(1)}% · hit={(item.avgHitRate * 100).toFixed(1)}%</span>
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>

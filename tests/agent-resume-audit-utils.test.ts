@@ -8,6 +8,7 @@ import {
   extractResumeAuditEntries,
   filterResumeAuditEntries,
   normalizeTaskIdsInput,
+  selectPrimaryTaskId,
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
@@ -18,6 +19,20 @@ describe('p17 resume audit utils', () => {
       normalizeTaskIdsInput(` task-a , task-b
  task-a；task-c ; task-b `),
     ).toEqual(['task-a', 'task-b', 'task-c']);
+  });
+
+  it('应支持选取首个 task 作为快照查询目标', () => {
+    expect(selectPrimaryTaskId('')).toEqual({
+      taskIds: [],
+      taskId: null,
+      hasMultiple: false,
+    });
+
+    expect(selectPrimaryTaskId('task-a, task-b')).toEqual({
+      taskIds: ['task-a', 'task-b'],
+      taskId: 'task-a',
+      hasMultiple: true,
+    });
   });
 
   it('应仅提取并解析 graph.resume.executed 事件', () => {

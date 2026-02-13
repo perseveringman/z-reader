@@ -110,6 +110,21 @@ export function normalizeTaskIdsInput(input: string): string[] {
   );
 }
 
+export interface PrimaryTaskSelection {
+  taskIds: string[];
+  taskId: string | null;
+  hasMultiple: boolean;
+}
+
+export function selectPrimaryTaskId(input: string): PrimaryTaskSelection {
+  const taskIds = normalizeTaskIdsInput(input);
+  return {
+    taskIds,
+    taskId: taskIds.length > 0 ? taskIds[0] : null,
+    hasMultiple: taskIds.length > 1,
+  };
+}
+
 export function extractResumeAuditEntries(events: AgentReplayEvent[]): ResumeAuditEntry[] {
   const entries: ResumeAuditEntry[] = [];
 
