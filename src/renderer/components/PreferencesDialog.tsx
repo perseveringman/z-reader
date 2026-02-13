@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Loader2, Save, Podcast, HardDrive, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle, Compass } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Database, RefreshCw, Trash2, AlertTriangle, PlayCircle, Compass, Globe } from 'lucide-react';
 import { useToast } from './Toast';
 import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
+import { changeLanguage, supportedLanguages } from '../../i18n';
 import {
   aggregateResumeAuditByTask,
   buildResumeAuditReport,
@@ -544,6 +545,44 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
           </div>
         ) : (
           <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+            {/* Language Settings */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Globe size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-medium text-white">语言</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="language-select"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    选择语言
+                  </label>
+                  <select
+                    id="language-select"
+                    value={settings.language || 'zh'}
+                    onChange={(e) => {
+                      const newLang = e.target.value;
+                      updateField('language', newLang);
+                      changeLanguage(newLang as 'en' | 'zh');
+                    }}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    {supportedLanguages.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.nativeName} ({lang.name})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-600 mt-1">
+                    更改语言后，部分界面将立即更新。
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Podcast size={16} className="text-blue-400" />

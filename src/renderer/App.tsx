@@ -22,6 +22,7 @@ import { DownloadManager } from './components/DownloadManager';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { DiscoverPage } from './components/discover/DiscoverPage';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
+import { changeLanguage } from '../i18n';
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -65,6 +66,21 @@ export function App() {
     : activeView === 'library-podcasts' ? 'podcast'
     : activeView === 'library-articles' ? 'article'
     : undefined;
+
+  // 加载语言设置
+  useEffect(() => {
+    const loadLanguage = async () => {
+      try {
+        const settings = await window.electronAPI.settingsGet();
+        if (settings.language) {
+          changeLanguage(settings.language as 'en' | 'zh');
+        }
+      } catch (err) {
+        console.error('Failed to load language setting:', err);
+      }
+    };
+    loadLanguage();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

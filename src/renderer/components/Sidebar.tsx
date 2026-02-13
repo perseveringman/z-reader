@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Inbox,
   Clock,
@@ -112,6 +113,7 @@ function SectionLabel({
 }
 
 export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
+  const { t } = useTranslation();
   const iconSize = 18;
   const [sections, setSections] = useState({
     library: true,
@@ -174,20 +176,20 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       {/* 顶部工具栏 */}
       <div className="flex items-center justify-between px-3 py-1.5 shrink-0">
         {!collapsed && (
-          <span className="text-xs font-medium text-gray-500 tracking-tight">Z-Reader</span>
+          <span className="text-xs font-medium text-gray-500 tracking-tight">{t('app.name')}</span>
         )}
         <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={onAddUrl}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Save URL to Library"
+            title={t('sidebar.saveUrl')}
           >
             <Link size={16} />
           </button>
           <button
             onClick={onAddFeed}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Add RSS Feed"
+            title={t('sidebar.addFeed')}
           >
             <Plus size={16} />
           </button>
@@ -204,7 +206,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       <nav className="flex-1 overflow-y-auto px-2 mt-1">
         {/* ===== Library Section ===== */}
         <SectionLabel
-          label="Library"
+          label={t('sidebar.library')}
           collapsed={collapsed}
           expanded={sections.library}
           onToggle={() => toggleSection('library')}
@@ -213,56 +215,56 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           <>
             <NavItem
               icon={<FileText size={iconSize} />}
-              label="Articles"
+              label={t('sidebar.articles')}
               active={activeView === 'library-articles'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-articles')}
             />
             <NavItem
               icon={<BookOpen size={iconSize} />}
-              label="Books"
+              label={t('sidebar.books')}
               active={activeView === 'books'}
               collapsed={collapsed}
               onClick={() => onViewChange('books')}
             />
             <NavItem
               icon={<Mail size={iconSize} />}
-              label="Emails"
+              label={t('sidebar.emails')}
               active={activeView === 'library-emails'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-emails')}
             />
             <NavItem
               icon={<FileType size={iconSize} />}
-              label="PDFs"
+              label={t('sidebar.pdfs')}
               active={activeView === 'library-pdfs'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-pdfs')}
             />
             <NavItem
               icon={<Twitter size={iconSize} />}
-              label="Tweets"
+              label={t('sidebar.tweets')}
               active={activeView === 'library-tweets'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-tweets')}
             />
             <NavItem
               icon={<Video size={iconSize} />}
-              label="Videos"
+              label={t('sidebar.videos')}
               active={activeView === 'library-videos'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-videos')}
             />
             <NavItem
               icon={<Podcast size={iconSize} />}
-              label="Podcasts"
+              label={t('sidebar.podcasts')}
               active={activeView === 'library-podcasts'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-podcasts')}
             />
             <NavItem
               icon={<Tag size={iconSize} />}
-              label="Tags"
+              label={t('sidebar.tags')}
               active={activeView === 'tags' && !selectedTagId}
               collapsed={collapsed}
               onClick={() => {
@@ -302,7 +304,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
 
         {/* ===== Feed Section ===== */}
         <SectionLabel
-          label="Feed"
+          label={t('sidebar.feed')}
           collapsed={collapsed}
           expanded={sections.feed}
           onToggle={() => toggleSection('feed')}
@@ -311,14 +313,14 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           <>
             <NavItem
               icon={<Compass size={iconSize} />}
-              label="Discover"
+              label={t('sidebar.discover')}
               active={activeView === 'discover'}
               collapsed={collapsed}
               onClick={() => onViewChange('discover')}
             />
             <NavItem
               icon={<Rss size={iconSize} />}
-              label="All Feeds"
+              label={t('sidebar.allFeeds')}
               active={activeView === 'feeds' && selectedFeedId === null}
               collapsed={collapsed}
               onClick={() => {
@@ -363,7 +365,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
             })}
             <NavItem
               icon={<ArrowRight size={iconSize} />}
-              label="Manage feeds"
+              label={t('sidebar.manageFeeds')}
               active={activeView === 'manage-feeds'}
               collapsed={collapsed}
               onClick={() => {
@@ -375,7 +377,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
 
         {/* ===== Pinned Section ===== */}
         <SectionLabel
-          label="Pinned"
+          label={t('sidebar.pinned')}
           collapsed={collapsed}
           expanded={sections.pinned}
           onToggle={() => toggleSection('pinned')}
@@ -384,7 +386,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           <>
             <NavItem
               icon={<Star size={iconSize} />}
-              label="Shortlist"
+              label={t('sidebar.shortlist')}
               active={activeView === 'shortlist'}
               collapsed={collapsed}
               onClick={() => onViewChange('shortlist')}
@@ -397,38 +399,38 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
       <div className="px-2 py-2 border-t border-white/5 space-y-0.5">
         <NavItem
           icon={<Trash2 size={iconSize} />}
-          label="Trash"
+          label={t('sidebar.trash')}
           active={activeView === 'trash'}
           collapsed={collapsed}
           onClick={() => onViewChange('trash')}
         />
         <NavItem
           icon={<Search size={iconSize} />}
-          label="Search"
+          label={t('sidebar.search')}
           collapsed={collapsed}
           onClick={onSearch}
         />
         <NavItem
           icon={<Keyboard size={iconSize} />}
-          label="Shortcuts"
+          label={t('sidebar.shortcuts')}
           collapsed={collapsed}
           onClick={onShortcutsHelp}
         />
         <NavItem
           icon={<Download size={iconSize} />}
-          label="Downloads"
+          label={t('sidebar.downloads')}
           collapsed={collapsed}
           onClick={onDownloads}
         />
         <NavItem
           icon={<Settings size={iconSize} />}
-          label="Preferences"
+          label={t('sidebar.preferences')}
           collapsed={collapsed}
           onClick={onPreferences}
         />
         <NavItem
           icon={<User size={iconSize} />}
-          label="Profile"
+          label={t('sidebar.profile')}
           collapsed={collapsed}
         />
       </div>

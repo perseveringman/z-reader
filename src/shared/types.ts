@@ -449,6 +449,7 @@ export interface AppSettings {
   downloadDirectory?: string;
   downloadCapacityMb?: number;
   rsshubBaseUrl?: string;
+  language?: string;
 }
 
 // ==================== Discover 相关类型 ====================
