@@ -463,6 +463,17 @@
     "yesterday": "Yesterday",
     "tomorrow": "Tomorrow"
   },
+  "chat": {
+    "title": "Chat",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "newSession": "New Chat",
+    "thinking": "Thinking...",
+    "toolCalling": "Executing: {{name}}",
+    "empty": "Start chatting with AI",
+    "sessionList": "Chat History",
+    "error": "An error occurred, please try again"
+  },
   "ai": {
     "settings": "AI Settings",
     "provider": "AI Provider",

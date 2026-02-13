@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Loader2 } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
+import { ChatPanel } from './ChatPanel';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -70,7 +71,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const TABS: { key: DetailTab; label: string }[] = [
     { key: 'info', label: t('feedDetail.info') },
     { key: 'notebook', label: t('detailPanel.highlights') },
-    { key: 'chat', label: 'Chat' },
+    { key: 'chat', label: t('chat.title') },
   ];
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
@@ -584,11 +585,8 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
             )}
 
             {activeTab === 'chat' && (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center text-gray-600">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">{t('ai.chatComingSoon')}</p>
-                </div>
+              <div className="flex-1 -m-4 flex flex-col min-h-0">
+                <ChatPanel articleId={articleId} />
               </div>
             )}
           </>

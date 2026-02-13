@@ -463,6 +463,17 @@
     "yesterday": "昨天",
     "tomorrow": "明天"
   },
+  "chat": {
+    "title": "对话",
+    "placeholder": "输入消息...",
+    "send": "发送",
+    "newSession": "新对话",
+    "thinking": "思考中...",
+    "toolCalling": "正在执行: {{name}}",
+    "empty": "开始和 AI 聊天吧",
+    "sessionList": "对话历史",
+    "error": "发生错误，请重试"
+  },
   "ai": {
     "settings": "AI 设置",
     "provider": "AI 服务商",
