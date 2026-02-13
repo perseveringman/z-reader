@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Loader2 } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Hash, Loader2 } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
 import { ChatPanel } from './ChatPanel';
@@ -93,6 +93,11 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const [aiTagResult, setAiTagResult] = useState<string[] | null>(null);
   const [aiTagError, setAiTagError] = useState<string | null>(null);
 
+  // AI 主题提取状态
+  const [aiTopicsLoading, setAiTopicsLoading] = useState(false);
+  const [aiTopicsResult, setAiTopicsResult] = useState<{ topics: string[] } | null>(null);
+  const [aiTopicsError, setAiTopicsError] = useState<string | null>(null);
+
   // 使用外部高亮或内部高亮
   const useExternal = externalHighlights != null;
   const highlights = useExternal ? externalHighlights : internalHighlights;
@@ -109,6 +114,9 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
     setAiTagResult(null);
     setAiTagError(null);
     setAiTagLoading(false);
+    setAiTopicsResult(null);
+    setAiTopicsError(null);
+    setAiTopicsLoading(false);
 
     if (!articleId) {
       setArticle(null);
@@ -237,6 +245,27 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       setAiTagError(t('ai.errorOccurred'));
     } finally {
       setAiTagLoading(false);
+    }
+  }, [articleId, checkAiConfigured, t]);
+
+  // AI 主题提取
+  const handleAiExtractTopics = useCallback(async () => {
+    if (!articleId) return;
+    const configured = await checkAiConfigured();
+    if (!configured) {
+      setAiTopicsError(t('ai.configureApiKey'));
+      return;
+    }
+    setAiTopicsLoading(true);
+    setAiTopicsResult(null);
+    setAiTopicsError(null);
+    try {
+      const result = await window.electronAPI.aiExtractTopics({ articleId });
+      setAiTopicsResult(result);
+    } catch {
+      setAiTopicsError(t('ai.errorOccurred'));
+    } finally {
+      setAiTopicsLoading(false);
     }
   }, [articleId, checkAiConfigured, t]);
 
@@ -459,6 +488,42 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                         {aiTagError && (
                           <p className="mt-2 text-[12px] text-red-400 border-t border-white/5 pt-2">
                             {aiTagError}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* AI 主题提取 */}
+                      <div className="rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
+                        <button
+                          onClick={handleAiExtractTopics}
+                          disabled={aiTopicsLoading}
+                          className="flex items-center gap-2 text-[13px] text-gray-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                        >
+                          {aiTopicsLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                          ) : (
+                            <Hash className="w-4 h-4 text-emerald-400" />
+                          )}
+                          <span>{aiTopicsLoading ? t('ai.generating') : t('ai.extractTopics')}</span>
+                        </button>
+                        {aiTopicsResult && (
+                          <div className="mt-2 border-t border-white/5 pt-2">
+                            <p className="text-[11px] text-gray-500 mb-1.5">{t('ai.topics')}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiTopicsResult.topics.map((topic, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs"
+                                >
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {aiTopicsError && (
+                          <p className="mt-2 text-[12px] text-red-400 border-t border-white/5 pt-2">
+                            {aiTopicsError}
                           </p>
                         )}
                       </div>

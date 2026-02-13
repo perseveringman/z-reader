@@ -504,7 +504,9 @@
     "suggestedTags": "推荐标签",
     "applyTag": "应用",
     "errorOccurred": "调用失败，请稍后重试",
-    "aiActions": "AI 操作"
+    "aiActions": "AI 操作",
+    "extractTopics": "提取主题",
+    "topics": "主题关键词"
   },
   "errors": {
     "networkError": "网络错误",

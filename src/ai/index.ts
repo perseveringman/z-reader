@@ -4,6 +4,7 @@ export { AIDatabase } from './providers/db';
 export type { AIProviderConfig } from './providers/config';
 export type { InsertTaskLogInput, TaskLogRow, ChatSessionRow } from './providers/db';
 export type { AISkill, AIContext, AITaskStatus, AITaskLog } from './skills/types';
+export { extractTopicsSkill } from './skills/extract-topics';
 export { AITraceCollector } from './services/trace';
 export type { AITraceStep, AIExecutionTrace } from './services/trace';
 export { ChatService } from './services/chat';
