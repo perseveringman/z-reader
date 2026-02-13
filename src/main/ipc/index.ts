@@ -10,7 +10,6 @@ import { registerPodcastHandlers } from './podcast-handlers';
 import { registerSettingsHandlers } from './settings-handlers';
 import { registerDownloadHandlers } from './download-handlers';
 import { registerDiscoverHandlers } from './discover-handlers';
-import { registerAgentHandlers } from './agent-handlers';
 import { registerNewsletterHandlers } from './newsletter-handlers';
 import { registerShareCardHandlers } from './share-card-handlers';
 
@@ -27,7 +26,6 @@ export function registerAllIpcHandlers() {
   registerSettingsHandlers();
   registerDownloadHandlers();
   registerDiscoverHandlers();
-  registerAgentHandlers();
   registerNewsletterHandlers();
   registerShareCardHandlers();
 }

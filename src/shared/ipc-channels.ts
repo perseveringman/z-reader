@@ -101,18 +101,6 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
 
-  // Agent
-  AGENT_APPROVAL_LIST: 'agent:approval:list',
-  AGENT_APPROVAL_DECIDE: 'agent:approval:decide',
-  AGENT_REPLAY_GET: 'agent:replay:get',
-  AGENT_POLICY_GET: 'agent:policy:get',
-  AGENT_POLICY_SET: 'agent:policy:set',
-  AGENT_SNAPSHOT_LIST: 'agent:snapshot:list',
-  AGENT_SNAPSHOT_CLEANUP: 'agent:snapshot:cleanup',
-  AGENT_RESUME_PREVIEW: 'agent:resume:preview',
-  AGENT_RESUME_EXECUTE: 'agent:resume:execute',
-  AGENT_RESUME_SPECIALISTS_LIST: 'agent:resume:specialists:list',
-
   // Share Card
   SHARE_CARD_EXPORT_IMAGE: 'shareCard:exportImage',
   SHARE_CARD_COPY_CLIPBOARD: 'shareCard:copyClipboard',

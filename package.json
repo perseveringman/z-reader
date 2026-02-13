@@ -11,9 +11,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "vitest run",
-    "test:agent": "vitest run tests/core-agent-*.test.ts",
-    "check:agent-boundary": "vitest run tests/core-agent-boundary.test.ts"
+    "test": "vitest run"
   },
   "keywords": [],
   "author": {

@@ -1,10 +1,8 @@
 import { app, BrowserWindow, session } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { createZReaderResumeSpecialists } from './business-adapters/zreader-agent';
 import { getDatabase } from './main/db';
 import { registerAllIpcHandlers } from './main/ipc';
-import { setResumeSpecialists } from './main/services/agent-runtime-context';
 import { startScheduledFetch, backfillMissingContent } from './main/services/rss-service';
 import { startApiServer, stopApiServer } from './main/services/api-server';
 
@@ -36,7 +34,6 @@ const createWindow = () => {
 
 app.on('ready', () => {
   getDatabase();
-  setResumeSpecialists(createZReaderResumeSpecialists());
   registerAllIpcHandlers();
   startScheduledFetch(15);
   backfillMissingContent().catch(console.error);

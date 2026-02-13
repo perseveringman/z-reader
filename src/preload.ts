@@ -104,18 +104,6 @@ const electronAPI: ElectronAPI = {
   // Newsletter
   newsletterCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.NEWSLETTER_CREATE, input),
 
-  // Agent
-  agentApprovalList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_LIST),
-  agentApprovalDecide: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_APPROVAL_DECIDE, input),
-  agentReplayGet: (taskId) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_REPLAY_GET, taskId),
-  agentPolicyGet: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_GET),
-  agentPolicySet: (patch) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_POLICY_SET, patch),
-  agentSnapshotList: (query) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SNAPSHOT_LIST, query),
-  agentSnapshotCleanup: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SNAPSHOT_CLEANUP, input),
-  agentResumePreview: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_PREVIEW, input),
-  agentResumeExecute: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_EXECUTE, input),
-  agentResumeSpecialistsList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_SPECIALISTS_LIST),
-
   // Share Card
   shareCardExportImage: (dataUrl: string, defaultName: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SHARE_CARD_EXPORT_IMAGE, dataUrl, defaultName),
