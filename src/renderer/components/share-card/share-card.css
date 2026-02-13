@@ -1,0 +1,500 @@
+/* ============================================================
+   分享卡片 — 主题样式
+   每个主题通过 .theme-{id} 类作用于卡片容器
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   通用基础
+   ---------------------------------------------------------- */
+.share-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* ----------------------------------------------------------
+   引用块四种样式
+   ---------------------------------------------------------- */
+
+/* 1. 左边框引用条 */
+.quote-border-left {
+  position: relative;
+  padding-left: 20px;
+  border-left: 4px solid var(--accent-color, #e63333);
+}
+
+/* 2. 大号引号装饰 */
+.quote-quotation-marks {
+  position: relative;
+  padding-left: 12px;
+  padding-top: 28px;
+}
+
+.quote-quotation-marks::before {
+  content: '\201C';
+  position: absolute;
+  top: -8px;
+  left: -4px;
+  font-size: 64px;
+  line-height: 1;
+  color: var(--accent-color, #e8614d);
+  opacity: 0.35;
+  font-family: Georgia, serif;
+  pointer-events: none;
+}
+
+.quote-quotation-marks::after {
+  content: '\201D';
+  font-size: 64px;
+  line-height: 0;
+  color: var(--accent-color, #e8614d);
+  opacity: 0.35;
+  font-family: Georgia, serif;
+  vertical-align: -0.45em;
+  margin-left: 4px;
+  pointer-events: none;
+}
+
+/* 3. 半透明强调色背景 */
+.quote-highlight-bg {
+  padding: 16px 20px;
+  border-radius: 2px;
+  background: var(--highlight-bg, rgba(0, 255, 204, 0.08));
+  border-left: 2px solid var(--accent-color, #00ffcc);
+}
+
+/* 4. 极简无装饰 */
+.quote-minimal {
+  font-style: italic;
+  opacity: 0.88;
+  padding-left: 4px;
+}
+
+/* ----------------------------------------------------------
+   1. Swiss Design — 瑞士设计 / 国际主义
+   ---------------------------------------------------------- */
+.theme-swiss-design {
+  --accent-color: #e63333;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Noto Sans SC', Arial, sans-serif;
+  border: none;
+  box-shadow: none;
+}
+
+/* 强烈的网格感：顶部红色粗线 */
+.theme-swiss-design::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: #e63333;
+}
+
+.theme-swiss-design .card-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  line-height: 1.15;
+}
+
+.theme-swiss-design .card-meta {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #666666;
+  border-top: 2px solid #1a1a1a;
+  padding-top: 10px;
+  margin-top: 8px;
+}
+
+.theme-swiss-design .card-source {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.theme-swiss-design .card-divider {
+  height: 2px;
+  background: #1a1a1a;
+  border: none;
+  margin: 16px 0;
+}
+
+.theme-swiss-design .card-branding {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #999999;
+}
+
+/* ----------------------------------------------------------
+   2. Minimalism — 极简主义
+   ---------------------------------------------------------- */
+.theme-minimalism {
+  --accent-color: #999999;
+  background: #fafafa;
+  color: #333333;
+  font-family: 'SF Pro Text', -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+  border: 1px solid #eeeeee;
+}
+
+.theme-minimalism .card-title {
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+  color: #111111;
+}
+
+.theme-minimalism .card-meta {
+  font-size: 12px;
+  color: #aaaaaa;
+  font-weight: 300;
+}
+
+.theme-minimalism .card-divider {
+  height: 1px;
+  background: #e8e8e8;
+  border: none;
+  margin: 20px 0;
+}
+
+.theme-minimalism .card-source {
+  color: #666666;
+  font-weight: 400;
+}
+
+.theme-minimalism .card-branding {
+  font-size: 10px;
+  color: #cccccc;
+  font-weight: 300;
+}
+
+/* ----------------------------------------------------------
+   3. Ink Wash 水墨风 — 东方美学
+   ---------------------------------------------------------- */
+.theme-ink-wash {
+  --accent-color: #5a4a3a;
+  color: #2c2416;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  border: none;
+  position: relative;
+
+  /* 宣纸纹理：多层噪点+暖色渐变模拟 */
+  background:
+    /* 细微纤维纹理 */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(139, 119, 92, 0.02) 2px,
+      rgba(139, 119, 92, 0.02) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(139, 119, 92, 0.015) 3px,
+      rgba(139, 119, 92, 0.015) 6px
+    ),
+    /* 渐变模拟纸张色差 */
+    radial-gradient(ellipse at 20% 80%, rgba(210, 190, 160, 0.25) 0%, transparent 70%),
+    radial-gradient(ellipse at 80% 20%, rgba(200, 185, 155, 0.15) 0%, transparent 60%),
+    /* 基底宣纸色 */
+    linear-gradient(175deg, #f5f0e8 0%, #ede6d8 50%, #f0ead9 100%);
+}
+
+/* 水墨渲染的左侧引用条 — 覆盖默认 border-left */
+.theme-ink-wash .quote-border-left {
+  border-left: none;
+  padding-left: 24px;
+}
+
+.theme-ink-wash .quote-border-left::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  /* 墨色由浓渐淡的渐变 */
+  background: linear-gradient(
+    180deg,
+    #2c2416 0%,
+    #5a4a3a 30%,
+    #8b775c 60%,
+    rgba(139, 119, 92, 0.3) 85%,
+    rgba(139, 119, 92, 0.05) 100%
+  );
+  border-radius: 2px;
+}
+
+.theme-ink-wash .card-title {
+  font-weight: 700;
+  line-height: 1.65;
+  letter-spacing: 0.05em;
+}
+
+.theme-ink-wash .card-meta {
+  font-size: 12px;
+  color: #8b775c;
+  letter-spacing: 0.1em;
+}
+
+.theme-ink-wash .card-divider {
+  height: 1px;
+  border: none;
+  margin: 20px 0;
+  /* 墨迹渐隐分隔线 */
+  background: linear-gradient(
+    90deg,
+    rgba(90, 74, 58, 0.6) 0%,
+    rgba(90, 74, 58, 0.25) 50%,
+    rgba(90, 74, 58, 0.05) 100%
+  );
+}
+
+.theme-ink-wash .card-source {
+  color: #5a4a3a;
+  font-weight: 600;
+}
+
+.theme-ink-wash .card-branding {
+  font-size: 10px;
+  color: #b0a090;
+  letter-spacing: 0.15em;
+}
+
+/* 引用文字额外排版调整 */
+.theme-ink-wash .quote-text {
+  line-height: 2;
+  letter-spacing: 0.04em;
+}
+
+/* ----------------------------------------------------------
+   4. Cyberpunk — 赛博朋克
+   ---------------------------------------------------------- */
+.theme-cyberpunk {
+  --accent-color: #00ffcc;
+  --highlight-bg: rgba(0, 255, 204, 0.08);
+  background: #0a0a0f;
+  color: #e0e0e8;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Noto Sans SC', monospace;
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  position: relative;
+}
+
+/* 顶部霓虹扫描线 */
+.theme-cyberpunk::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #00ffcc 20%,
+    #00ffcc 50%,
+    #a855f7 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 8px rgba(0, 255, 204, 0.6),
+    0 0 20px rgba(0, 255, 204, 0.2);
+}
+
+/* 底部渐隐霓虹线 */
+.theme-cyberpunk::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(168, 85, 247, 0.4) 30%,
+    rgba(0, 255, 204, 0.3) 70%,
+    transparent 100%
+  );
+}
+
+/* CRT 扫描线纹理 */
+.theme-cyberpunk .card-content {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 204, 0.015) 2px,
+    rgba(0, 255, 204, 0.015) 4px
+  );
+}
+
+.theme-cyberpunk .card-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(0, 255, 204, 0.15);
+}
+
+.theme-cyberpunk .card-meta {
+  font-size: 11px;
+  color: #00ffcc;
+  opacity: 0.7;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.theme-cyberpunk .card-meta::before {
+  content: '> ';
+  opacity: 0.5;
+}
+
+.theme-cyberpunk .card-divider {
+  height: 1px;
+  border: none;
+  margin: 16px 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 255, 204, 0.4) 0%,
+    rgba(168, 85, 247, 0.3) 50%,
+    rgba(0, 255, 204, 0.1) 100%
+  );
+  box-shadow: 0 0 4px rgba(0, 255, 204, 0.15);
+}
+
+.theme-cyberpunk .card-source {
+  color: #a855f7;
+  font-weight: 500;
+}
+
+.theme-cyberpunk .card-branding {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 255, 204, 0.35);
+}
+
+/* 引用块霓虹高亮增强 */
+.theme-cyberpunk .quote-highlight-bg {
+  background: rgba(0, 255, 204, 0.06);
+  border-left-color: #00ffcc;
+  box-shadow:
+    inset 0 0 20px rgba(0, 255, 204, 0.03),
+    0 0 1px rgba(0, 255, 204, 0.1);
+}
+
+.theme-cyberpunk .quote-text {
+  text-shadow: 0 0 30px rgba(0, 255, 204, 0.05);
+}
+
+/* ----------------------------------------------------------
+   5. Risograph — 孔版印刷风
+   ---------------------------------------------------------- */
+.theme-risograph {
+  --accent-color: #e8614d;
+  color: #1a2744;
+  font-family: Georgia, 'Noto Serif SC', 'Times New Roman', serif;
+  position: relative;
+
+  /* 双色叠印底色 + 颗粒纹理 */
+  background:
+    /* 模拟印刷颗粒噪点 */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"),
+    /* 双色叠印效果 */
+    radial-gradient(
+      ellipse at 75% 25%,
+      rgba(232, 97, 77, 0.08) 0%,
+      rgba(232, 97, 77, 0.03) 40%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse at 25% 75%,
+      rgba(26, 39, 68, 0.06) 0%,
+      rgba(26, 39, 68, 0.02) 40%,
+      transparent 70%
+    ),
+    /* 纸张底色 */
+    #fef5f0;
+}
+
+/* 引号装饰色增强 */
+.theme-risograph .quote-quotation-marks::before,
+.theme-risograph .quote-quotation-marks::after {
+  color: #e8614d;
+  opacity: 0.45;
+  font-family: Georgia, serif;
+}
+
+.theme-risograph .card-title {
+  font-weight: 700;
+  line-height: 1.45;
+  color: #1a2744;
+  letter-spacing: 0.01em;
+}
+
+.theme-risograph .card-meta {
+  font-size: 12px;
+  color: #7a8aaa;
+  font-style: italic;
+}
+
+.theme-risograph .card-divider {
+  height: 2px;
+  border: none;
+  margin: 18px 0;
+  /* 双色叠印分隔线 */
+  background: linear-gradient(
+    90deg,
+    #e8614d 0%,
+    #e8614d 45%,
+    #8b5a9a 55%,
+    #1a2744 100%
+  );
+  opacity: 0.5;
+}
+
+.theme-risograph .card-source {
+  color: #e8614d;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.theme-risograph .card-branding {
+  font-size: 10px;
+  color: #c4b5aa;
+  font-style: italic;
+  letter-spacing: 0.05em;
+}
+
+/* 引用文字排版 */
+.theme-risograph .quote-text {
+  line-height: 1.75;
+}
+
+/* 叠印色块装饰（可选：笔记区域背景） */
+.theme-risograph .card-note {
+  background: rgba(232, 97, 77, 0.06);
+  border-radius: 2px;
+  padding: 12px 16px;
+  position: relative;
+}
+
+.theme-risograph .card-note::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(26, 39, 68, 0.04) 0%,
+    transparent 70%
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
