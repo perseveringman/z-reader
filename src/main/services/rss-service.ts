@@ -233,8 +233,8 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
 
     const feedTitle = parsed.title ?? feed.title;
     await db.update(schema.feeds).set({
-      title: feed.title ?? feedTitle ?? null,
-      description: feed.description ?? parsed.description ?? null,
+      title: feedTitle ?? null,
+      description: parsed.description ?? feed.description ?? null,
       etag: newEtag,
       lastModified: newLastModified,
       lastFetchedAt: now,

@@ -76,6 +76,7 @@ export interface Article {
   seasonNumber: number | null;
   createdAt: string;
   updatedAt: string;
+  feedTitle?: string | null;
 }
 
 export interface ArticleListQuery {

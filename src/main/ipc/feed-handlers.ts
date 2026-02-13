@@ -67,10 +67,11 @@ export function registerFeedHandlers() {
       updatedAt: now,
     };
     await db.insert(schema.feeds).values(values);
+
+    // 等待 fetchFeed 完成，确保 RSS 解析的 title 已写入数据库
+    await fetchFeed(id).catch(console.error);
+
     const result = await db.select().from(schema.feeds).where(eq(schema.feeds.id, id));
-
-    fetchFeed(id).catch(console.error);
-
     return result[0];
   });
 

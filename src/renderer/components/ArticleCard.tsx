@@ -75,12 +75,13 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
     onSaveToLibrary?.(article.id);
   };
 
-  const domainInitial = getDomainInitial(article.domain);
+  const displayName = article.feedTitle || article.domain;
+  const domainInitial = getDomainInitial(displayName);
   const timestamp = formatRelativeTime(article.savedAt || article.publishedAt);
   const isRead = article.readProgress >= 0.9 || article.readStatus === 'archive' || article.readStatus === 'seen';
 
   const metaParts: string[] = [];
-  if (article.domain) metaParts.push(article.domain.replace(/^www\./, ''));
+  if (displayName) metaParts.push(displayName.replace(/^www\./, ''));
   if (article.author) metaParts.push(article.author);
   if (article.readingTime != null && article.readingTime > 0) {
     metaParts.push(`${article.readingTime} min`);

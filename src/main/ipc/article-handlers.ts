@@ -32,13 +32,19 @@ export function registerArticleHandlers() {
     const sortField = query.sortBy === 'published_at' ? schema.articles.publishedAt : schema.articles.savedAt;
     const sortFn = query.sortOrder === 'asc' ? asc : desc;
 
-    return db
-      .select()
+    const rows = await db
+      .select({
+        article: schema.articles,
+        feedTitle: schema.feeds.title,
+      })
       .from(schema.articles)
+      .leftJoin(schema.feeds, eq(schema.articles.feedId, schema.feeds.id))
       .where(and(...conditions))
       .orderBy(sortFn(sortField))
       .limit(query.limit ?? 50)
       .offset(query.offset ?? 0);
+
+    return rows.map(r => ({ ...r.article, feedTitle: r.feedTitle }));
   });
 
   ipcMain.handle(ARTICLE_GET, async (_event, id: string) => {
