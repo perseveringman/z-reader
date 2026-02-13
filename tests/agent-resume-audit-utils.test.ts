@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AgentReplayEvent } from '../src/shared/types';
 import {
+  aggregateResumeAuditByTask,
   buildResumeAuditReport,
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
@@ -10,7 +11,7 @@ import {
   summarizeResumeAuditEntries,
 } from '../src/renderer/utils/agent-resume-audit';
 
-describe('p16 resume audit utils', () => {
+describe('p17 resume audit utils', () => {
   it('应解析并去重多 taskId 输入', () => {
     expect(normalizeTaskIdsInput('')).toEqual([]);
     expect(
@@ -95,7 +96,7 @@ describe('p16 resume audit utils', () => {
     expect(entries[1].pendingNodeIds).toEqual(['n2', 'n3']);
   });
 
-  it('应支持筛选、聚合、告警与摘要导出', () => {
+  it('应支持筛选、聚合、告警、task排行与摘要导出', () => {
     const entries = [
       {
         id: '1',
@@ -160,6 +161,10 @@ describe('p16 resume audit utils', () => {
     expect(summary.totalMissCount).toBe(3);
     expect(summary.topMissingAgents).toEqual(['writer', 'summarizer']);
 
+    const taskRanks = aggregateResumeAuditByTask(entries);
+    expect(taskRanks[0].taskId).toBe('task-a');
+    expect(taskRanks[0].failed).toBe(1);
+
     const alerts = detectResumeAuditAlerts(filtered, summary);
     expect(alerts.some((item) => item.id === 'missing-specialists')).toBe(true);
     expect(alerts.some((item) => item.id === 'side-effect-failure')).toBe(true);
@@ -169,6 +174,7 @@ describe('p16 resume audit utils', () => {
     expect(report).toContain('总量: 2');
     expect(report).toContain('副作用占比: 100.0%');
     expect(report).toContain('Top Missing Agents: writer, summarizer');
+    expect(report).toContain('Top Risk Tasks:');
     expect(report).toContain('告警:');
     expect(report).toContain('[critical] 副作用恢复存在失败');
   });

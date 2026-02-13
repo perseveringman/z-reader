@@ -48,6 +48,17 @@ export interface ResumeAuditAlert {
   detail: string;
 }
 
+export interface ResumeAuditTaskAggregate {
+  taskId: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  successRate: number;
+  avgHitRate: number;
+  sideEffectFailures: number;
+  lastOccurredAt: string;
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -286,6 +297,59 @@ export function detectResumeAuditAlerts(
   return alerts;
 }
 
+export function aggregateResumeAuditByTask(entries: ResumeAuditEntry[]): ResumeAuditTaskAggregate[] {
+  const grouped = new Map<string, ResumeAuditTaskAggregate>();
+
+  for (const entry of entries) {
+    const existed = grouped.get(entry.taskId);
+    if (!existed) {
+      grouped.set(entry.taskId, {
+        taskId: entry.taskId,
+        total: 1,
+        succeeded: entry.status === 'succeeded' ? 1 : 0,
+        failed: entry.status === 'failed' ? 1 : 0,
+        successRate: 0,
+        avgHitRate: entry.specialistHitRate,
+        sideEffectFailures: entry.sideEffectFlag && entry.status === 'failed' ? 1 : 0,
+        lastOccurredAt: entry.occurredAt,
+      });
+      continue;
+    }
+
+    existed.total += 1;
+    if (entry.status === 'succeeded') existed.succeeded += 1;
+    if (entry.status === 'failed') existed.failed += 1;
+    if (entry.sideEffectFlag && entry.status === 'failed') existed.sideEffectFailures += 1;
+    existed.avgHitRate += entry.specialistHitRate;
+
+    if (Date.parse(entry.occurredAt) > Date.parse(existed.lastOccurredAt)) {
+      existed.lastOccurredAt = entry.occurredAt;
+    }
+  }
+
+  const aggregates = Array.from(grouped.values()).map((item) => ({
+    ...item,
+    successRate: item.total > 0 ? item.succeeded / item.total : 0,
+    avgHitRate: item.total > 0 ? item.avgHitRate / item.total : 0,
+  }));
+
+  return aggregates.sort((a, b) => {
+    if (b.failed !== a.failed) {
+      return b.failed - a.failed;
+    }
+
+    if (a.successRate !== b.successRate) {
+      return a.successRate - b.successRate;
+    }
+
+    if (a.avgHitRate !== b.avgHitRate) {
+      return a.avgHitRate - b.avgHitRate;
+    }
+
+    return a.taskId.localeCompare(b.taskId);
+  });
+}
+
 export function buildResumeAuditReport(
   entries: ResumeAuditEntry[],
   summary?: ResumeAuditSummary,
@@ -294,6 +358,9 @@ export function buildResumeAuditReport(
   const resolvedSummary = summary ?? summarizeResumeAuditEntries(entries);
   const resolvedAlerts = alerts ?? detectResumeAuditAlerts(entries, resolvedSummary);
   const latest = entries[0];
+  const topRiskTasks = aggregateResumeAuditByTask(entries)
+    .slice(0, 3)
+    .map((item) => `${item.taskId}(f=${item.failed},sr=${(item.successRate * 100).toFixed(0)}%)`);
 
   const lines = [
     'Agent 恢复审计摘要',
@@ -303,6 +370,7 @@ export function buildResumeAuditReport(
     `平均命中率: ${(resolvedSummary.avgHitRate * 100).toFixed(1)}%`,
     `hit/miss: ${resolvedSummary.totalHitCount}/${resolvedSummary.totalMissCount}`,
     `Top Missing Agents: ${resolvedSummary.topMissingAgents.join(', ') || '(none)'}`,
+    `Top Risk Tasks: ${topRiskTasks.join(', ') || '(none)'}`,
     latest ? `最近一次: ${latest.mode}/${latest.status} @ ${latest.occurredAt}` : '最近一次: (none)',
   ];
 

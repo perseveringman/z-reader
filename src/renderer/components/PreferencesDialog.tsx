@@ -3,6 +3,7 @@ import { X, Loader2, Save, Podcast, HardDrive, Database, RefreshCw, Trash2, Aler
 import { useToast } from './Toast';
 import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
 import {
+  aggregateResumeAuditByTask,
   buildResumeAuditReport,
   detectResumeAuditAlerts,
   extractResumeAuditEntries,
@@ -339,6 +340,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const resumeAuditAlerts = useMemo(() => {
     return detectResumeAuditAlerts(filteredResumeAuditEntries, resumeAuditSummary);
   }, [filteredResumeAuditEntries, resumeAuditSummary]);
+
+  const resumeAuditTaskAggregates = useMemo(() => {
+    return aggregateResumeAuditByTask(filteredResumeAuditEntries);
+  }, [filteredResumeAuditEntries]);
 
   const handleCopyResumeAuditSummary = async () => {
     if (filteredResumeAuditEntries.length === 0) {
@@ -809,6 +814,20 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   ) : (
                     <div className="text-[11px] text-emerald-300">当前未检测到异常告警。</div>
                   )}
+
+                  <div className="rounded border border-white/10 bg-[#141414] p-2 space-y-1">
+                    <div className="text-[11px] text-gray-400">Task 风险排行（Top 5）</div>
+                    {resumeAuditTaskAggregates.length === 0 ? (
+                      <div className="text-[11px] text-gray-500">暂无 task 聚合数据。</div>
+                    ) : (
+                      resumeAuditTaskAggregates.slice(0, 5).map((item) => (
+                        <div key={item.taskId} className="text-[11px] text-gray-500 break-all">
+                          <span className="text-gray-300">{item.taskId}</span>
+                          <span className="ml-1">f={item.failed} · success={(item.successRate * 100).toFixed(1)}% · hit={(item.avgHitRate * 100).toFixed(1)}%</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
 
                   {resumeAuditLoading ? (
                     <div className="flex items-center gap-2 text-xs text-gray-500">
