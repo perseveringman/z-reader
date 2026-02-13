@@ -306,14 +306,18 @@ export function registerAIHandlers() {
         articleContext,
         (chunk) => {
           // 通过 event.sender.send 逐块推送到渲染进程
-          event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, chunk);
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, chunk);
+          }
         },
       );
     } catch (err) {
-      event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, {
-        type: 'error',
-        error: String(err),
-      });
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IPC_CHANNELS.AI_CHAT_STREAM, {
+          type: 'error',
+          error: String(err),
+        });
+      }
     }
   });
 
