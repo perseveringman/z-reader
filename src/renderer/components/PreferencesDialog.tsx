@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe, Brain, Eye, EyeOff, ScrollText } from 'lucide-react';
 import { useToast } from './Toast';
-import type { AppSettings } from '../../shared/types';
+import type { AppSettings, AISettingsData, AITaskLogItem } from '../../shared/types';
 import { changeLanguage, supportedLanguages } from '../../i18n';
 
 interface PreferencesDialogProps {
@@ -17,16 +17,38 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  // AI 设置相关状态
+  const [aiSettings, setAiSettings] = useState<AISettingsData>({
+    provider: 'openrouter',
+    apiKey: '',
+    models: { fast: '', smart: '', cheap: '' },
+  });
+  const [aiDirty, setAiDirty] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [aiLogs, setAiLogs] = useState<AITaskLogItem[]>([]);
+
   const { showToast } = useToast();
 
   useEffect(() => {
     if (open) {
       setLoading(true);
       setDirty(false);
+      setAiDirty(false);
+      setShowApiKey(false);
 
-      window.electronAPI
-        .settingsGet()
-        .then((s) => setSettings(s))
+      Promise.all([
+        window.electronAPI.settingsGet(),
+        window.electronAPI.aiSettingsGet().catch(() => null),
+        window.electronAPI.aiTaskLogs(10).catch(() => []),
+      ])
+        .then(([s, ai, logs]) => {
+          setSettings(s);
+          if (ai) {
+            setAiSettings(ai);
+          }
+          setAiLogs(logs);
+        })
         .catch((err) => console.error('Failed to load settings:', err))
         .finally(() => setLoading(false));
     }
@@ -61,6 +83,41 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       showToast(t('preferences.saveFailed'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // AI 设置字段更新
+  const updateAiField = useCallback(
+    <K extends keyof AISettingsData>(key: K, value: AISettingsData[K]) => {
+      setAiSettings((prev) => ({ ...prev, [key]: value }));
+      setAiDirty(true);
+    },
+    [],
+  );
+
+  const updateAiModel = useCallback(
+    (slot: 'fast' | 'smart' | 'cheap', value: string) => {
+      setAiSettings((prev) => ({
+        ...prev,
+        models: { ...prev.models, [slot]: value },
+      }));
+      setAiDirty(true);
+    },
+    [],
+  );
+
+  // AI 设置保存
+  const handleAiSave = async () => {
+    setAiSaving(true);
+    try {
+      await window.electronAPI.aiSettingsSet(aiSettings);
+      setAiDirty(false);
+      showToast(t('ai.saved'));
+    } catch (err) {
+      console.error('Failed to save AI settings:', err);
+      showToast(t('preferences.saveFailed'));
+    } finally {
+      setAiSaving(false);
     }
   };
 
@@ -259,6 +316,186 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   </p>
                 </div>
               </div>
+            </section>
+
+            {/* AI Settings Section */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Brain size={16} className="text-purple-400" />
+                <h3 className="text-sm font-medium text-white">{t('ai.settings')}</h3>
+              </div>
+
+              <div className="space-y-4">
+                {/* Provider 选择 */}
+                <div>
+                  <label
+                    htmlFor="ai-provider"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    {t('ai.provider')}
+                  </label>
+                  <select
+                    id="ai-provider"
+                    value={aiSettings.provider}
+                    onChange={(e) =>
+                      updateAiField('provider', e.target.value as 'openrouter' | 'minimax')
+                    }
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="minimax">MiniMax</option>
+                  </select>
+                </div>
+
+                {/* API Key */}
+                <div>
+                  <label
+                    htmlFor="ai-api-key"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    {t('ai.apiKey')}
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="ai-api-key"
+                      type={showApiKey ? 'text' : 'password'}
+                      value={aiSettings.apiKey}
+                      onChange={(e) => updateAiField('apiKey', e.target.value)}
+                      placeholder={t('ai.apiKeyPlaceholder')}
+                      className="w-full px-3 py-2 pr-10 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 模型 ID 输入 */}
+                <div>
+                  <label
+                    htmlFor="ai-model-fast"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    {t('ai.modelFast')}
+                  </label>
+                  <input
+                    id="ai-model-fast"
+                    type="text"
+                    value={aiSettings.models.fast}
+                    onChange={(e) => updateAiModel('fast', e.target.value)}
+                    placeholder={aiSettings.provider === 'openrouter' ? 'google/gemini-flash-1.5' : 'abab6.5s-chat'}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ai-model-smart"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    {t('ai.modelSmart')}
+                  </label>
+                  <input
+                    id="ai-model-smart"
+                    type="text"
+                    value={aiSettings.models.smart}
+                    onChange={(e) => updateAiModel('smart', e.target.value)}
+                    placeholder={aiSettings.provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'abab6.5-chat'}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ai-model-cheap"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    {t('ai.modelCheap')}
+                  </label>
+                  <input
+                    id="ai-model-cheap"
+                    type="text"
+                    value={aiSettings.models.cheap}
+                    onChange={(e) => updateAiModel('cheap', e.target.value)}
+                    placeholder={aiSettings.provider === 'openrouter' ? 'google/gemini-flash-1.5-8b' : 'abab5.5-chat'}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* AI 保存按钮 */}
+                <button
+                  onClick={handleAiSave}
+                  disabled={aiSaving || !aiDirty}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                >
+                  {aiSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{t('preferences.saving')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>{aiDirty ? t('ai.save') : t('ai.saved')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </section>
+
+            {/* AI 调用日志 */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <ScrollText size={16} className="text-purple-400" />
+                <h3 className="text-sm font-medium text-white">{t('ai.taskLogs')}</h3>
+              </div>
+
+              {aiLogs.length === 0 ? (
+                <p className="text-xs text-gray-500">{t('ai.noLogs')}</p>
+              ) : (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {aiLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex items-center justify-between px-3 py-2 bg-[#111] border border-white/5 rounded-md text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-gray-300 font-medium truncate">
+                          {log.taskType}
+                        </span>
+                        <span
+                          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            log.status === 'done'
+                              ? 'bg-green-900/40 text-green-400'
+                              : log.status === 'failed'
+                                ? 'bg-red-900/40 text-red-400'
+                                : 'bg-yellow-900/40 text-yellow-400'
+                          }`}
+                        >
+                          {log.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-gray-500">
+                        <span>{log.tokenCount} tokens</span>
+                        <span>${log.costUsd.toFixed(4)}</span>
+                        <span>
+                          {new Date(log.createdAt).toLocaleString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <div className="pt-2">
