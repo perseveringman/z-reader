@@ -193,8 +193,16 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
   const handleDelete = async (id: string) => {
     try {
+      // 删除前计算下一篇选中目标
+      const currentIndex = articles.findIndex(a => a.id === id);
+      const remaining = articles.filter(a => a.id !== id);
+      const nextId = remaining.length > 0
+        ? remaining[Math.min(currentIndex, remaining.length - 1)].id
+        : null;
+
       await window.electronAPI.articleDelete(id);
       await fetchArticles();
+      if (nextId) onSelectArticle(nextId);
       showToast('Moved to Trash', 'success');
       undoStack.push({
         description: 'Undo delete',
