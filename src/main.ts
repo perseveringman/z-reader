@@ -5,7 +5,7 @@ import { createZReaderResumeSpecialists } from './business-adapters/zreader-agen
 import { getDatabase } from './main/db';
 import { registerAllIpcHandlers } from './main/ipc';
 import { setResumeSpecialists } from './main/services/agent-runtime-context';
-import { startScheduledFetch } from './main/services/rss-service';
+import { startScheduledFetch, backfillMissingContent } from './main/services/rss-service';
 import { startApiServer, stopApiServer } from './main/services/api-server';
 
 if (started) {
@@ -39,6 +39,7 @@ app.on('ready', () => {
   setResumeSpecialists(createZReaderResumeSpecialists());
   registerAllIpcHandlers();
   startScheduledFetch(15);
+  backfillMissingContent().catch(console.error);
   startApiServer();
 
   // 移除微信图片防盗链 Referer，解决"此图片来自微信公众平台未经允许不可引用"

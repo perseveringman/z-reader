@@ -1,6 +1,6 @@
 import Parser from 'rss-parser';
 import { randomUUID } from 'node:crypto';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
 import { parseArticleContent } from './parser-service';
 
@@ -339,6 +339,51 @@ export async function importOpml(opmlXml: string) {
   }
 
   return createdFeeds;
+}
+
+/**
+ * 对已入库但正文为空或过短的文章，批量拉取全文（一次性回填）
+ */
+export async function backfillMissingContent(): Promise<number> {
+  const db = getDatabase();
+  const rows = await db.select({ id: schema.articles.id, url: schema.articles.url })
+    .from(schema.articles)
+    .where(
+      and(
+        eq(schema.articles.deletedFlg, 0),
+        eq(schema.articles.mediaType, 'article'),
+        sql`${schema.articles.url} IS NOT NULL`,
+        sql`(${schema.articles.content} IS NULL OR LENGTH(${schema.articles.content}) < 500)`,
+      ),
+    );
+
+  let filled = 0;
+  for (const row of rows) {
+    if (!row.url) continue;
+    try {
+      const parsed = await parseArticleContent(row.url);
+      if (!parsed?.content) continue;
+
+      const now = new Date().toISOString();
+      const updates: Record<string, unknown> = {
+        content: parsed.content,
+        contentText: parsed.contentText,
+        summary: parsed.excerpt,
+        wordCount: parsed.wordCount,
+        readingTime: parsed.readingTime,
+        updatedAt: now,
+      };
+      if (parsed.leadImageUrl) updates.thumbnail = parsed.leadImageUrl;
+
+      await db.update(schema.articles).set(updates).where(eq(schema.articles.id, row.id));
+      filled++;
+    } catch (err) {
+      console.error(`Backfill failed for ${row.url}:`, err);
+    }
+  }
+
+  console.log(`Backfill complete: ${filled}/${rows.length} articles updated`);
+  return filled;
 }
 
 let fetchTimer: ReturnType<typeof setInterval> | null = null;
