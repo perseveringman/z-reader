@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Loader2 } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
 
@@ -78,6 +78,20 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
 
+  // AI 操作状态
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryResult, setAiSummaryResult] = useState<string | null>(null);
+  const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
+
+  const [aiTranslateLoading, setAiTranslateLoading] = useState(false);
+  const [aiTranslateResult, setAiTranslateResult] = useState<{ title: string; content: string } | null>(null);
+  const [aiTranslateError, setAiTranslateError] = useState<string | null>(null);
+  const [showLangPicker, setShowLangPicker] = useState(false);
+
+  const [aiTagLoading, setAiTagLoading] = useState(false);
+  const [aiTagResult, setAiTagResult] = useState<string[] | null>(null);
+  const [aiTagError, setAiTagError] = useState<string | null>(null);
+
   // 使用外部高亮或内部高亮
   const useExternal = externalHighlights != null;
   const highlights = useExternal ? externalHighlights : internalHighlights;
@@ -86,6 +100,14 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
     if (!articleId) {
       setArticle(null);
       setInternalHighlights([]);
+      // 重置 AI 操作状态
+      setAiSummaryResult(null);
+      setAiSummaryError(null);
+      setAiTranslateResult(null);
+      setAiTranslateError(null);
+      setShowLangPicker(false);
+      setAiTagResult(null);
+      setAiTagError(null);
       return;
     }
 
@@ -138,6 +160,80 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       // Could show toast but DetailPanel doesn't have access to showToast
     }
   }, [articleId]);
+
+  // AI 操作：检查 API Key 是否配置
+  const checkAiConfigured = useCallback(async (): Promise<boolean> => {
+    try {
+      const settings = await window.electronAPI.aiSettingsGet();
+      return !!(settings.apiKey && settings.apiKey.trim().length > 0);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // AI 摘要
+  const handleAiSummarize = useCallback(async () => {
+    if (!articleId) return;
+    const configured = await checkAiConfigured();
+    if (!configured) {
+      setAiSummaryError(t('ai.configureApiKey'));
+      return;
+    }
+    setAiSummaryLoading(true);
+    setAiSummaryResult(null);
+    setAiSummaryError(null);
+    try {
+      const result = await window.electronAPI.aiSummarize({ articleId });
+      setAiSummaryResult(result.summary);
+    } catch {
+      setAiSummaryError(t('ai.errorOccurred'));
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  }, [articleId, checkAiConfigured, t]);
+
+  // AI 翻译
+  const handleAiTranslate = useCallback(async (targetLanguage: string) => {
+    if (!articleId) return;
+    const configured = await checkAiConfigured();
+    if (!configured) {
+      setAiTranslateError(t('ai.configureApiKey'));
+      return;
+    }
+    setAiTranslateLoading(true);
+    setAiTranslateResult(null);
+    setAiTranslateError(null);
+    setShowLangPicker(false);
+    try {
+      const result = await window.electronAPI.aiTranslate({ articleId, targetLanguage });
+      setAiTranslateResult({ title: result.translatedTitle, content: result.translatedContent });
+    } catch {
+      setAiTranslateError(t('ai.errorOccurred'));
+    } finally {
+      setAiTranslateLoading(false);
+    }
+  }, [articleId, checkAiConfigured, t]);
+
+  // AI 自动标签
+  const handleAiAutoTag = useCallback(async () => {
+    if (!articleId) return;
+    const configured = await checkAiConfigured();
+    if (!configured) {
+      setAiTagError(t('ai.configureApiKey'));
+      return;
+    }
+    setAiTagLoading(true);
+    setAiTagResult(null);
+    setAiTagError(null);
+    try {
+      const result = await window.electronAPI.aiAutoTag({ articleId });
+      setAiTagResult(result.tags);
+    } catch {
+      setAiTagError(t('ai.errorOccurred'));
+    } finally {
+      setAiTagLoading(false);
+    }
+  }, [articleId, checkAiConfigured, t]);
 
   const isVideo = article?.mediaType === 'video';
   const metaRows: MetaRow[] = article
@@ -244,6 +340,125 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Tags</span>
                     </div>
                     <TagPicker articleId={article.id} />
+                  </div>
+
+                  {/* AI 操作区域 */}
+                  <div className="mt-6">
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <Sparkles className="w-3.5 h-3.5 text-gray-500" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{t('ai.aiActions')}</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+
+                      {/* AI 摘要 */}
+                      <div className="rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
+                        <button
+                          onClick={handleAiSummarize}
+                          disabled={aiSummaryLoading}
+                          className="flex items-center gap-2 text-[13px] text-gray-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                        >
+                          {aiSummaryLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                          )}
+                          <span>{aiSummaryLoading ? t('ai.generating') : t('ai.summarize')}</span>
+                        </button>
+                        {aiSummaryResult && (
+                          <p className="mt-2 text-[13px] text-gray-300 leading-[1.6] border-t border-white/5 pt-2">
+                            {aiSummaryResult}
+                          </p>
+                        )}
+                        {aiSummaryError && (
+                          <p className="mt-2 text-[12px] text-red-400 border-t border-white/5 pt-2">
+                            {aiSummaryError}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* AI 翻译 */}
+                      <div className="rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
+                        <button
+                          onClick={() => {
+                            if (!aiTranslateLoading) setShowLangPicker(!showLangPicker);
+                          }}
+                          disabled={aiTranslateLoading}
+                          className="flex items-center gap-2 text-[13px] text-gray-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                        >
+                          {aiTranslateLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-green-400" />
+                          ) : (
+                            <Languages className="w-4 h-4 text-green-400" />
+                          )}
+                          <span>{aiTranslateLoading ? t('ai.generating') : t('ai.translate')}</span>
+                        </button>
+                        {showLangPicker && (
+                          <div className="mt-2 flex gap-2 border-t border-white/5 pt-2">
+                            {[
+                              { key: 'zh', label: t('ai.chinese') },
+                              { key: 'en', label: t('ai.english') },
+                              { key: 'ja', label: t('ai.japanese') },
+                            ].map((lang) => (
+                              <button
+                                key={lang.key}
+                                onClick={() => handleAiTranslate(lang.key)}
+                                className="px-2.5 py-1 text-[12px] rounded-md bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                              >
+                                {lang.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {aiTranslateResult && (
+                          <div className="mt-2 border-t border-white/5 pt-2">
+                            <p className="text-[13px] text-white font-medium">{aiTranslateResult.title}</p>
+                            <p className="mt-1 text-[13px] text-gray-300 leading-[1.6] line-clamp-6">{aiTranslateResult.content}</p>
+                          </div>
+                        )}
+                        {aiTranslateError && (
+                          <p className="mt-2 text-[12px] text-red-400 border-t border-white/5 pt-2">
+                            {aiTranslateError}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* AI 标签 */}
+                      <div className="rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
+                        <button
+                          onClick={handleAiAutoTag}
+                          disabled={aiTagLoading}
+                          className="flex items-center gap-2 text-[13px] text-gray-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                        >
+                          {aiTagLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                          ) : (
+                            <Tags className="w-4 h-4 text-purple-400" />
+                          )}
+                          <span>{aiTagLoading ? t('ai.generating') : t('ai.autoTag')}</span>
+                        </button>
+                        {aiTagResult && (
+                          <div className="mt-2 border-t border-white/5 pt-2">
+                            <p className="text-[11px] text-gray-500 mb-1.5">{t('ai.suggestedTags')}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiTagResult.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[12px] rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {aiTagError && (
+                          <p className="mt-2 text-[12px] text-red-400 border-t border-white/5 pt-2">
+                            {aiTagError}
+                          </p>
+                        )}
+                      </div>
+
+                    </div>
                   </div>
                 </div>
 
@@ -368,7 +583,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
               <div className="flex items-center justify-center h-full">
                 <div className="text-center text-gray-600">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">AI {t('detailPanel.noHighlights')}（二期功能）</p>
+                  <p className="text-sm">{t('ai.chatComingSoon')}</p>
                 </div>
               </div>
             )}

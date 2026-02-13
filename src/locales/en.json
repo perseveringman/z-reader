@@ -484,7 +484,16 @@
     "translateTo": "Translate to",
     "taskLogs": "AI Call Logs",
     "tokenUsage": "Token Usage",
-    "noLogs": "No call logs yet"
+    "noLogs": "No call logs yet",
+    "chatComingSoon": "AI Chat coming in Phase 2",
+    "configureApiKey": "Please configure AI API Key in Preferences first",
+    "chinese": "Chinese",
+    "english": "English",
+    "japanese": "Japanese",
+    "suggestedTags": "Suggested Tags",
+    "applyTag": "Apply",
+    "errorOccurred": "Request failed, please try again later",
+    "aiActions": "AI Actions"
   },
   "errors": {
     "networkError": "Network error",

@@ -484,7 +484,16 @@
     "translateTo": "翻译为",
     "taskLogs": "AI 调用记录",
     "tokenUsage": "Token 用量",
-    "noLogs": "暂无调用记录"
+    "noLogs": "暂无调用记录",
+    "chatComingSoon": "AI 对话功能将在 Phase 2 中上线",
+    "configureApiKey": "请先在偏好设置中配置 AI API Key",
+    "chinese": "中文",
+    "english": "英文",
+    "japanese": "日文",
+    "suggestedTags": "推荐标签",
+    "applyTag": "应用",
+    "errorOccurred": "调用失败，请稍后重试",
+    "aiActions": "AI 操作"
   },
   "errors": {
     "networkError": "网络错误",
