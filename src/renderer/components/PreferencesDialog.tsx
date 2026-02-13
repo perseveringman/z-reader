@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe, Brain, Eye, EyeOff, ScrollText } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe, Brain, Eye, EyeOff } from 'lucide-react';
 import { useToast } from './Toast';
-import type { AppSettings, AISettingsData, AITaskLogItem } from '../../shared/types';
+import { AIDebugPanel } from './AIDebugPanel';
+import type { AppSettings, AISettingsData } from '../../shared/types';
 import { changeLanguage, supportedLanguages } from '../../i18n';
 
 interface PreferencesDialogProps {
@@ -26,7 +27,6 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [aiDirty, setAiDirty] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [aiLogs, setAiLogs] = useState<AITaskLogItem[]>([]);
 
   const { showToast } = useToast();
 
@@ -40,14 +40,12 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       Promise.all([
         window.electronAPI.settingsGet(),
         window.electronAPI.aiSettingsGet().catch(() => null),
-        window.electronAPI.aiTaskLogs(10).catch(() => []),
       ])
-        .then(([s, ai, logs]) => {
+        .then(([s, ai]) => {
           setSettings(s);
           if (ai) {
             setAiSettings(ai);
           }
-          setAiLogs(logs);
         })
         .catch((err) => console.error('Failed to load settings:', err))
         .finally(() => setLoading(false));
@@ -448,55 +446,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               </div>
             </section>
 
-            {/* AI 调用日志 */}
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <ScrollText size={16} className="text-purple-400" />
-                <h3 className="text-sm font-medium text-white">{t('ai.taskLogs')}</h3>
-              </div>
-
-              {aiLogs.length === 0 ? (
-                <p className="text-xs text-gray-500">{t('ai.noLogs')}</p>
-              ) : (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {aiLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between px-3 py-2 bg-[#111] border border-white/5 rounded-md text-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-gray-300 font-medium truncate">
-                          {log.taskType}
-                        </span>
-                        <span
-                          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            log.status === 'done'
-                              ? 'bg-green-900/40 text-green-400'
-                              : log.status === 'failed'
-                                ? 'bg-red-900/40 text-red-400'
-                                : 'bg-yellow-900/40 text-yellow-400'
-                          }`}
-                        >
-                          {log.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 text-gray-500">
-                        <span>{log.tokenCount} tokens</span>
-                        <span>${log.costUsd.toFixed(4)}</span>
-                        <span>
-                          {new Date(log.createdAt).toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            {/* AI 调试面板 */}
+            <AIDebugPanel />
 
             <div className="pt-2">
               <button
