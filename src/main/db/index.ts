@@ -290,6 +290,32 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
   `);
 
+  // Migration: AI 模块表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS ai_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_task_logs (
+      id TEXT PRIMARY KEY,
+      task_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      input_json TEXT,
+      output_json TEXT,
+      traces_json TEXT,
+      token_count INTEGER DEFAULT 0,
+      cost_usd REAL DEFAULT 0,
+      error_text TEXT,
+      metadata_json TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_task_logs_type ON ai_task_logs(task_type);
+    CREATE INDEX IF NOT EXISTS idx_ai_task_logs_created ON ai_task_logs(created_at);
+  `);
+
 }
 
 export { schema };

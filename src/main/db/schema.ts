@@ -150,3 +150,27 @@ export const transcripts = sqliteTable('transcripts', {
   language: text('language'),
   createdAt: text('created_at').notNull(),
 });
+
+// ==================== AI 模块表 ====================
+
+/** AI 设置键值存储 */
+export const aiSettings = sqliteTable('ai_settings', {
+  key: text('key').primaryKey(),
+  valueJson: text('value_json').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+/** AI 任务执行日志 */
+export const aiTaskLogs = sqliteTable('ai_task_logs', {
+  id: text('id').primaryKey(),
+  taskType: text('task_type').notNull(),
+  status: text('status').notNull().default('pending'),
+  inputJson: text('input_json'),
+  outputJson: text('output_json'),
+  tracesJson: text('traces_json'),
+  tokenCount: integer('token_count').default(0),
+  costUsd: real('cost_usd').default(0),
+  errorText: text('error_text'),
+  metadataJson: text('metadata_json'),
+  createdAt: text('created_at').notNull(),
+});
