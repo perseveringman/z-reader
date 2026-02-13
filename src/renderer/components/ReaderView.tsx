@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter } from 'lucide-react';
+import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter, Image as ImageIcon } from 'lucide-react';
 import type { Article, Highlight, Tag } from '../../shared/types';
+import ShareCardModal from './share-card/ShareCardModal';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP, FONTS, LINE_HEIGHTS, saveReaderSettings } from './ReaderSettings';
 import { AnnotationLayer, type EditingAnnotation } from './AnnotationLayer';
@@ -72,6 +73,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [editingAnnotation, setEditingAnnotation] = useState<EditingAnnotation | null>(null);
   const [currentDetailTab, setCurrentDetailTab] = useState<'info' | 'notebook' | 'chat'>('info');
   const [highlightTagsMap, setHighlightTagsMap] = useState<Record<string, Tag[]>>({});
+  const [shareCardOpen, setShareCardOpen] = useState(false);
+  const [shareCardHighlights, setShareCardHighlights] = useState<Highlight[]>([]);
 
   useEffect(() => {
     if (forceTab) setCurrentDetailTab(forceTab.tab);
@@ -970,6 +973,22 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
                 <TagIcon className="w-3.5 h-3.5" />
               </button>
               <button
+                onClick={() => {
+                  if (toolbar.highlightId) {
+                    const hl = highlights.find(h => h.id === toolbar.highlightId);
+                    if (hl) {
+                      setShareCardHighlights([hl]);
+                      setShareCardOpen(true);
+                    }
+                    setToolbar(null);
+                  }
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+                title="生成分享卡片"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+              </button>
+              <button
                 className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
                 title="更多"
               >
@@ -992,6 +1011,16 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           readProgress={readProgress}
         />
       </div>
+
+      {article && (
+        <ShareCardModal
+          open={shareCardOpen}
+          onClose={() => setShareCardOpen(false)}
+          highlights={shareCardHighlights}
+          article={article}
+          initialCardType="single"
+        />
+      )}
     </div>
   );
 }
