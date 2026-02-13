@@ -115,6 +115,12 @@ const electronAPI: ElectronAPI = {
   agentResumePreview: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_PREVIEW, input),
   agentResumeExecute: (input) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_EXECUTE, input),
   agentResumeSpecialistsList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESUME_SPECIALISTS_LIST),
+
+  // Share Card
+  shareCardExportImage: (dataUrl: string, defaultName: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SHARE_CARD_EXPORT_IMAGE, dataUrl, defaultName),
+  shareCardCopyClipboard: (dataUrl: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SHARE_CARD_COPY_CLIPBOARD, dataUrl),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
