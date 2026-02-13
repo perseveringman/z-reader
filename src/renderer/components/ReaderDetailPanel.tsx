@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Download, Copy } from 'lucide-react';
-import type { Article, Highlight } from '../../shared/types';
+import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Download, Copy, Share2, Image as ImageIcon } from 'lucide-react';
+import type { Article, Highlight, CardType } from '../../shared/types';
+import ShareCardModal from './share-card/ShareCardModal';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -98,6 +99,17 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
   const handleExport = useCallback(async (mode: 'clipboard' | 'file') => {
     await window.electronAPI.highlightExport(articleId, mode);
   }, [articleId]);
+
+  // 分享卡片相关 state
+  const [shareCardOpen, setShareCardOpen] = useState(false);
+  const [shareCardHighlights, setShareCardHighlights] = useState<Highlight[]>([]);
+  const [shareCardInitialType, setShareCardInitialType] = useState<CardType | undefined>();
+
+  const openShareCard = useCallback((hls: Highlight[], type?: CardType) => {
+    setShareCardHighlights(hls);
+    setShareCardInitialType(type);
+    setShareCardOpen(true);
+  }, []);
 
   const metaRows: MetaRow[] = article
     ? [
@@ -215,6 +227,13 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                         >
                           <Download className="w-3 h-3" />
                         </button>
+                        <button
+                          onClick={() => openShareCard(highlights)}
+                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          title="生成分享卡片"
+                        >
+                          <ImageIcon className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                     {[...highlights].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((hl) => (
@@ -263,12 +282,21 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                             {formatRelativeTime(hl.createdAt)}
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteHighlight(hl.id)}
-                          className="absolute top-1.5 right-1.5 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all cursor-pointer text-gray-500 hover:text-red-400"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openShareCard([hl], 'single'); }}
+                            className="p-1 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-blue-400"
+                            title="生成分享卡片"
+                          >
+                            <Share2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteHighlight(hl.id); }}
+                            className="p-1 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-red-400"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -287,6 +315,17 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
           </>
         )}
       </div>
+
+      {/* 分享卡片弹窗 */}
+      {article && (
+        <ShareCardModal
+          open={shareCardOpen}
+          onClose={() => setShareCardOpen(false)}
+          highlights={shareCardHighlights}
+          article={article}
+          initialCardType={shareCardInitialType}
+        />
+      )}
     </div>
   );
 }
