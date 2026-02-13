@@ -2,6 +2,7 @@ import Parser from 'rss-parser';
 import { randomUUID } from 'node:crypto';
 import { eq, and } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
+import { parseArticleContent } from './parser-service';
 
 const parser = new Parser({
   timeout: 15000,
@@ -195,8 +196,9 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
       if (isYouTubeFeed) mediaType = 'video';
       else if (isPodcast) mediaType = 'podcast';
 
+      const articleId = randomUUID();
       await db.insert(schema.articles).values({
-        id: randomUUID(),
+        id: articleId,
         feedId,
         guid,
         url: articleUrl,
@@ -227,6 +229,32 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
         createdAt: now,
         updatedAt: now,
       });
+
+      // 正文为空或过短时，自动拉取全文（跳过 podcast/video）
+      if (mediaType === 'article' && articleUrl) {
+        const textLen = contentText.split(/\s+/).filter(Boolean).length;
+        if (!rawContent || textLen < 100) {
+          try {
+            const fullContent = await parseArticleContent(articleUrl);
+            if (fullContent?.content) {
+              const updates: Record<string, unknown> = {
+                content: fullContent.content,
+                contentText: fullContent.contentText,
+                summary: fullContent.excerpt ?? summary,
+                wordCount: fullContent.wordCount,
+                readingTime: fullContent.readingTime,
+                updatedAt: now,
+              };
+              if (fullContent.leadImageUrl) {
+                updates.thumbnail = fullContent.leadImageUrl;
+              }
+              await db.update(schema.articles).set(updates).where(eq(schema.articles.id, articleId));
+            }
+          } catch (err) {
+            console.error(`Auto-fetch full content failed for ${articleUrl}:`, err);
+          }
+        }
+      }
 
       newArticles++;
     }
