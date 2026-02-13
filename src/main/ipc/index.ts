@@ -12,6 +12,7 @@ import { registerDownloadHandlers } from './download-handlers';
 import { registerDiscoverHandlers } from './discover-handlers';
 import { registerNewsletterHandlers } from './newsletter-handlers';
 import { registerShareCardHandlers } from './share-card-handlers';
+import { registerAIHandlers } from './ai-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -28,4 +29,5 @@ export function registerAllIpcHandlers() {
   registerDiscoverHandlers();
   registerNewsletterHandlers();
   registerShareCardHandlers();
+  registerAIHandlers();
 }

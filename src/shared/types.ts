@@ -393,6 +393,56 @@ export interface ShareCardData {
   article: Pick<Article, 'id' | 'title' | 'author' | 'url' | 'domain' | 'publishedAt'>;
 }
 
+// ==================== AI 模块类型 ====================
+export interface AISettingsData {
+  provider: 'openrouter' | 'minimax';
+  apiKey: string;
+  models: {
+    fast: string;
+    smart: string;
+    cheap: string;
+  };
+}
+
+export interface AISummarizeInput {
+  articleId: string;
+  language?: string;
+}
+
+export interface AISummarizeResult {
+  summary: string;
+  tokenCount: number;
+}
+
+export interface AITranslateInput {
+  articleId: string;
+  targetLanguage: string;
+}
+
+export interface AITranslateResult {
+  translatedTitle: string;
+  translatedContent: string;
+  tokenCount: number;
+}
+
+export interface AIAutoTagInput {
+  articleId: string;
+}
+
+export interface AIAutoTagResult {
+  tags: string[];
+  tokenCount: number;
+}
+
+export interface AITaskLogItem {
+  id: string;
+  taskType: string;
+  status: string;
+  tokenCount: number;
+  costUsd: number;
+  createdAt: string;
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
@@ -499,4 +549,12 @@ export interface ElectronAPI {
   // Share Card 操作
   shareCardExportImage: (dataUrl: string, defaultName: string) => Promise<string>;
   shareCardCopyClipboard: (dataUrl: string) => Promise<void>;
+
+  // AI 操作
+  aiSettingsGet: () => Promise<AISettingsData>;
+  aiSettingsSet: (settings: Partial<AISettingsData>) => Promise<void>;
+  aiSummarize: (input: AISummarizeInput) => Promise<AISummarizeResult>;
+  aiTranslate: (input: AITranslateInput) => Promise<AITranslateResult>;
+  aiAutoTag: (input: AIAutoTagInput) => Promise<AIAutoTagResult>;
+  aiTaskLogs: (limit?: number) => Promise<AITaskLogItem[]>;
 }

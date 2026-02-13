@@ -109,6 +109,14 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.SHARE_CARD_EXPORT_IMAGE, dataUrl, defaultName),
   shareCardCopyClipboard: (dataUrl: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SHARE_CARD_COPY_CLIPBOARD, dataUrl),
+
+  // AI
+  aiSettingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.AI_SETTINGS_GET),
+  aiSettingsSet: (settings) => ipcRenderer.invoke(IPC_CHANNELS.AI_SETTINGS_SET, settings),
+  aiSummarize: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE, input),
+  aiTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_TRANSLATE, input),
+  aiAutoTag: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_AUTO_TAG, input),
+  aiTaskLogs: (limit) => ipcRenderer.invoke(IPC_CHANNELS.AI_TASK_LOGS, limit),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

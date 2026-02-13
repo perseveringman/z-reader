@@ -104,4 +104,12 @@ export const IPC_CHANNELS = {
   // Share Card
   SHARE_CARD_EXPORT_IMAGE: 'shareCard:exportImage',
   SHARE_CARD_COPY_CLIPBOARD: 'shareCard:copyClipboard',
+
+  // AI
+  AI_SETTINGS_GET: 'ai:settings:get',
+  AI_SETTINGS_SET: 'ai:settings:set',
+  AI_SUMMARIZE: 'ai:summarize',
+  AI_TRANSLATE: 'ai:translate',
+  AI_AUTO_TAG: 'ai:autoTag',
+  AI_TASK_LOGS: 'ai:taskLogs',
 } as const;
