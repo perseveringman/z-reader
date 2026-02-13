@@ -260,6 +260,7 @@ export function App() {
                   onFetchFeed={handleFetchFeed}
                   onOpenArticle={(id) => {
                     setSelectedArticleId(id);
+                    setSelectedFeedId(manageFeedSelectedId);
                     setActiveView('feeds');
                   }}
                   refreshTrigger={refreshTrigger}
