@@ -86,6 +86,10 @@ export function registerAIHandlers() {
     });
 
     const tokenCount = result.usage?.totalTokens ?? 0;
+
+    // 将摘要写回文章
+    await db.update(articles).set({ summary: result.object.summary }).where(eq(articles.id, input.articleId));
+
     aiDb.insertTaskLog({
       taskType: 'summarize',
       status: 'completed',
@@ -150,8 +154,8 @@ export function registerAIHandlers() {
     const llm = createLLMProvider(config);
 
     const { getDatabase } = await import('../db');
-    const { articles, tags } = await import('../db/schema');
-    const { eq } = await import('drizzle-orm');
+    const { articles, tags, articleTags } = await import('../db/schema');
+    const { eq, and } = await import('drizzle-orm');
     const db = getDatabase();
     const article = await db.select().from(articles).where(eq(articles.id, input.articleId)).get();
     if (!article) throw new Error('文章不存在');
@@ -171,6 +175,38 @@ export function registerAIHandlers() {
     });
 
     const tokenCount = result.usage?.totalTokens ?? 0;
+
+    // 将推荐标签关联到文章
+    const { randomUUID } = await import('node:crypto');
+    const now = new Date().toISOString();
+    const allExistingTags = await db.select().from(tags).where(eq(tags.deletedFlg, 0)).all();
+    const tagMap = new Map(allExistingTags.map(t => [t.name.toLowerCase(), t.id]));
+
+    for (const tagName of result.object.tags) {
+      let tagId = tagMap.get(tagName.toLowerCase());
+      // 标签不存在则创建
+      if (!tagId) {
+        tagId = randomUUID();
+        await db.insert(tags).values({
+          id: tagId,
+          name: tagName,
+          parentId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      // 检查关联是否已存在
+      const existing = await db.select().from(articleTags)
+        .where(and(eq(articleTags.articleId, input.articleId), eq(articleTags.tagId, tagId)));
+      if (existing.length === 0) {
+        await db.insert(articleTags).values({
+          articleId: input.articleId,
+          tagId,
+          createdAt: now,
+        });
+      }
+    }
+
     aiDb.insertTaskLog({
       taskType: 'auto_tag',
       status: 'completed',

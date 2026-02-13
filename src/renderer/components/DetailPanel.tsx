@@ -97,17 +97,21 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const highlights = useExternal ? externalHighlights : internalHighlights;
 
   useEffect(() => {
+    // 每次 articleId 变化时重置 AI 操作状态
+    setAiSummaryResult(null);
+    setAiSummaryError(null);
+    setAiSummaryLoading(false);
+    setAiTranslateResult(null);
+    setAiTranslateError(null);
+    setAiTranslateLoading(false);
+    setShowLangPicker(false);
+    setAiTagResult(null);
+    setAiTagError(null);
+    setAiTagLoading(false);
+
     if (!articleId) {
       setArticle(null);
       setInternalHighlights([]);
-      // 重置 AI 操作状态
-      setAiSummaryResult(null);
-      setAiSummaryError(null);
-      setAiTranslateResult(null);
-      setAiTranslateError(null);
-      setShowLangPicker(false);
-      setAiTagResult(null);
-      setAiTagError(null);
       return;
     }
 
@@ -265,7 +269,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       transition-[width] duration-200 overflow-hidden
       ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
     `}>
-      <div className="min-w-[360px]">
+      <div className="min-w-[360px] flex flex-col h-full">
       {/* Tab 切换 */}
       <div className="shrink-0 flex gap-1 px-4 pt-3 border-b border-white/5">
         {TABS.map((tab) => (
