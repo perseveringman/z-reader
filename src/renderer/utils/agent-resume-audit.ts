@@ -39,6 +39,15 @@ export interface ResumeAuditSummary {
   topMissingAgents: string[];
 }
 
+export type ResumeAuditAlertLevel = 'info' | 'warning' | 'critical';
+
+export interface ResumeAuditAlert {
+  id: string;
+  level: ResumeAuditAlertLevel;
+  title: string;
+  detail: string;
+}
+
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -217,8 +226,73 @@ export function summarizeResumeAuditEntries(entries: ResumeAuditEntry[]): Resume
   };
 }
 
-export function buildResumeAuditReport(entries: ResumeAuditEntry[], summary?: ResumeAuditSummary): string {
+export function detectResumeAuditAlerts(
+  entries: ResumeAuditEntry[],
+  summary: ResumeAuditSummary = summarizeResumeAuditEntries(entries),
+): ResumeAuditAlert[] {
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const alerts: ResumeAuditAlert[] = [];
+
+  if (summary.total >= 3 && summary.successRate < 0.5) {
+    alerts.push({
+      id: 'low-success-rate',
+      level: 'critical',
+      title: '恢复成功率偏低',
+      detail: `当前成功率 ${(summary.successRate * 100).toFixed(1)}%，建议优先排查失败节点与依赖。`,
+    });
+  }
+
+  if (summary.total >= 3 && summary.avgHitRate < 0.6) {
+    alerts.push({
+      id: 'low-hit-rate',
+      level: 'warning',
+      title: 'specialist 命中率偏低',
+      detail: `平均命中率 ${(summary.avgHitRate * 100).toFixed(1)}%，存在执行器配置缺口风险。`,
+    });
+  }
+
+  if (summary.topMissingAgents.length > 0) {
+    alerts.push({
+      id: 'missing-specialists',
+      level: 'warning',
+      title: '存在缺失 specialist',
+      detail: `高频缺失：${summary.topMissingAgents.join(', ')}。`,
+    });
+  }
+
+  const sideEffectFailures = entries.filter((entry) => entry.sideEffectFlag && entry.status === 'failed').length;
+  if (sideEffectFailures > 0) {
+    alerts.push({
+      id: 'side-effect-failure',
+      level: 'critical',
+      title: '副作用恢复存在失败',
+      detail: `检测到 ${sideEffectFailures} 条 delegate 失败记录，请谨慎重试并先完成预检。`,
+    });
+  }
+
+  const latest = entries[0];
+  if (latest && latest.status === 'failed') {
+    alerts.push({
+      id: 'latest-failed',
+      level: 'info',
+      title: '最近一次恢复失败',
+      detail: `最近失败模式：${latest.mode}，建议优先检查该 task 的回放明细。`,
+    });
+  }
+
+  return alerts;
+}
+
+export function buildResumeAuditReport(
+  entries: ResumeAuditEntry[],
+  summary?: ResumeAuditSummary,
+  alerts?: ResumeAuditAlert[],
+): string {
   const resolvedSummary = summary ?? summarizeResumeAuditEntries(entries);
+  const resolvedAlerts = alerts ?? detectResumeAuditAlerts(entries, resolvedSummary);
   const latest = entries[0];
 
   const lines = [
@@ -231,6 +305,15 @@ export function buildResumeAuditReport(entries: ResumeAuditEntry[], summary?: Re
     `Top Missing Agents: ${resolvedSummary.topMissingAgents.join(', ') || '(none)'}`,
     latest ? `最近一次: ${latest.mode}/${latest.status} @ ${latest.occurredAt}` : '最近一次: (none)',
   ];
+
+  if (resolvedAlerts.length > 0) {
+    lines.push('告警:');
+    for (const alert of resolvedAlerts) {
+      lines.push(`- [${alert.level}] ${alert.title}: ${alert.detail}`);
+    }
+  } else {
+    lines.push('告警: (none)');
+  }
 
   return lines.join('\n');
 }

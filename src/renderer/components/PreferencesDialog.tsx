@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import type { AgentGraphSnapshotItem, AgentResumeMode, AgentResumePreviewResult, AppSettings } from '../../shared/types';
 import {
   buildResumeAuditReport,
+  detectResumeAuditAlerts,
   extractResumeAuditEntries,
   filterResumeAuditEntries,
   normalizeTaskIdsInput,
@@ -31,6 +32,12 @@ const RISK_LEVEL_CLASS: Record<NonNullable<AgentResumePreviewResult['riskLevel']
   high: 'text-red-300',
   critical: 'text-red-300',
 };
+
+const ALERT_LEVEL_CLASS = {
+  info: 'text-sky-300',
+  warning: 'text-yellow-300',
+  critical: 'text-red-300',
+} as const;
 
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -329,6 +336,10 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     return new Set(filteredResumeAuditEntries.map((entry) => entry.taskId)).size;
   }, [filteredResumeAuditEntries]);
 
+  const resumeAuditAlerts = useMemo(() => {
+    return detectResumeAuditAlerts(filteredResumeAuditEntries, resumeAuditSummary);
+  }, [filteredResumeAuditEntries, resumeAuditSummary]);
+
   const handleCopyResumeAuditSummary = async () => {
     if (filteredResumeAuditEntries.length === 0) {
       showToast('暂无可复制的审计数据');
@@ -336,7 +347,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     }
 
     try {
-      const report = buildResumeAuditReport(filteredResumeAuditEntries, resumeAuditSummary);
+      const report = buildResumeAuditReport(filteredResumeAuditEntries, resumeAuditSummary, resumeAuditAlerts);
       await navigator.clipboard.writeText(report);
       showToast('恢复审计摘要已复制');
     } catch (err) {
@@ -785,6 +796,19 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   <div className="text-[11px] text-gray-500 break-all">
                     tasks: {resumeAuditTaskCount} · total: {resumeAuditSummary.total} · successRate: {(resumeAuditSummary.successRate * 100).toFixed(1)}% · sideEffectRate: {(resumeAuditSummary.sideEffectRate * 100).toFixed(1)}% · avgHitRate: {(resumeAuditSummary.avgHitRate * 100).toFixed(1)}% · topMissing: {resumeAuditSummary.topMissingAgents.join(', ') || '(none)'}
                   </div>
+
+                  {resumeAuditAlerts.length > 0 ? (
+                    <div className="rounded border border-white/10 bg-[#141414] p-2 space-y-1">
+                      {resumeAuditAlerts.map((alert) => (
+                        <div key={alert.id} className="text-[11px] leading-relaxed">
+                          <span className={ALERT_LEVEL_CLASS[alert.level]}>[{alert.level}] {alert.title}</span>
+                          <span className="text-gray-500 ml-1">{alert.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-emerald-300">当前未检测到异常告警。</div>
+                  )}
 
                   {resumeAuditLoading ? (
                     <div className="flex items-center gap-2 text-xs text-gray-500">
