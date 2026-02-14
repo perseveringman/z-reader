@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe, Brain, Eye, EyeOff } from 'lucide-react';
+import { X, Loader2, Save, Podcast, HardDrive, Compass, Globe, Brain, Eye, EyeOff, Mic } from 'lucide-react';
 import { useToast } from './Toast';
 import { AIDebugPanel } from './AIDebugPanel';
 import type { AppSettings, AISettingsData } from '../../shared/types';
@@ -313,6 +313,139 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                     超过限制时自动清理最早的已下载文件。默认 5120 MB (5 GB)。
                   </p>
                 </div>
+              </div>
+            </section>
+
+            {/* ASR (语音识别) Section */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Mic size={16} className="text-teal-400" />
+                <h3 className="text-sm font-medium text-white">语音识别 (ASR)</h3>
+              </div>
+
+              <div className="space-y-4">
+                {/* Provider 选择器 */}
+                <div>
+                  <label
+                    htmlFor="asr-provider"
+                    className="block text-xs font-medium text-gray-400 mb-1.5"
+                  >
+                    服务提供商
+                  </label>
+                  <select
+                    id="asr-provider"
+                    value={settings.asrProvider || 'volcengine'}
+                    onChange={(e) => updateField('asrProvider', e.target.value as 'volcengine' | 'tencent')}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  >
+                    <option value="volcengine">火山引擎</option>
+                    <option value="tencent">腾讯云</option>
+                  </select>
+                </div>
+
+                {/* 火山引擎凭据 */}
+                {(settings.asrProvider || 'volcengine') === 'volcengine' && (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="volc-asr-app-key"
+                        className="block text-xs font-medium text-gray-400 mb-1.5"
+                      >
+                        App Key
+                      </label>
+                      <input
+                        id="volc-asr-app-key"
+                        type="text"
+                        value={settings.volcAsrAppKey || ''}
+                        onChange={(e) => updateField('volcAsrAppKey', e.target.value || undefined)}
+                        placeholder="控制台获取的 APP ID"
+                        className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="volc-asr-access-key"
+                        className="block text-xs font-medium text-gray-400 mb-1.5"
+                      >
+                        Access Token
+                      </label>
+                      <input
+                        id="volc-asr-access-key"
+                        type="password"
+                        value={settings.volcAsrAccessKey || ''}
+                        onChange={(e) =>
+                          updateField('volcAsrAccessKey', e.target.value || undefined)
+                        }
+                        placeholder="控制台获取的 Access Token"
+                        className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      在{' '}
+                      <span className="text-gray-400">console.volcengine.com</span>{' '}
+                      开通豆包语音识别服务，获取 App Key 和 Access Token。
+                    </p>
+                  </>
+                )}
+
+                {/* 腾讯云凭据 */}
+                {settings.asrProvider === 'tencent' && (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="tencent-asr-app-id"
+                        className="block text-xs font-medium text-gray-400 mb-1.5"
+                      >
+                        AppID
+                      </label>
+                      <input
+                        id="tencent-asr-app-id"
+                        type="text"
+                        value={settings.tencentAsrAppId || ''}
+                        onChange={(e) => updateField('tencentAsrAppId', e.target.value || undefined)}
+                        placeholder="腾讯云账号 AppID"
+                        className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="tencent-asr-secret-id"
+                        className="block text-xs font-medium text-gray-400 mb-1.5"
+                      >
+                        SecretId
+                      </label>
+                      <input
+                        id="tencent-asr-secret-id"
+                        type="text"
+                        value={settings.tencentAsrSecretId || ''}
+                        onChange={(e) => updateField('tencentAsrSecretId', e.target.value || undefined)}
+                        placeholder="API 密钥 SecretId"
+                        className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="tencent-asr-secret-key"
+                        className="block text-xs font-medium text-gray-400 mb-1.5"
+                      >
+                        SecretKey
+                      </label>
+                      <input
+                        id="tencent-asr-secret-key"
+                        type="password"
+                        value={settings.tencentAsrSecretKey || ''}
+                        onChange={(e) => updateField('tencentAsrSecretKey', e.target.value || undefined)}
+                        placeholder="API 密钥 SecretKey"
+                        className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      在{' '}
+                      <span className="text-gray-400">console.cloud.tencent.com</span>{' '}
+                      开通语音识别服务，获取 AppID 和 API 密钥。使用极速版引擎，转写速度极快。
+                    </p>
+                  </>
+                )}
               </div>
             </section>
 

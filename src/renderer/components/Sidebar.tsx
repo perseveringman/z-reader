@@ -29,6 +29,8 @@ import {
   Podcast,
   Download,
   Compass,
+  CheckSquare,
+  Bell,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -43,6 +45,8 @@ interface SidebarProps {
   onShortcutsHelp: () => void;
   onDownloads: () => void;
   onPreferences: () => void;
+  onTasks: () => void;
+  onNotifications: () => void;
   selectedFeedId: string | null;
   onFeedSelect: (feedId: string | null) => void;
   selectedTagId?: string | null;
@@ -112,7 +116,7 @@ function SectionLabel({
   );
 }
 
-export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, onTasks, onNotifications, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const { t } = useTranslation();
   const iconSize = 18;
   const [sections, setSections] = useState({
@@ -421,6 +425,18 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           label={t('sidebar.downloads')}
           collapsed={collapsed}
           onClick={onDownloads}
+        />
+        <NavItem
+          icon={<CheckSquare size={iconSize} />}
+          label="任务"
+          collapsed={collapsed}
+          onClick={onTasks}
+        />
+        <NavItem
+          icon={<Bell size={iconSize} />}
+          label="通知"
+          collapsed={collapsed}
+          onClick={onNotifications}
         />
         <NavItem
           icon={<Settings size={iconSize} />}

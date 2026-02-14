@@ -316,6 +316,40 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_ai_task_logs_created ON ai_task_logs(created_at);
   `);
 
+  // Migration: app_tasks 通用任务表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS app_tasks (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      article_id TEXT,
+      status TEXT NOT NULL,
+      progress REAL DEFAULT 0,
+      title TEXT NOT NULL,
+      detail TEXT,
+      meta TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_tasks_status ON app_tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_app_tasks_article_id ON app_tasks(article_id);
+  `);
+
+  // Migration: notifications 通知表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      article_id TEXT,
+      read INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+    CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+  `);
+
 }
 
 export { schema };

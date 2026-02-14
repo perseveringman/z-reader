@@ -160,6 +160,32 @@ export const aiSettings = sqliteTable('ai_settings', {
   updatedAt: text('updated_at').notNull(),
 });
 
+// ==================== app_tasks 通用任务表 ====================
+export const appTasks = sqliteTable('app_tasks', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),            // 'asr-realtime' | 'asr-standard' | 'download' | ...
+  articleId: text('article_id'),
+  status: text('status').notNull(),        // 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+  progress: real('progress').default(0),
+  title: text('title').notNull(),
+  detail: text('detail'),
+  meta: text('meta'),                      // JSON
+  error: text('error'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// ==================== notifications 通知表 ====================
+export const notifications = sqliteTable('notifications', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),            // 'success' | 'error' | 'info'
+  title: text('title').notNull(),
+  body: text('body'),
+  articleId: text('article_id'),
+  read: integer('read').default(0),
+  createdAt: text('created_at').notNull(),
+});
+
 /** AI 任务执行日志 */
 export const aiTaskLogs = sqliteTable('ai_task_logs', {
   id: text('id').primaryKey(),

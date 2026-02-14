@@ -13,6 +13,9 @@ import { registerDiscoverHandlers } from './discover-handlers';
 import { registerNewsletterHandlers } from './newsletter-handlers';
 import { registerShareCardHandlers } from './share-card-handlers';
 import { registerAIHandlers } from './ai-handlers';
+import { registerAsrHandlers } from './asr-handlers';
+import { registerAppTaskHandlers } from './app-task-handlers';
+import { registerNotificationHandlers } from './notification-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -30,4 +33,7 @@ export function registerAllIpcHandlers() {
   registerNewsletterHandlers();
   registerShareCardHandlers();
   registerAIHandlers();
+  registerAsrHandlers();
+  registerAppTaskHandlers();
+  registerNotificationHandlers();
 }

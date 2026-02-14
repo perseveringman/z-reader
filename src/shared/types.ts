@@ -169,6 +169,7 @@ export interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
+  speakerId?: number;
 }
 
 export interface Transcript {
@@ -287,6 +288,8 @@ export interface NewsletterCreateResult {
 }
 
 // ==================== Settings 相关类型 ====================
+export type AsrProviderType = 'volcengine' | 'tencent';
+
 export interface AppSettings {
   podcastIndexApiKey?: string;
   podcastIndexApiSecret?: string;
@@ -294,6 +297,15 @@ export interface AppSettings {
   downloadCapacityMb?: number;
   rsshubBaseUrl?: string;
   language?: string;
+  // ASR 通用
+  asrProvider?: AsrProviderType;
+  // 火山引擎
+  volcAsrAppKey?: string;
+  volcAsrAccessKey?: string;
+  // 腾讯云
+  tencentAsrAppId?: string;
+  tencentAsrSecretId?: string;
+  tencentAsrSecretKey?: string;
 }
 
 // ==================== Discover 相关类型 ====================
@@ -500,6 +512,68 @@ export interface AIExtractTopicsResult {
   tokenCount: number;
 }
 
+// ==================== ASR (语音识别) 类型 ====================
+export interface AsrProgressEvent {
+  articleId: string;
+  chunkIndex: number;
+  totalChunks: number;
+  chunkProgress: number; // 0-1 within current chunk
+  overallProgress: number; // 0-1 overall
+}
+
+export interface AsrSegmentEvent {
+  articleId: string;
+  segments: TranscriptSegment[]; // accumulated segments so far
+}
+
+export interface AsrCompleteEvent {
+  articleId: string;
+  segments: TranscriptSegment[];
+}
+
+export interface AsrErrorEvent {
+  articleId: string;
+  error: string;
+}
+
+// ==================== App Task (通用任务系统) 类型 ====================
+export type AppTaskType = 'asr-realtime' | 'asr-standard' | 'download' | string;
+export type AppTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface AppTask {
+  id: string;
+  type: AppTaskType;
+  articleId?: string;
+  status: AppTaskStatus;
+  progress: number;
+  title: string;
+  detail?: string;
+  meta?: Record<string, unknown>;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAppTaskInput {
+  type: AppTaskType;
+  articleId?: string;
+  title: string;
+  meta?: Record<string, unknown>;
+}
+
+// ==================== Notification (通知系统) 类型 ====================
+export type NotificationType = 'success' | 'error' | 'info';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  articleId?: string;
+  read: boolean;
+  createdAt: string;
+}
+
 // ==================== IPC Channel 定义 ====================
 export interface ElectronAPI {
   // Feed 操作
@@ -630,4 +704,26 @@ export interface ElectronAPI {
 
   // AI 任务日志详情
   aiTaskLogDetail: (logId: string) => Promise<AITaskLogDetail | null>;
+
+  // ASR (语音识别)
+  asrStart: (articleId: string) => Promise<void>;
+  asrCancel: (articleId: string) => Promise<void>;
+  asrOnProgress: (callback: (event: AsrProgressEvent) => void) => () => void;
+  asrOnSegment: (callback: (event: AsrSegmentEvent) => void) => () => void;
+  asrOnComplete: (callback: (event: AsrCompleteEvent) => void) => () => void;
+  asrOnError: (callback: (event: AsrErrorEvent) => void) => () => void;
+
+  // App Task (通用任务系统)
+  appTaskCreate: (input: CreateAppTaskInput) => Promise<AppTask>;
+  appTaskCancel: (taskId: string) => Promise<void>;
+  appTaskList: () => Promise<AppTask[]>;
+  appTaskOnUpdated: (callback: (task: AppTask) => void) => () => void;
+
+  // Notification (通知系统)
+  notificationList: () => Promise<AppNotification[]>;
+  notificationRead: (id: string) => Promise<void>;
+  notificationReadAll: () => Promise<void>;
+  notificationClear: () => Promise<void>;
+  notificationOnNew: (callback: (notification: AppNotification) => void) => () => void;
+  notificationUnreadCount: () => Promise<number>;
 }

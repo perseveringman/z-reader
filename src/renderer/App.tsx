@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { ContentList } from './components/ContentList';
 import { DetailPanel } from './components/DetailPanel';
 import { ReaderView } from './components/ReaderView';
-import { ToastProvider } from './components/Toast';
+import { ToastProvider, useToast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { AddFeedDialog } from './components/AddFeedDialog';
 import { AddUrlDialog } from './components/AddUrlDialog';
@@ -21,10 +21,13 @@ import { PodcastReaderView } from './components/PodcastReaderView';
 import { DownloadManager } from './components/DownloadManager';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { DiscoverPage } from './components/discover/DiscoverPage';
+import { TaskDrawer } from './components/TaskDrawer';
+import { NotificationDrawer } from './components/NotificationDrawer';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
 import { changeLanguage } from '../i18n';
 
-export function App() {
+function AppContent() {
+  const { showToast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<string>('library-articles');
@@ -47,6 +50,8 @@ export function App() {
   const [bookReaderMode, setBookReaderMode] = useState(false);
   const [bookReaderId, setBookReaderId] = useState<string | null>(null);
   const [readerMediaType, setReaderMediaType] = useState<string>('article');
+  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
 
   // Derive source and sub-view from activeView
   const contentSource: ArticleSource | undefined =
@@ -79,6 +84,16 @@ export function App() {
     };
     loadLanguage();
   }, []);
+
+  // 全局通知监听 — 接收到新通知时显示 Toast
+  useEffect(() => {
+    const unsub = window.electronAPI.notificationOnNew((notification) => {
+      const message = notification.body || notification.title;
+      const type = notification.type === 'error' ? 'error' : 'info';
+      showToast(message, type);
+    });
+    return unsub;
+  }, [showToast]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -222,9 +237,16 @@ export function App() {
     }
   }, []);
 
+  // 从抽屉导航到文章
+  const handleNavigateToArticle = useCallback((articleId: string) => {
+    setSelectedArticleId(articleId);
+    setReaderMediaType('article');
+    setReaderArticleId(articleId);
+    setReaderMode(true);
+  }, []);
+
   return (
-    <ToastProvider>
-      <div className="flex flex-col h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
         {/* macOS title bar drag region */}
         <div className="h-[38px] shrink-0 drag-region flex items-center" />
         {!readerMode && !bookReaderMode ? (
@@ -243,6 +265,8 @@ export function App() {
               onShortcutsHelp={() => setShortcutsHelpOpen(true)}
               onDownloads={() => setDownloadManagerOpen(true)}
               onPreferences={() => setPreferencesOpen(true)}
+              onTasks={() => setTaskDrawerOpen(true)}
+              onNotifications={() => setNotificationDrawerOpen(true)}
               selectedFeedId={selectedFeedId}
               onFeedSelect={(feedId) => {
                 setSelectedFeedId(feedId);
@@ -411,7 +435,26 @@ export function App() {
             onFetch={handleFetchFeed}
           />
         )}
+
+        <TaskDrawer
+          open={taskDrawerOpen}
+          onClose={() => setTaskDrawerOpen(false)}
+          onNavigateToArticle={handleNavigateToArticle}
+        />
+
+        <NotificationDrawer
+          open={notificationDrawerOpen}
+          onClose={() => setNotificationDrawerOpen(false)}
+          onNavigateToArticle={handleNavigateToArticle}
+        />
       </div>
+  );
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
     </ToastProvider>
   );
 }

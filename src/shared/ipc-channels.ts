@@ -124,4 +124,26 @@ export const IPC_CHANNELS = {
   // AI 新增
   AI_EXTRACT_TOPICS: 'ai:extractTopics',
   AI_TASK_LOG_DETAIL: 'ai:taskLogDetail',
+
+  // ASR (语音识别)
+  ASR_START: 'asr:start',
+  ASR_CANCEL: 'asr:cancel',
+  ASR_PROGRESS: 'asr:progress',
+  ASR_SEGMENT: 'asr:segment',
+  ASR_COMPLETE: 'asr:complete',
+  ASR_ERROR: 'asr:error',
+
+  // App Task (通用任务系统)
+  APP_TASK_CREATE: 'app-task:create',
+  APP_TASK_CANCEL: 'app-task:cancel',
+  APP_TASK_LIST: 'app-task:list',
+  APP_TASK_UPDATED: 'app-task:updated',
+
+  // Notification (通知系统)
+  NOTIFICATION_LIST: 'notification:list',
+  NOTIFICATION_READ: 'notification:read',
+  NOTIFICATION_READ_ALL: 'notification:read-all',
+  NOTIFICATION_CLEAR: 'notification:clear',
+  NOTIFICATION_NEW: 'notification:new',
+  NOTIFICATION_UNREAD_COUNT: 'notification:unread-count',
 } as const;

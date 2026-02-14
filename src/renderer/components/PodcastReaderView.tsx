@@ -1,12 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, PanelRightClose, PanelRightOpen, Download, FileText, Sparkles, Mic } from 'lucide-react';
-import type { Article, Highlight, HighlightTagsMap } from '../../shared/types';
+import {
+  ArrowLeft, Loader2, PanelRightClose, PanelRightOpen,
+  FileText, Sparkles, Mic, Settings, Download, RefreshCw, XCircle, Cloud,
+} from 'lucide-react';
+import type { Article, Highlight, HighlightTagsMap, TranscriptSegment, AppSettings, AppTask } from '../../shared/types';
 import { AudioPlayer, type AudioPlayerRef } from './AudioPlayer';
+import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
 
 interface PodcastReaderViewProps {
   articleId: string;
   onClose: () => void;
+}
+
+/** 转写 tab 状态 */
+type TranscriptState =
+  | 'loading'            // 正在加载已有转写
+  | 'not-configured'     // 未配置 ASR 凭据
+  | 'not-downloaded'     // 音频未下载
+  | 'downloading'        // 音频下载中
+  | 'ready'              // 就绪，可以开始转写
+  | 'transcribing'       // 实时转写中
+  | 'background-running' // 后台转写中
+  | 'complete';          // 转写完成（或从 DB 加载的）
+
+/** 解析 anchorPath "transcript:startIdx-endIdx" 获取起始 segment */
+function parseScrollTarget(anchorPath: string | null): number | null {
+  if (!anchorPath?.startsWith('transcript:')) return null;
+  const parts = anchorPath.slice('transcript:'.length).split('-');
+  const idx = parseInt(parts[0], 10);
+  return isNaN(idx) ? null : idx;
 }
 
 export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps) {
@@ -24,11 +47,24 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [highlightTagsMap, setHighlightTagsMap] = useState<HighlightTagsMap>({});
 
+  // Transcript / ASR 状态
+  const [transcriptState, setTranscriptState] = useState<TranscriptState>('loading');
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [asrProgress, setAsrProgress] = useState({ chunkIndex: 0, totalChunks: 1, overallProgress: 0 });
+  const [asrError, setAsrError] = useState<string | null>(null);
+  const [backgroundTask, setBackgroundTask] = useState<AppTask | null>(null);
+
+  // 外部触发 TranscriptView 滚动到某个 segment
+  const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
+  const scrollTriggerRef = useRef(0);
+
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const progressSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durationRef = useRef<number>(0);
+  const segmentsLengthRef = useRef(0);
+  segmentsLengthRef.current = segments.length;
 
-  // Load article data
+  // ==================== 加载文章数据 ====================
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -43,7 +79,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
       else if (data.duration) durationRef.current = data.duration;
       setLoading(false);
 
-      // Fetch feed title for show name display
+      // Fetch feed title
       if (data.feedId) {
         try {
           const feeds = await window.electronAPI.feedList();
@@ -65,7 +101,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     return () => { cancelled = true; };
   }, [articleId]);
 
-  // Load highlights
+  // ==================== 加载高亮 ====================
   useEffect(() => {
     let cancelled = false;
     window.electronAPI.highlightList(articleId).then((list) => {
@@ -81,7 +117,190 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     return () => { cancelled = true; };
   }, [articleId]);
 
-  // Time update callback — throttled progress save every 10s
+  // ==================== 加载已有转写 + 检查 ASR 配置 ====================
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initTranscriptState() {
+      // 1. 检查是否已有转写
+      try {
+        const existing = await window.electronAPI.transcriptGet(articleId);
+        if (existing && existing.segments.length > 0 && !cancelled) {
+          setSegments(existing.segments);
+          setTranscriptState('complete');
+          return;
+        }
+      } catch { /* ignore */ }
+
+      if (cancelled) return;
+
+      // 2. 检查是否有正在运行的后台转写任务
+      try {
+        const tasks = await window.electronAPI.appTaskList();
+        const runningTask = tasks.find(
+          (t) => t.articleId === articleId && t.type === 'asr-standard' && (t.status === 'pending' || t.status === 'running'),
+        );
+        if (runningTask && !cancelled) {
+          setBackgroundTask(runningTask);
+          setTranscriptState('background-running');
+          return;
+        }
+      } catch { /* ignore */ }
+
+      if (cancelled) return;
+
+      // 3. 检查 ASR 凭据（根据当前 Provider 判断）
+      let settings: AppSettings;
+      try {
+        settings = await window.electronAPI.settingsGet();
+      } catch {
+        if (!cancelled) setTranscriptState('not-configured');
+        return;
+      }
+
+      const provider = settings.asrProvider || 'volcengine';
+      const hasCredentials =
+        provider === 'volcengine'
+          ? !!(settings.volcAsrAppKey && settings.volcAsrAccessKey)
+          : provider === 'tencent'
+            ? !!(settings.tencentAsrAppId && settings.tencentAsrSecretId && settings.tencentAsrSecretKey)
+            : false;
+
+      if (!hasCredentials) {
+        if (!cancelled) setTranscriptState('not-configured');
+        return;
+      }
+
+      // 4. 检查音频是否已下载（影响实时转写可用性）
+      try {
+        const downloads = await window.electronAPI.downloadList();
+        const dl = downloads.find((d) => d.articleId === articleId && d.status === 'ready');
+        if (dl && !cancelled) setDownloaded(true);
+      } catch { /* ignore */ }
+
+      // 进入 ready 状态 — 后台转写始终可用，实时转写需要已下载
+      if (!cancelled) setTranscriptState('ready');
+    }
+
+    initTranscriptState();
+    return () => { cancelled = true; };
+  }, [articleId]);
+
+  // ==================== ASR 事件监听 ====================
+  useEffect(() => {
+    const unsubProgress = window.electronAPI.asrOnProgress((event) => {
+      if (event.articleId !== articleId) return;
+      setAsrProgress({
+        chunkIndex: event.chunkIndex,
+        totalChunks: event.totalChunks,
+        overallProgress: event.overallProgress,
+      });
+    });
+
+    const unsubSegment = window.electronAPI.asrOnSegment((event) => {
+      if (event.articleId !== articleId) return;
+      setSegments(event.segments);
+    });
+
+    const unsubComplete = window.electronAPI.asrOnComplete((event) => {
+      if (event.articleId !== articleId) return;
+      setSegments(event.segments);
+      setTranscriptState('complete');
+    });
+
+    const unsubError = window.electronAPI.asrOnError((event) => {
+      if (event.articleId !== articleId) return;
+      setAsrError(event.error);
+      // 如果有部分结果保留，否则回到 ready
+      if (segmentsLengthRef.current > 0) {
+        setTranscriptState('complete');
+      } else {
+        setTranscriptState('ready');
+      }
+    });
+
+    return () => {
+      unsubProgress();
+      unsubSegment();
+      unsubComplete();
+      unsubError();
+    };
+  }, [articleId]);
+
+  // ==================== 后台任务状态监听 ====================
+  useEffect(() => {
+    const unsub = window.electronAPI.appTaskOnUpdated((task) => {
+      if (task.articleId !== articleId || task.type !== 'asr-standard') return;
+      setBackgroundTask(task);
+      if (task.status === 'completed') {
+        // 后台转写完成，重新加载 transcript
+        window.electronAPI.transcriptGet(articleId).then((existing) => {
+          if (existing && existing.segments.length > 0) {
+            setSegments(existing.segments);
+          }
+          setTranscriptState('complete');
+        }).catch(() => setTranscriptState('complete'));
+      } else if (task.status === 'failed' || task.status === 'cancelled') {
+        setTranscriptState('ready');
+        if (task.error) setAsrError(task.error);
+      }
+    });
+    return unsub;
+  }, [articleId]);
+
+  // ==================== ASR 操作 ====================
+
+  /** 实时转写 (WebSocket 流式) */
+  const handleStartTranscribe = useCallback(async () => {
+    setAsrError(null);
+    setSegments([]);
+    setTranscriptState('transcribing');
+    setAsrProgress({ chunkIndex: 0, totalChunks: 1, overallProgress: 0 });
+    try {
+      await window.electronAPI.asrStart(articleId);
+    } catch (err) {
+      console.error('ASR start failed:', err);
+      setAsrError(err instanceof Error ? err.message : String(err));
+      setTranscriptState('ready');
+    }
+  }, [articleId]);
+
+  /** 后台转写 (标准版 HTTP API) */
+  const handleStartBackgroundTranscribe = useCallback(async () => {
+    setAsrError(null);
+    try {
+      const task = await window.electronAPI.appTaskCreate({
+        type: 'asr-standard',
+        articleId,
+        title: `转写: ${article?.title || '播客'}`,
+      });
+      setBackgroundTask(task);
+      setTranscriptState('background-running');
+    } catch (err) {
+      console.error('Background ASR start failed:', err);
+      setAsrError(err instanceof Error ? err.message : String(err));
+    }
+  }, [articleId, article?.title]);
+
+  const handleCancelTranscribe = useCallback(async () => {
+    try {
+      await window.electronAPI.asrCancel(articleId);
+    } catch { /* ignore */ }
+    if (segments.length > 0) {
+      setTranscriptState('complete');
+    } else {
+      setTranscriptState('ready');
+    }
+  }, [articleId, segments.length]);
+
+  const handleRetranscribe = useCallback(() => {
+    if (confirm('重新转写将覆盖当前的转写结果，是否继续？')) {
+      handleStartTranscribe();
+    }
+  }, [handleStartTranscribe]);
+
+  // ==================== 播放回调 ====================
+
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
 
@@ -95,16 +314,12 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
           id: articleId,
           readProgress: progress,
         };
-        // Auto-mark seen at 90%
-        if (progress >= 0.9) {
-          updates.readStatus = 'seen';
-        }
+        if (progress >= 0.9) updates.readStatus = 'seen';
         window.electronAPI.articleUpdate(updates).catch(console.error);
       }
     }, 10000);
   }, [articleId]);
 
-  // Duration callback
   const handleDuration = useCallback((duration: number) => {
     durationRef.current = duration;
     if (article && !article.audioDuration && !article.duration) {
@@ -112,7 +327,6 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     }
   }, [article]);
 
-  // Ended callback — mark seen
   const handleEnded = useCallback(() => {
     window.electronAPI.articleUpdate({
       id: articleId,
@@ -121,17 +335,101 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     }).catch(console.error);
   }, [articleId]);
 
-  // Download episode
+  // ==================== 下载 ====================
+
   const handleDownload = useCallback(async () => {
     try {
       await window.electronAPI.downloadStart(articleId);
-      setDownloaded(true);
+      // 进入 downloading 状态轮询等待完成
+      setTranscriptState('downloading');
     } catch (err) {
       console.error('Download failed:', err);
     }
   }, [articleId]);
 
-  // Close — save final progress
+  // ==================== 下载进度轮询 ====================
+  useEffect(() => {
+    if (transcriptState !== 'downloading') return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const downloads = await window.electronAPI.downloadList();
+        const dl = downloads.find((d) => d.articleId === articleId);
+        if (cancelled) return;
+        if (dl?.status === 'ready') {
+          setDownloaded(true);
+          setTranscriptState('ready');
+        } else if (dl?.status === 'failed') {
+          setTranscriptState('not-downloaded');
+        }
+        // 'downloading' or 'queued' — keep polling
+      } catch { /* ignore */ }
+    };
+
+    // Poll immediately then every 2 seconds
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [transcriptState, articleId]);
+
+  // ==================== Transcript 交互 ====================
+
+  const handleSegmentClick = useCallback((startTime: number) => {
+    audioPlayerRef.current?.seekTo(startTime);
+  }, []);
+
+  const handleCreateHighlight = useCallback(async (data: {
+    text: string;
+    paragraphIndex: number;
+    startOffset: number;
+    endOffset: number;
+    anchorPath: string;
+  }) => {
+    const hl = await window.electronAPI.highlightCreate({
+      articleId,
+      text: data.text,
+      color: 'yellow',
+      paragraphIndex: data.paragraphIndex,
+      startOffset: data.startOffset,
+      endOffset: data.endOffset,
+      anchorPath: data.anchorPath,
+    });
+    setHighlights((prev) => [...prev, hl]);
+  }, [articleId]);
+
+  const handleDeleteHighlight = useCallback(async (id: string) => {
+    await window.electronAPI.highlightDelete(id);
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    setHighlightTagsMap((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  const handleUpdateHighlight = useCallback(async (id: string, note: string) => {
+    const updated = await window.electronAPI.highlightUpdate({ id, note });
+    setHighlights((prev) => prev.map((h) => h.id === id ? updated : h));
+  }, []);
+
+  // 点击高亮跳转到对应字幕 segment
+  const handleHighlightClick = useCallback((highlightId: string) => {
+    const hl = highlights.find((h) => h.id === highlightId);
+    if (!hl) return;
+    const segIdx = parseScrollTarget(hl.anchorPath);
+    if (segIdx != null) {
+      scrollTriggerRef.current += 1;
+      setScrollToSegment(segIdx + scrollTriggerRef.current * 0.001);
+      // 同时跳转到对应时间
+      if (segments[segIdx]) {
+        audioPlayerRef.current?.seekTo(segments[segIdx].start);
+      }
+    }
+  }, [highlights, segments]);
+
+  // ==================== 关闭 ====================
+
   const handleClose = useCallback(() => {
     const duration = durationRef.current;
     if (duration > 0 && currentTime > 0) {
@@ -154,17 +452,6 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     setDetailCollapsed((prev) => {
       const next = !prev;
       localStorage.setItem('podcast-reader-detail-collapsed', String(next));
-      return next;
-    });
-  }, []);
-
-  // Highlight delete
-  const handleDeleteHighlight = useCallback(async (id: string) => {
-    await window.electronAPI.highlightDelete(id);
-    setHighlights((prev) => prev.filter((h) => h.id !== id));
-    setHighlightTagsMap((prev) => {
-      const next = { ...prev };
-      delete next[id];
       return next;
     });
   }, []);
@@ -204,12 +491,14 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     );
   }
 
-  // Resume position: convert readProgress to seconds
+  // Resume position
   const initialTime = article.readProgress > 0 && durationRef.current > 0
     ? article.readProgress * durationRef.current
     : (article.readProgress > 0 && article.audioDuration
       ? article.readProgress * article.audioDuration
       : 0);
+
+  const scrollToSegmentInt = scrollToSegment != null ? Math.floor(scrollToSegment) : null;
 
   return (
     <div className="flex flex-col h-full bg-[#0f0f0f]">
@@ -236,7 +525,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
-        {/* Left: player + show notes */}
+        {/* Left: player + content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Audio player */}
           <div className="shrink-0 px-6 pt-4">
@@ -278,83 +567,269 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
-            {contentTab === 'about' && (
-              <>
-                {/* Episode metadata */}
-                <div className="flex items-center gap-3 mb-4">
-                  {feedTitle && (
-                    <span className="text-xs text-gray-500">{feedTitle}</span>
-                  )}
-                  {article.publishedAt && (
-                    <>
-                      {feedTitle && <span className="text-xs text-gray-600">·</span>}
-                      <span className="text-xs text-gray-500">
-                        {new Date(article.publishedAt).toLocaleDateString()}
-                      </span>
-                    </>
-                  )}
-                  {article.episodeNumber != null && (
-                    <>
-                      <span className="text-xs text-gray-600">·</span>
-                      <span className="text-xs text-gray-500">
-                        {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
-                        E{article.episodeNumber}
-                      </span>
-                    </>
-                  )}
-                  {article.audioDuration != null && (
-                    <>
-                      <span className="text-xs text-gray-600">·</span>
-                      <span className="text-xs text-gray-500">
-                        {formatDuration(article.audioDuration)}
-                      </span>
-                    </>
-                  )}
+          {contentTab === 'about' && (
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
+              {/* Episode metadata */}
+              <div className="flex items-center gap-3 mb-4">
+                {feedTitle && (
+                  <span className="text-xs text-gray-500">{feedTitle}</span>
+                )}
+                {article.publishedAt && (
+                  <>
+                    {feedTitle && <span className="text-xs text-gray-600">·</span>}
+                    <span className="text-xs text-gray-500">
+                      {new Date(article.publishedAt).toLocaleDateString()}
+                    </span>
+                  </>
+                )}
+                {article.episodeNumber != null && (
+                  <>
+                    <span className="text-xs text-gray-600">·</span>
+                    <span className="text-xs text-gray-500">
+                      {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
+                      E{article.episodeNumber}
+                    </span>
+                  </>
+                )}
+                {article.audioDuration != null && (
+                  <>
+                    <span className="text-xs text-gray-600">·</span>
+                    <span className="text-xs text-gray-500">
+                      {formatDuration(article.audioDuration)}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Summary */}
+              {article.summary && (
+                <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                  {article.summary}
+                </p>
+              )}
+
+              {/* Full content (show notes) */}
+              {article.content && (
+                <div
+                  className="prose prose-invert prose-sm max-w-none text-gray-300
+                    prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                    prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
+                  dangerouslySetInnerHTML={{ __html: article.content }}
+                />
+              )}
+
+              {/* Fallback: plaintext content */}
+              {!article.content && article.contentText && (
+                <div className="text-sm text-gray-400 whitespace-pre-wrap leading-relaxed">
+                  {article.contentText}
                 </div>
+              )}
+            </div>
+          )}
 
-                {/* Summary */}
-                {article.summary && (
-                  <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                    {article.summary}
-                  </p>
-                )}
-
-                {/* Full content (show notes) */}
-                {article.content && (
-                  <div
-                    className="prose prose-invert prose-sm max-w-none text-gray-300
-                      prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                      prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
-                    dangerouslySetInnerHTML={{ __html: article.content }}
-                  />
-                )}
-
-                {/* Fallback: plaintext content */}
-                {!article.content && article.contentText && (
-                  <div className="text-sm text-gray-400 whitespace-pre-wrap leading-relaxed">
-                    {article.contentText}
-                  </div>
-                )}
-              </>
-            )}
-
-            {contentTab === 'summary' && (
+          {contentTab === 'summary' && (
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
               <div className="flex flex-col items-center justify-center py-16 text-gray-500">
                 <Sparkles size={32} className="mb-3 opacity-40" />
                 <p className="text-sm">摘要功能即将上线</p>
                 <p className="text-xs mt-1 text-gray-600">将自动生成播客内容摘要</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {contentTab === 'transcript' && (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <Mic size={32} className="mb-3 opacity-40" />
-                <p className="text-sm">转写功能即将上线</p>
-                <p className="text-xs mt-1 text-gray-600">将自动转写播客音频为文本</p>
-              </div>
-            )}
-          </div>
+          {contentTab === 'transcript' && (
+            <div className="flex-1 min-h-0 flex flex-col">
+              {/* 转写进行中的进度条 + 控制栏 */}
+              {transcriptState === 'transcribing' && (
+                <div className="shrink-0 px-6 pt-3 pb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin text-teal-400" />
+                      <span className="text-xs text-gray-400">
+                        {asrProgress.totalChunks > 1
+                          ? `分块 ${asrProgress.chunkIndex + 1}/${asrProgress.totalChunks} · `
+                          : ''}
+                        {Math.round(asrProgress.overallProgress * 100)}% 完成
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleCancelTranscribe}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
+                    >
+                      <XCircle size={12} />
+                      取消
+                    </button>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                      style={{ width: `${asrProgress.overallProgress * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 已完成的重新转写按钮 */}
+              {transcriptState === 'complete' && (
+                <div className="shrink-0 px-6 pt-3 pb-1 flex justify-end">
+                  <button
+                    onClick={handleRetranscribe}
+                    className="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw size={11} />
+                    重新转写
+                  </button>
+                </div>
+              )}
+
+              {/* 错误提示 */}
+              {asrError && (
+                <div className="shrink-0 mx-6 mt-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-md">
+                  <p className="text-xs text-red-400">{asrError}</p>
+                </div>
+              )}
+
+              {/* 转写内容区 */}
+              {(transcriptState === 'complete' || (transcriptState === 'transcribing' && segments.length > 0)) ? (
+                <div className="flex-1 min-h-0">
+                  <TranscriptView
+                    segments={segments}
+                    currentTime={currentTime}
+                    onSegmentClick={handleSegmentClick}
+                    highlights={highlights}
+                    onCreateHighlight={handleCreateHighlight}
+                    onDeleteHighlight={handleDeleteHighlight}
+                    onUpdateHighlight={handleUpdateHighlight}
+                    highlightTagsMap={highlightTagsMap}
+                    scrollToSegment={scrollToSegmentInt}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0 flex items-center justify-center">
+                  {transcriptState === 'loading' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500">
+                      <Loader2 size={24} className="animate-spin" />
+                      <p className="text-sm">加载中...</p>
+                    </div>
+                  )}
+
+                  {transcriptState === 'not-configured' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                      <Settings size={32} className="opacity-40" />
+                      <p className="text-sm">需要配置语音识别服务</p>
+                      <p className="text-xs text-gray-600">
+                        请在设置中选择语音识别服务（火山引擎或腾讯云）并配置凭据
+                      </p>
+                    </div>
+                  )}
+
+                  {transcriptState === 'not-downloaded' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                      <Download size={32} className="opacity-40" />
+                      <p className="text-sm">请先下载音频</p>
+                      <p className="text-xs text-gray-600 mb-2">
+                        后台转写将自动下载音频并在后台完成
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleStartBackgroundTranscribe}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
+                        >
+                          <Cloud size={14} />
+                          后台转写
+                        </button>
+                        <button
+                          onClick={handleDownload}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
+                        >
+                          <Download size={14} />
+                          下载音频
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {transcriptState === 'downloading' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                      <Loader2 size={32} className="animate-spin text-teal-400" />
+                      <p className="text-sm">正在下载音频...</p>
+                      <p className="text-xs text-gray-600">
+                        下载完成后可使用实时转写
+                      </p>
+                    </div>
+                  )}
+
+                  {transcriptState === 'ready' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                      <Mic size={32} className="opacity-40" />
+                      <p className="text-sm">音频转写为文字</p>
+                      {article.audioDuration != null && (
+                        <p className="text-xs text-gray-600">
+                          音频时长 {formatDuration(article.audioDuration)}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          onClick={handleStartBackgroundTranscribe}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
+                        >
+                          <Cloud size={14} />
+                          后台转写
+                        </button>
+                        {downloaded && (
+                          <button
+                            onClick={handleStartTranscribe}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
+                          >
+                            <Mic size={14} />
+                            实时转写
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-600 mt-1">
+                        {downloaded
+                          ? '后台转写速度更快，实时转写可边转边看'
+                          : '后台转写将自动下载音频，可离开页面等待完成'}
+                      </p>
+                    </div>
+                  )}
+
+                  {transcriptState === 'background-running' && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                      <Cloud size={32} className="text-teal-400 opacity-70" />
+                      <p className="text-sm text-gray-300">后台转写进行中</p>
+                      {backgroundTask && (
+                        <>
+                          {backgroundTask.progress > 0 && (
+                            <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.round(backgroundTask.progress * 100)}%` }}
+                              />
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-500">
+                            {backgroundTask.detail || '等待处理...'}
+                          </p>
+                        </>
+                      )}
+                      <p className="text-[11px] text-gray-600 mt-1">
+                        可离开此页面，完成后将收到通知
+                      </p>
+                    </div>
+                  )}
+
+                  {transcriptState === 'transcribing' && segments.length === 0 && (
+                    <div className="flex flex-col items-center gap-3 text-gray-500">
+                      <Loader2 size={24} className="animate-spin text-teal-400" />
+                      <p className="text-sm">正在处理音频...</p>
+                      <p className="text-xs text-gray-600">转写结果将实时显示</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: detail panel */}
@@ -363,6 +838,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
           collapsed={detailCollapsed}
           externalHighlights={highlights}
           onExternalDeleteHighlight={handleDeleteHighlight}
+          onHighlightClick={handleHighlightClick}
         />
       </div>
     </div>

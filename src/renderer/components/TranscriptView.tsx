@@ -414,6 +414,9 @@ export function TranscriptView({
           const isActive = index === activeIndex;
           const isPast = index < activeIndex;
           const fragments = computeFragments(index, segment.text, transcriptHighlights);
+          const prevSpeaker = index > 0 ? segments[index - 1].speakerId : undefined;
+          const showSpeakerLabel =
+            segment.speakerId != null && segment.speakerId !== prevSpeaker;
 
           return (
             <div
@@ -423,6 +426,7 @@ export function TranscriptView({
                 flex gap-3 py-2 px-3 rounded-md cursor-pointer transition-colors duration-200
                 hover:bg-white/5
                 ${isActive ? 'bg-blue-500/10' : ''}
+                ${showSpeakerLabel ? 'mt-3' : ''}
               `}
             >
               {/* 左侧进度指示条 */}
@@ -449,7 +453,7 @@ export function TranscriptView({
                 {formatTimestamp(segment.start)}
               </span>
 
-              {/* 文本（带高亮渲染） */}
+              {/* 文本（带说话人标签 + 高亮渲染） */}
               <span
                 data-seg-idx={index}
                 className={`
@@ -465,6 +469,11 @@ export function TranscriptView({
                   handleSegmentClick(segment.start);
                 }}
               >
+                {showSpeakerLabel && (
+                  <span className="inline-block text-[11px] font-medium text-teal-400/80 bg-teal-400/10 rounded px-1.5 py-0.5 mr-2 align-middle select-none">
+                    说话人 {(segment.speakerId ?? 0) + 1}
+                  </span>
+                )}
                 {fragments.map((frag, fi) =>
                   frag.highlightId ? (
                     <mark

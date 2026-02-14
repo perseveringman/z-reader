@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI, ChatStreamChunk } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -145,6 +145,52 @@ const electronAPI: ElectronAPI = {
   // AI 任务日志详情
   aiTaskLogDetail: (logId) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_TASK_LOG_DETAIL, logId),
+
+  // ASR (语音识别)
+  asrStart: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ASR_START, articleId),
+  asrCancel: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ASR_CANCEL, articleId),
+  asrOnProgress: (callback: (event: AsrProgressEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, data: AsrProgressEvent) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ASR_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ASR_PROGRESS, handler);
+  },
+  asrOnSegment: (callback: (event: AsrSegmentEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, data: AsrSegmentEvent) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ASR_SEGMENT, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ASR_SEGMENT, handler);
+  },
+  asrOnComplete: (callback: (event: AsrCompleteEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, data: AsrCompleteEvent) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ASR_COMPLETE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ASR_COMPLETE, handler);
+  },
+  asrOnError: (callback: (event: AsrErrorEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, data: AsrErrorEvent) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ASR_ERROR, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ASR_ERROR, handler);
+  },
+
+  // App Task (通用任务系统)
+  appTaskCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.APP_TASK_CREATE, input),
+  appTaskCancel: (taskId) => ipcRenderer.invoke(IPC_CHANNELS.APP_TASK_CANCEL, taskId),
+  appTaskList: () => ipcRenderer.invoke(IPC_CHANNELS.APP_TASK_LIST),
+  appTaskOnUpdated: (callback: (task: AppTask) => void) => {
+    const handler = (_event: IpcRendererEvent, task: AppTask) => callback(task);
+    ipcRenderer.on(IPC_CHANNELS.APP_TASK_UPDATED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_TASK_UPDATED, handler);
+  },
+
+  // Notification (通知系统)
+  notificationList: () => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_LIST),
+  notificationRead: (id) => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_READ, id),
+  notificationReadAll: () => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_READ_ALL),
+  notificationClear: () => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_CLEAR),
+  notificationOnNew: (callback: (notification: AppNotification) => void) => {
+    const handler = (_event: IpcRendererEvent, notification: AppNotification) => callback(notification);
+    ipcRenderer.on(IPC_CHANNELS.NOTIFICATION_NEW, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.NOTIFICATION_NEW, handler);
+  },
+  notificationUnreadCount: () => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_UNREAD_COUNT),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
