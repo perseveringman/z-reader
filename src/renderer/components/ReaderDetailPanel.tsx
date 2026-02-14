@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Download, Copy, Share2, Image as ImageIcon } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, Trash2, Highlighter, Download, Copy, Share2, Image as ImageIcon } from 'lucide-react';
 import type { Article, Highlight, CardType } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
+import { ChatPanel } from './ChatPanel';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -56,6 +58,12 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0 }: ReaderDetailPanelProps) {
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 500,
+    minWidth: 240,
+    maxWidth: 500,
+    storageKey: 'readerDetailPanelWidth',
+  });
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(false);
@@ -124,7 +132,12 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
     : [];
 
   return (
-    <div className="w-[280px] shrink-0 flex flex-col h-full min-h-0 border-l border-[#262626] bg-[#141414]">
+    <div className="shrink-0 flex flex-col h-full min-h-0 border-l border-[#262626] bg-[#141414] relative" style={{ width: panelWidth }}>
+      {/* 拖拽手柄 */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+      />
       {/* Tab 切换 */}
       <div className="shrink-0 flex gap-2 px-4 pt-3 pb-2 border-b border-[#262626]">
         {[
@@ -152,7 +165,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'chat' ? '' : 'overflow-y-auto p-4'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             加载中…
@@ -305,11 +318,8 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
             )}
 
             {activeTab === 'chat' && (
-              <div className="flex items-center justify-center h-[300px]">
-                <div className="text-center text-gray-600">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">AI 对话（二期功能）</p>
-                </div>
+              <div className="flex-1 flex flex-col min-h-0">
+                <ChatPanel articleId={articleId} />
               </div>
             )}
           </>

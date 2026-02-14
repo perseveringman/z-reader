@@ -1000,7 +1000,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       )}
 
       {/* Right Sidebar - Info/Notebook/Chat */}
-      <div className={`shrink-0 h-full transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
+      <div className={`shrink-0 h-full overflow-hidden ${detailCollapsed ? 'w-0' : ''}`}>
         <ReaderDetailPanel
           articleId={articleId}
           highlights={highlights}

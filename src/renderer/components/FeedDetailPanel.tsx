@@ -14,6 +14,7 @@ import {
   FileText,
 } from 'lucide-react';
 import type { Feed, FeedArticleCount, Article } from '../../shared/types';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 interface FeedDetailPanelProps {
   feedId: string | null;
@@ -38,6 +39,12 @@ export function FeedDetailPanel({
   const [articleCount, setArticleCount] = useState<FeedArticleCount | null>(null);
   const [recentArticles, setRecentArticles] = useState<Article[]>([]);
   const [fetching, setFetching] = useState(false);
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 600,
+    minWidth: 280,
+    maxWidth: 600,
+    storageKey: 'feedDetailPanelWidth',
+  });
 
   const loadFeedData = useCallback(async () => {
     if (!feedId) return;
@@ -95,12 +102,21 @@ export function FeedDetailPanel({
 
   if (!feedId) {
     return (
-      <div className={`
-        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-        transition-[width] duration-200 overflow-hidden
-        ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-      `}>
-        <div className="min-w-[360px] flex items-center justify-center h-full text-gray-600 text-[13px]">
+      <div
+        className={`
+          flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+          overflow-hidden relative
+          ${collapsed ? 'w-0 border-l-0' : ''}
+        `}
+        style={collapsed ? undefined : { width: panelWidth }}
+      >
+        {!collapsed && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+          />
+        )}
+        <div className="flex items-center justify-center h-full text-gray-600 text-[13px]" style={{ minWidth: panelWidth }}>
           选择一个订阅源查看详情
         </div>
       </div>
@@ -109,12 +125,21 @@ export function FeedDetailPanel({
 
   if (!feed) {
     return (
-      <div className={`
-        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-        transition-[width] duration-200 overflow-hidden
-        ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-      `}>
-        <div className="min-w-[360px] flex items-center justify-center h-full text-gray-500 text-[13px]">
+      <div
+        className={`
+          flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+          overflow-hidden relative
+          ${collapsed ? 'w-0 border-l-0' : ''}
+        `}
+        style={collapsed ? undefined : { width: panelWidth }}
+      >
+        {!collapsed && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+          />
+        )}
+        <div className="flex items-center justify-center h-full text-gray-500 text-[13px]" style={{ minWidth: panelWidth }}>
           Loading...
         </div>
       </div>
@@ -122,12 +147,21 @@ export function FeedDetailPanel({
   }
 
   return (
-    <div className={`
-      flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-      transition-[width] duration-200 overflow-hidden
-      ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-    `}>
-      <div className="min-w-[360px] flex flex-col h-full overflow-y-auto">
+    <div
+      className={`
+        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+        overflow-hidden relative
+        ${collapsed ? 'w-0 border-l-0' : ''}
+      `}
+      style={collapsed ? undefined : { width: panelWidth }}
+    >
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+        />
+      )}
+      <div className="flex flex-col h-full overflow-y-auto" style={{ minWidth: panelWidth }}>
       {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-[#1e1e1e]">
         <div className="flex items-start gap-3">

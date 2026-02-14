@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Clock, User, Building2, Globe, FileText, MessageSquare, Trash2, Highlighter } from 'lucide-react';
 import type { Book, Highlight } from '../../shared/types';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 export type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -48,6 +49,13 @@ export function BookReaderDetailPanel({
   onDeleteHighlight,
   onHighlightClick,
 }: BookReaderDetailPanelProps) {
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 500,
+    minWidth: 240,
+    maxWidth: 500,
+    storageKey: 'bookReaderDetailPanelWidth',
+  });
+
   const [uncontrolledActiveTab, setUncontrolledActiveTab] = useState<DetailTab>('info');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
@@ -89,7 +97,12 @@ export function BookReaderDetailPanel({
   const sortedHighlights = [...highlights].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
-    <div className="w-[280px] shrink-0 flex flex-col h-full min-h-0 border-l border-[#262626] bg-[#141414]">
+    <div className="shrink-0 flex flex-col h-full min-h-0 border-l border-[#262626] bg-[#141414] relative" style={{ width: panelWidth }}>
+      {/* 拖拽手柄 */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+      />
       <div className="shrink-0 flex gap-2 px-4 pt-3 pb-2 border-b border-[#262626]">
         {[
           { key: 'info' as DetailTab, label: 'Info' },

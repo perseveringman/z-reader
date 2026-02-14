@@ -252,7 +252,7 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
       </div>
 
       {/* Right Sidebar - Detail */}
-      <div className={`shrink-0 h-full transition-all duration-200 overflow-hidden ${detailCollapsed ? 'w-0' : 'w-[280px]'}`}>
+      <div className={`shrink-0 h-full overflow-hidden ${detailCollapsed ? 'w-0' : ''}`}>
         <BookReaderDetailPanel
           book={book}
           readProgress={readProgress}

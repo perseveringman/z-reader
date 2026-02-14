@@ -472,6 +472,19 @@
     "toolCalling": "正在执行: {{name}}",
     "empty": "开始和 AI 聊天吧",
     "sessionList": "对话历史",
+    "analysisHint": "或直接输入你的问题",
+    "analysis": {
+      "valueClarification": "价值澄清",
+      "valueClarificationDesc": "识别核心价值观与潜在冲突",
+      "sixThinkingHats": "六顶思考帽",
+      "sixThinkingHatsDesc": "从六个角度全面分析",
+      "firstPrinciples": "第一性原理",
+      "firstPrinciplesDesc": "回归基本事实重新推导",
+      "socraticMethod": "苏格拉底提问",
+      "socraticMethodDesc": "层层追问挑战假设与逻辑",
+      "feynmanTechnique": "费曼教学法",
+      "feynmanTechniqueDesc": "用最简单的语言重新解释"
+    },
     "error": "发生错误，请重试"
   },
   "ai": {

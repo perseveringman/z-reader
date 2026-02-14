@@ -227,6 +227,11 @@
   transition: border-color 0.15s ease;
 }
 
+.article-content li[data-focused="true"] {
+  margin-left: -1.5rem;
+  padding-left: calc(1.5rem - 3px);
+}
+
 .article-content figure {
   margin: 1rem 0;
 }

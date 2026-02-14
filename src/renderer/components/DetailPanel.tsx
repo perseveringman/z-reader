@@ -4,6 +4,7 @@ import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highligh
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
 import { ChatPanel } from './ChatPanel';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 type DetailTab = 'info' | 'notebook' | 'chat';
 
@@ -67,6 +68,12 @@ function formatDuration(seconds: number | null): string | null {
 
 export function DetailPanel({ articleId, collapsed, externalHighlights, onExternalDeleteHighlight, onHighlightClick }: DetailPanelProps) {
   const { t } = useTranslation();
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 600,
+    minWidth: 280,
+    maxWidth: 600,
+    storageKey: 'detailPanelWidth',
+  });
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const TABS: { key: DetailTab; label: string }[] = [
     { key: 'info', label: t('feedDetail.info') },
@@ -294,12 +301,22 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   };
 
   return (
-    <div className={`
-      flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-      transition-[width] duration-200 overflow-hidden
-      ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-    `}>
-      <div className="min-w-[360px] flex flex-col h-full">
+    <div
+      className={`
+        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+        overflow-hidden relative
+        ${collapsed ? 'w-0 border-l-0' : ''}
+      `}
+      style={collapsed ? undefined : { width: panelWidth }}
+    >
+      {/* 拖拽手柄 */}
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+        />
+      )}
+      <div className="flex flex-col h-full" style={{ minWidth: panelWidth }}>
       {/* Tab 切换 */}
       <div className="shrink-0 flex gap-1 px-4 pt-3 border-b border-white/5">
         {TABS.map((tab) => (
@@ -323,7 +340,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+      <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'chat' ? '' : 'overflow-y-auto p-4'}`}>
         {!articleId ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             {t('detailPanel.noSelection')}
@@ -650,7 +667,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
             )}
 
             {activeTab === 'chat' && (
-              <div className="flex-1 -m-4 flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col min-h-0">
                 <ChatPanel articleId={articleId} />
               </div>
             )}

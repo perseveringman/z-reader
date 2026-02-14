@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Archive, Clock, Trash2, User, Building2, Globe } from 'lucide-react';
 import type { Book, BookReadStatus } from '../../shared/types';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 interface BookDetailPanelProps {
   bookId: string | null;
@@ -12,6 +13,12 @@ interface BookDetailPanelProps {
 export function BookDetailPanel({ bookId, collapsed, onOpenReader, onRefresh }: BookDetailPanelProps) {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(false);
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 600,
+    minWidth: 280,
+    maxWidth: 600,
+    storageKey: 'bookDetailPanelWidth',
+  });
 
   useEffect(() => {
     if (!bookId) {
@@ -81,12 +88,21 @@ export function BookDetailPanel({ bookId, collapsed, onOpenReader, onRefresh }: 
     : [];
 
   return (
-    <div className={`
-      flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-      transition-[width] duration-200 overflow-hidden
-      ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-    `}>
-      <div className="min-w-[360px] flex flex-col h-full">
+    <div
+      className={`
+        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+        overflow-hidden relative
+        ${collapsed ? 'w-0 border-l-0' : ''}
+      `}
+      style={collapsed ? undefined : { width: panelWidth }}
+    >
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+        />
+      )}
+      <div className="flex flex-col h-full" style={{ minWidth: panelWidth }}>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col">
           {!bookId ? (
             <div className="flex items-center justify-center h-full text-sm text-gray-500">

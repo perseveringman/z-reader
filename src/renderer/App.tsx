@@ -55,10 +55,8 @@ export function App() {
     : undefined;
 
   const initialTab =
-    activeView.startsWith('library-') ? 'inbox'
-    : activeView === 'feed-unseen' ? 'unseen'
+    activeView === 'feed-unseen' ? 'unseen'
     : activeView === 'feed-seen' ? 'seen'
-    : activeView === 'feeds' ? 'unseen'
     : undefined;
 
   const contentMediaType: MediaType | undefined =

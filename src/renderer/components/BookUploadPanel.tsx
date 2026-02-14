@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { BookOpen, Upload } from 'lucide-react';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 
 interface BookUploadPanelProps {
   onImported: () => void;
@@ -37,13 +38,29 @@ export function BookUploadPanel({ onImported, collapsed }: BookUploadPanelProps)
     handleImport();
   }, [handleImport]);
 
+  const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
+    defaultWidth: 600,
+    minWidth: 280,
+    maxWidth: 600,
+    storageKey: 'bookUploadPanelWidth',
+  });
+
   return (
-    <div className={`
-      flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
-      transition-[width] duration-200 overflow-hidden
-      ${collapsed ? 'w-0 border-l-0' : 'w-[360px]'}
-    `}>
-      <div className="min-w-[360px] flex flex-col h-full">
+    <div
+      className={`
+        flex flex-col bg-[#0f0f0f] border-l border-[#262626] shrink-0
+        overflow-hidden relative
+        ${collapsed ? 'w-0 border-l-0' : ''}
+      `}
+      style={collapsed ? undefined : { width: panelWidth }}
+    >
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
+        />
+      )}
+      <div className="flex flex-col h-full" style={{ minWidth: panelWidth }}>
         <div className="shrink-0 px-4 pt-3 pb-2 border-b border-white/5">
           <h3 className="text-[13px] font-semibold text-white">Upload Books</h3>
         </div>

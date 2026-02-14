@@ -27,13 +27,20 @@ const EMPTY_MESSAGES: Record<TabKey, string> = {
 };
 
 export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTrigger, expanded: _expanded }: BookListProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('inbox');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    return (localStorage.getItem('z-reader-tab-book') as TabKey) || 'inbox';
+  });
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const { showToast } = useToast();
   const undoStack = useUndoStack();
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 持久化 tab 选择
+  useEffect(() => {
+    localStorage.setItem('z-reader-tab-book', activeTab);
+  }, [activeTab]);
 
   const fetchBooks = useCallback(async () => {
     setLoading(true);

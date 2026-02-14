@@ -472,6 +472,19 @@
     "toolCalling": "Executing: {{name}}",
     "empty": "Start chatting with AI",
     "sessionList": "Chat History",
+    "analysisHint": "or ask your own question",
+    "analysis": {
+      "valueClarification": "Value Clarification",
+      "valueClarificationDesc": "Identify core values and conflicts",
+      "sixThinkingHats": "Six Thinking Hats",
+      "sixThinkingHatsDesc": "Analyze from six perspectives",
+      "firstPrinciples": "First Principles",
+      "firstPrinciplesDesc": "Derive from fundamental truths",
+      "socraticMethod": "Socratic Method",
+      "socraticMethodDesc": "Challenge assumptions with questions",
+      "feynmanTechnique": "Feynman Technique",
+      "feynmanTechniqueDesc": "Explain in simplest terms"
+    },
     "error": "An error occurred, please try again"
   },
   "ai": {

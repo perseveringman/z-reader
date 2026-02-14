@@ -35,7 +35,11 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
 
 export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType }: ContentListProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab as TabKey || 'inbox');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    if (initialTab) return initialTab as TabKey;
+    const storageKey = source === 'feed' ? 'z-reader-tab-feed' : 'z-reader-tab-library';
+    return (localStorage.getItem(storageKey) as TabKey) || 'inbox';
+  });
   const [sortBy, setSortBy] = useState<SortBy>('saved_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -69,12 +73,24 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     : libraryTabs; // fallback
   const showTabs = !isShortlisted && !isTrash && !tagId && (isFeedView || isLibraryView);
 
-  // Sync activeTab when initialTab changes (sidebar navigation)
+  // Sync activeTab when initialTab or source changes
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab as TabKey);
+      return;
     }
-  }, [initialTab]);
+    // source 切换时从 localStorage 恢复
+    const storageKey = isFeedView ? 'z-reader-tab-feed' : 'z-reader-tab-library';
+    const saved = localStorage.getItem(storageKey) as TabKey | null;
+    const fallback = isFeedView ? 'unseen' : 'inbox';
+    setActiveTab(saved || fallback);
+  }, [initialTab, isFeedView]);
+
+  // 持久化 tab 选择
+  useEffect(() => {
+    const storageKey = isFeedView ? 'z-reader-tab-feed' : 'z-reader-tab-library';
+    localStorage.setItem(storageKey, activeTab);
+  }, [activeTab, isFeedView]);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
