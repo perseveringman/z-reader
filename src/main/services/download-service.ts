@@ -12,7 +12,7 @@ import type { DownloadRecord } from '../../shared/types';
 const activeDownloads = new Map<string, AbortController>();
 
 /** Get the configured download directory, falling back to userData/podcasts. */
-function getDownloadDir(): string {
+export function getDownloadDir(): string {
   const settings = loadSettings();
   const dir = settings.downloadDirectory || path.join(app.getPath('userData'), 'podcasts');
   mkdirSync(dir, { recursive: true });

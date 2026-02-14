@@ -15,6 +15,13 @@ export interface AsrProvider {
   /** 显示名称 */
   readonly name: string;
 
+  /**
+   * 是否支持直接接收原始音频文件（mp3/m4a/aac 等），无需经过 audio-pipeline 转码。
+   * 为 true 时，asr-handlers 会直接调用 transcribeFile 传入原始文件路径，跳过 processAudio。
+   * 默认 false（需要 pipeline 转为 16kHz PCM WAV）。
+   */
+  readonly supportsRawAudio?: boolean;
+
   /** 检查凭据是否已配置 */
   isConfigured(settings: AppSettings): boolean;
 

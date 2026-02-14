@@ -73,6 +73,8 @@ const electronAPI: ElectronAPI = {
   // Transcript
   transcriptGet: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_GET, articleId),
   transcriptFetch: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_FETCH, articleId),
+  transcriptUpdateSpeaker: (articleId, speakerId, name) =>
+    ipcRenderer.invoke(IPC_CHANNELS.TRANSCRIPT_UPDATE_SPEAKER, articleId, speakerId, name),
 
   // YouTube 视频流
   youtubeGetStreamUrl: (videoId) => ipcRenderer.invoke(IPC_CHANNELS.YOUTUBE_GET_STREAM_URL, videoId),
@@ -91,6 +93,7 @@ const electronAPI: ElectronAPI = {
   downloadCancel: (downloadId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_CANCEL, downloadId),
   downloadList: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_LIST),
   downloadStatus: (downloadId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_STATUS, downloadId),
+  downloadOpenDir: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_OPEN_DIR),
 
   // Settings
   settingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),

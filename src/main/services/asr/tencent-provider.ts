@@ -2,27 +2,65 @@
  * 腾讯云语音转写极速版 Provider
  *
  * 同步 HTTP POST — 发送音频二进制数据，直接返回转写结果。
- * 支持 m4a/mp3/wav 等格式，无需 ffmpeg 转码。
+ * 为保证兼容性，上传前会用 ffmpeg 将非 mp3/wav/pcm 的音频转为 mp3。
  * 最大 100MB / 2 小时。
  *
  * 文档: https://cloud.tencent.com/document/product/1093/52097
  */
 
 import { createHmac } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { TranscriptSegment, AppSettings } from '../../../shared/types';
 import type { AsrProvider, AsrJobCallbacks, AsrStreamCallbacks } from './asr-provider';
 
+const execFileAsync = promisify(execFile);
+
 const HOST = 'asr.cloud.tencent.com';
+
+// ffmpeg-static 提供的 ffmpeg 二进制路径
+let ffmpegPath: string;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  ffmpegPath = require('ffmpeg-static') as string;
+} catch {
+  ffmpegPath = 'ffmpeg';
+}
 
 /** 从文件扩展名推断音频格式 */
 function guessVoiceFormat(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase().replace('.', '');
   const supported = ['wav', 'pcm', 'ogg-opus', 'speex', 'silk', 'mp3', 'm4a', 'aac', 'amr'];
+  // 常见别名映射
   if (ext === 'ogg' || ext === 'opus') return 'ogg-opus';
+  if (ext === 'mp4' || ext === 'mp4a') return 'm4a';
+  if (ext === 'mpeg' || ext === 'mpga') return 'mp3';
+  if (ext === 'weba') return 'ogg-opus';
   if (supported.includes(ext)) return ext;
   return 'mp3'; // 默认
+}
+
+/** 可以直接上传、无需转码的安全格式 */
+const SAFE_FORMATS = new Set(['mp3', 'wav', 'pcm']);
+
+/**
+ * 将音频转为 mp3 以确保腾讯云兼容性。
+ * 返回转换后的临时文件路径，调用方负责清理。
+ */
+async function convertToMp3(inputPath: string): Promise<string> {
+  const tmpPath = `/tmp/z-reader-tencent-asr-${Date.now()}.mp3`;
+  await execFileAsync(ffmpegPath, [
+    '-i', inputPath,
+    '-ac', '1',          // 单声道
+    '-ar', '16000',      // 16kHz 匹配 16k_zh 引擎
+    '-b:a', '64k',       // 64kbps 压缩，减小体积
+    '-f', 'mp3',
+    '-y',
+    tmpPath,
+  ], { timeout: 600000 }); // 10 分钟超时
+  return tmpPath;
 }
 
 /**
@@ -113,6 +151,7 @@ interface TencentFlashResponse {
 export class TencentFlashProvider implements AsrProvider {
   readonly id = 'tencent';
   readonly name = '腾讯云';
+  readonly supportsRawAudio = true;
 
   isConfigured(settings: AppSettings): boolean {
     return !!(settings.tencentAsrAppId && settings.tencentAsrSecretId && settings.tencentAsrSecretKey);
@@ -130,68 +169,88 @@ export class TencentFlashProvider implements AsrProvider {
 
     if (abortSignal?.aborted) return [];
 
-    // 1. 读取音频文件
-    callbacks.onProgress(0.05);
-    const audioData = await fs.promises.readFile(filePath);
+    // 1. 准备音频文件（非 mp3/wav/pcm 统一转为 mp3 以确保兼容性）
+    callbacks.onProgress(0.02);
+    const originalFormat = guessVoiceFormat(filePath);
+    let audioFilePath = filePath;
+    let tmpConvertedPath: string | null = null;
+    let voiceFormat = originalFormat;
 
-    if (abortSignal?.aborted) return [];
-
-    // 检查文件大小 (最大 100MB)
-    if (audioData.length > 100 * 1024 * 1024) {
-      throw new Error('音频文件超过 100MB，超出腾讯云极速版限制');
+    if (!SAFE_FORMATS.has(originalFormat)) {
+      console.log(`[TencentASR] 转码 ${originalFormat} -> mp3: ${filePath}`);
+      tmpConvertedPath = await convertToMp3(filePath);
+      audioFilePath = tmpConvertedPath;
+      voiceFormat = 'mp3';
     }
 
-    // 2. 构建请求
-    const voiceFormat = guessVoiceFormat(filePath);
-    const engineType = '16k_zh'; // 标准中文（16k_zh_large 为大模型版，需单独计费）
-    const timestamp = Math.floor(Date.now() / 1000);
+    try {
+      callbacks.onProgress(0.05);
+      const audioData = await fs.promises.readFile(audioFilePath);
 
-    const queryParams = buildQueryParams(
-      settings.tencentAsrSecretId,
-      engineType,
-      voiceFormat,
-      timestamp,
-    );
+      if (abortSignal?.aborted) return [];
 
-    const signature = generateSignature(
-      settings.tencentAsrAppId,
-      settings.tencentAsrSecretKey,
-      queryParams,
-    );
+      // 检查文件大小 (最大 100MB)
+      if (audioData.length > 100 * 1024 * 1024) {
+        throw new Error('音频文件超过 100MB，超出腾讯云极速版限制');
+      }
 
-    const url = buildRequestUrl(settings.tencentAsrAppId, queryParams);
+      // 2. 构建请求
+      console.log(`[TencentASR] file=${audioFilePath}, voice_format=${voiceFormat}, size=${audioData.length}`);
+      const engineType = '16k_zh';
+      const timestamp = Math.floor(Date.now() / 1000);
 
-    callbacks.onProgress(0.1);
+      const queryParams = buildQueryParams(
+        settings.tencentAsrSecretId,
+        engineType,
+        voiceFormat,
+        timestamp,
+      );
 
-    // 3. 发送请求
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Host': HOST,
-        'Authorization': signature,
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': String(audioData.length),
-      },
-      body: audioData,
-    });
+      const signature = generateSignature(
+        settings.tencentAsrAppId,
+        settings.tencentAsrSecretKey,
+        queryParams,
+      );
 
-    callbacks.onProgress(0.8);
+      const url = buildRequestUrl(settings.tencentAsrAppId, queryParams);
 
-    if (!response.ok) {
-      throw new Error(`腾讯云 ASR HTTP 错误: ${response.status} ${response.statusText}`);
+      callbacks.onProgress(0.1);
+
+      // 3. 发送请求
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Host': HOST,
+          'Authorization': signature,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': String(audioData.length),
+        },
+        body: audioData,
+      });
+
+      callbacks.onProgress(0.8);
+
+      if (!response.ok) {
+        throw new Error(`腾讯云 ASR HTTP 错误: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json() as TencentFlashResponse;
+
+      if (result.code !== 0) {
+        throw new Error(`腾讯云 ASR 错误 [${result.code}]: ${result.message}`);
+      }
+
+      // 4. 解析结果
+      const segments = this.parseResponse(result);
+      callbacks.onProgress(1);
+
+      return segments;
+    } finally {
+      // 清理临时转码文件
+      if (tmpConvertedPath) {
+        fs.promises.unlink(tmpConvertedPath).catch(() => {});
+      }
     }
-
-    const result = await response.json() as TencentFlashResponse;
-
-    if (result.code !== 0) {
-      throw new Error(`腾讯云 ASR 错误 [${result.code}]: ${result.message}`);
-    }
-
-    // 4. 解析结果
-    const segments = this.parseResponse(result);
-    callbacks.onProgress(1);
-
-    return segments;
   }
 
   async transcribeStream(

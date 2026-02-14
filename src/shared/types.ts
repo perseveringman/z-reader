@@ -176,6 +176,8 @@ export interface Transcript {
   id: string;
   articleId: string;
   segments: TranscriptSegment[];
+  /** 说话人 ID 到自定义名称的映射，如 {"0":"张三","1":"李四"} */
+  speakerMap?: Record<string, string>;
   language: string | null;
   createdAt: string;
 }
@@ -645,6 +647,7 @@ export interface ElectronAPI {
   // Transcript 操作
   transcriptGet: (articleId: string) => Promise<Transcript | null>;
   transcriptFetch: (articleId: string) => Promise<Transcript | null>;
+  transcriptUpdateSpeaker: (articleId: string, speakerId: number, name: string) => Promise<void>;
 
   // YouTube 视频流
   youtubeGetStreamUrl: (videoId: string) => Promise<VideoStreamData | null>;
@@ -663,6 +666,7 @@ export interface ElectronAPI {
   downloadCancel: (downloadId: string) => Promise<void>;
   downloadList: () => Promise<DownloadRecord[]>;
   downloadStatus: (downloadId: string) => Promise<DownloadRecord | null>;
+  downloadOpenDir: () => Promise<void>;
 
   // Settings 操作
   settingsGet: () => Promise<AppSettings>;

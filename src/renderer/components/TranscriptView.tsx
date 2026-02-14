@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Loader2, Highlighter, X, MessageSquareText, Tag as TagIcon } from 'lucide-react';
+import { Loader2, Highlighter, X, MessageSquareText, Tag as TagIcon, Pencil } from 'lucide-react';
 import type { TranscriptSegment, Highlight, Tag } from '../../shared/types';
 
 // ==================== 工具栏类型 ====================
@@ -119,6 +119,10 @@ interface TranscriptViewProps {
   highlightTagsMap?: Record<string, Tag[]>;
   /** 外部触发滚动到某个 segment（由 highlightId 触发） */
   scrollToSegment?: number | null;
+  /** 说话人 ID 到自定义名称的映射 */
+  speakerMap?: Record<string, string>;
+  /** 修改说话人名称的回调 */
+  onSpeakerRename?: (speakerId: number, name: string) => void;
 }
 
 function formatTimestamp(seconds: number): string {
@@ -141,6 +145,8 @@ export function TranscriptView({
   onUpdateHighlight,
   highlightTagsMap = {},
   scrollToSegment,
+  speakerMap = {},
+  onSpeakerRename,
 }: TranscriptViewProps) {
   const [syncMode, setSyncMode] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -156,6 +162,8 @@ export function TranscriptView({
   const [editingNote, setEditingNote] = useState<{ highlightId: string; text: string } | null>(null);
   // 标签选择器
   const [editingTagHighlightId, setEditingTagHighlightId] = useState<string | null>(null);
+  // 说话人名称编辑状态
+  const [editingSpeaker, setEditingSpeaker] = useState<{ speakerId: number; name: string } | null>(null);
 
   // 只保留字幕高亮（transcript: 前缀）
   const transcriptHighlights = useMemo(
@@ -374,7 +382,7 @@ export function TranscriptView({
       const target = e.target as HTMLElement;
       if (target.closest('mark[data-highlight-id]')) return;
       // 如果点击的是笔记编辑器或标签选择器，不关闭
-      if (target.closest('.transcript-note-editor, .transcript-tag-picker')) return;
+      if (target.closest('.transcript-note-editor, .transcript-tag-picker, .transcript-speaker-editor')) return;
 
       setToolbar(null);
       setEditingNote(null);
@@ -470,8 +478,20 @@ export function TranscriptView({
                 }}
               >
                 {showSpeakerLabel && (
-                  <span className="inline-block text-[11px] font-medium text-teal-400/80 bg-teal-400/10 rounded px-1.5 py-0.5 mr-2 align-middle select-none">
-                    说话人 {(segment.speakerId ?? 0) + 1}
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-400/80 bg-teal-400/10 rounded px-1.5 py-0.5 mr-2 align-middle select-none cursor-pointer hover:bg-teal-400/20 transition-colors group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const sid = segment.speakerId ?? 0;
+                      setEditingSpeaker({
+                        speakerId: sid,
+                        name: speakerMap[String(sid)] || '',
+                      });
+                    }}
+                    title="点击修改说话人名称"
+                  >
+                    {speakerMap[String(segment.speakerId ?? 0)] || `说话人 ${(segment.speakerId ?? 0) + 1}`}
+                    <Pencil size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
                   </span>
                 )}
                 {fragments.map((frag, fi) =>
@@ -647,6 +667,64 @@ export function TranscriptView({
             currentTags={highlightTagsMap[editingTagHighlightId] || []}
             onClose={() => setEditingTagHighlightId(null)}
           />
+        </div>
+      )}
+
+      {/* 说话人名称编辑浮层 */}
+      {editingSpeaker && (
+        <div className="transcript-speaker-editor absolute z-[9999] bg-[#2a2a2a] rounded-lg shadow-xl border border-white/10 p-3 w-[260px]"
+          style={{
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-400">
+              修改说话人 {editingSpeaker.speakerId + 1} 的名称
+            </span>
+            <button
+              onClick={() => setEditingSpeaker(null)}
+              className="p-0.5 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          <input
+            autoFocus
+            type="text"
+            value={editingSpeaker.name}
+            onChange={(e) => setEditingSpeaker({ ...editingSpeaker, name: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onSpeakerRename?.(editingSpeaker.speakerId, editingSpeaker.name);
+                setEditingSpeaker(null);
+              }
+              if (e.key === 'Escape') {
+                setEditingSpeaker(null);
+              }
+            }}
+            className="w-full text-[13px] text-gray-300 bg-white/5 border border-white/10 rounded px-2 py-1.5 outline-none focus:border-teal-500/50"
+            placeholder={`说话人 ${editingSpeaker.speakerId + 1}`}
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={() => setEditingSpeaker(null)}
+              className="px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              onClick={() => {
+                onSpeakerRename?.(editingSpeaker.speakerId, editingSpeaker.name);
+                setEditingSpeaker(null);
+              }}
+              className="px-2 py-1 text-xs text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+            >
+              保存
+            </button>
+          </div>
         </div>
       )}
 

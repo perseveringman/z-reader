@@ -103,7 +103,7 @@ async function runTranscription(articleId: string, abortSignal: { aborted: boole
 
   if (abortSignal.aborted) return;
 
-  // 3. 音频处理管道（格式转换 + 分块）
+  // 3. 转写音频
   broadcast(IPC_CHANNELS.ASR_PROGRESS, {
     articleId,
     chunkIndex: 0,
@@ -112,66 +112,90 @@ async function runTranscription(articleId: string, abortSignal: { aborted: boole
     overallProgress: 0,
   });
 
-  const pipeline = await processAudio(download.filePath);
-
-  // 保存临时目录引用，供取消时清理
-  const task = activeTasks.get(articleId);
-  if (task) task.tempDir = pipeline.tempDir;
-
-  if (abortSignal.aborted) {
-    await cleanupTempDir(pipeline.tempDir);
-    return;
-  }
-
-  const { chunks } = pipeline;
   let allSegments: TranscriptSegment[] = [];
 
-  // 4. 逐块发送到 ASR Provider
-  for (let i = 0; i < chunks.length; i++) {
-    if (abortSignal.aborted) break;
-
-    const chunk = chunks[i];
-    const audioBuffer = await fs.promises.readFile(chunk.filePath);
-
-    const chunkSegments = await provider.transcribeStream(
-      audioBuffer,
+  if (provider.supportsRawAudio) {
+    // ---- 直接使用原始文件（腾讯云等原生支持多格式的 Provider） ----
+    allSegments = await provider.transcribeFile(
+      download.filePath,
       settings,
       {
-        onProgress: (chunkProgress) => {
-          const overallProgress = (i + chunkProgress) / chunks.length;
+        onProgress: (progress) => {
           broadcast(IPC_CHANNELS.ASR_PROGRESS, {
             articleId,
-            chunkIndex: i,
-            totalChunks: chunks.length,
-            chunkProgress,
-            overallProgress,
+            chunkIndex: 0,
+            totalChunks: 1,
+            chunkProgress: progress,
+            overallProgress: progress,
           });
         },
-        onSegments: (segments) => {
-          // 发送实时 segment 更新
-          broadcast(IPC_CHANNELS.ASR_SEGMENT, {
-            articleId,
-            segments: [...allSegments, ...segments],
-          });
-        },
-        onComplete: () => { /* 由外层处理 */ },
         onError: (error) => {
-          console.error(`[ASR] Chunk ${i} 错误:`, error);
+          console.error('[ASR] 转写错误:', error);
         },
       },
-      chunk.startTime,
       abortSignal,
     );
+  } else {
+    // ---- 需要 pipeline 转码 + 分块（火山引擎等需要 16kHz PCM WAV 的 Provider） ----
+    const pipeline = await processAudio(download.filePath);
 
-    allSegments = [...allSegments, ...chunkSegments];
+    // 保存临时目录引用，供取消时清理
+    const task = activeTasks.get(articleId);
+    if (task) task.tempDir = pipeline.tempDir;
+
+    if (abortSignal.aborted) {
+      await cleanupTempDir(pipeline.tempDir);
+      return;
+    }
+
+    const { chunks } = pipeline;
+
+    for (let i = 0; i < chunks.length; i++) {
+      if (abortSignal.aborted) break;
+
+      const chunk = chunks[i];
+      const audioBuffer = await fs.promises.readFile(chunk.filePath);
+
+      const chunkSegments = await provider.transcribeStream(
+        audioBuffer,
+        settings,
+        {
+          onProgress: (chunkProgress) => {
+            const overallProgress = (i + chunkProgress) / chunks.length;
+            broadcast(IPC_CHANNELS.ASR_PROGRESS, {
+              articleId,
+              chunkIndex: i,
+              totalChunks: chunks.length,
+              chunkProgress,
+              overallProgress,
+            });
+          },
+          onSegments: (segments) => {
+            // 发送实时 segment 更新
+            broadcast(IPC_CHANNELS.ASR_SEGMENT, {
+              articleId,
+              segments: [...allSegments, ...segments],
+            });
+          },
+          onComplete: () => { /* 由外层处理 */ },
+          onError: (error) => {
+            console.error(`[ASR] Chunk ${i} 错误:`, error);
+          },
+        },
+        chunk.startTime,
+        abortSignal,
+      );
+
+      allSegments = [...allSegments, ...chunkSegments];
+    }
+
+    // 清理临时文件
+    await cleanupTempDir(pipeline.tempDir);
   }
-
-  // 5. 清理临时文件
-  await cleanupTempDir(pipeline.tempDir);
 
   if (abortSignal.aborted) return;
 
-  // 6. 保存转写结果到数据库
+  // 4. 保存转写结果到数据库
   if (allSegments.length > 0) {
     // 先删除已有的转写记录（支持重新转写）
     await db.delete(schema.transcripts)
@@ -188,7 +212,7 @@ async function runTranscription(articleId: string, abortSignal: { aborted: boole
     });
   }
 
-  // 7. 发送完成事件
+  // 5. 发送完成事件
   broadcast(IPC_CHANNELS.ASR_COMPLETE, {
     articleId,
     segments: allSegments,

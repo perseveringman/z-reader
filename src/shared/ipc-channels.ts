@@ -68,6 +68,7 @@ export const IPC_CHANNELS = {
   // Transcript
   TRANSCRIPT_GET: 'transcript:get',
   TRANSCRIPT_FETCH: 'transcript:fetch',
+  TRANSCRIPT_UPDATE_SPEAKER: 'transcript:updateSpeaker',
 
   // YouTube 视频流
   YOUTUBE_GET_STREAM_URL: 'youtube:getStreamUrl',
@@ -89,6 +90,7 @@ export const IPC_CHANNELS = {
   DOWNLOAD_CANCEL: 'download:cancel',
   DOWNLOAD_LIST: 'download:list',
   DOWNLOAD_STATUS: 'download:status',
+  DOWNLOAD_OPEN_DIR: 'download:openDir',
 
   // Discover
   DISCOVER_SEARCH: 'discover:search',

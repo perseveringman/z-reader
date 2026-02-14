@@ -50,6 +50,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   // Transcript / ASR 状态
   const [transcriptState, setTranscriptState] = useState<TranscriptState>('loading');
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [speakerMap, setSpeakerMap] = useState<Record<string, string>>({});
   const [asrProgress, setAsrProgress] = useState({ chunkIndex: 0, totalChunks: 1, overallProgress: 0 });
   const [asrError, setAsrError] = useState<string | null>(null);
   const [backgroundTask, setBackgroundTask] = useState<AppTask | null>(null);
@@ -127,6 +128,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
         const existing = await window.electronAPI.transcriptGet(articleId);
         if (existing && existing.segments.length > 0 && !cancelled) {
           setSegments(existing.segments);
+          if (existing.speakerMap) setSpeakerMap(existing.speakerMap);
           setTranscriptState('complete');
           return;
         }
@@ -702,6 +704,19 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
                     onUpdateHighlight={handleUpdateHighlight}
                     highlightTagsMap={highlightTagsMap}
                     scrollToSegment={scrollToSegmentInt}
+                    speakerMap={speakerMap}
+                    onSpeakerRename={async (speakerId, name) => {
+                      await window.electronAPI.transcriptUpdateSpeaker(articleId, speakerId, name);
+                      setSpeakerMap((prev) => {
+                        const next = { ...prev };
+                        if (name.trim()) {
+                          next[String(speakerId)] = name.trim();
+                        } else {
+                          delete next[String(speakerId)];
+                        }
+                        return next;
+                      });
+                    }}
                   />
                 </div>
               ) : (

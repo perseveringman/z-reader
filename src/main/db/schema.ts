@@ -146,7 +146,8 @@ export const downloads = sqliteTable('downloads', {
 export const transcripts = sqliteTable('transcripts', {
   id: text('id').primaryKey(),
   articleId: text('article_id').references(() => articles.id),
-  segments: text('segments'), // JSON: [{start, end, text}]
+  segments: text('segments'), // JSON: [{start, end, text, speakerId?}]
+  speakerMap: text('speaker_map'), // JSON: {"0":"张三","1":"李四"} — 说话人 ID 到自定义名称的映射
   language: text('language'),
   createdAt: text('created_at').notNull(),
 });

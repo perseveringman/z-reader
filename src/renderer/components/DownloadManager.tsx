@@ -9,6 +9,7 @@ import {
   Trash2,
   RefreshCw,
   HardDrive,
+  FolderOpen,
 } from 'lucide-react';
 import type { DownloadRecord } from '../../shared/types';
 
@@ -147,6 +148,13 @@ export function DownloadManager({ open, onClose }: DownloadManagerProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.electronAPI.downloadOpenDir()}
+              className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              title="在 Finder 中打开下载目录"
+            >
+              <FolderOpen size={16} />
+            </button>
             <button
               onClick={loadDownloads}
               className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"

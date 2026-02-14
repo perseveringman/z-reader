@@ -255,6 +255,11 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_transcripts_article_id ON transcripts(article_id);
   `);
 
+  // Migration: transcripts 表新增 speaker_map 字段
+  try {
+    sqlite.exec(`ALTER TABLE transcripts ADD COLUMN speaker_map TEXT`);
+  } catch { /* Column already exists */ }
+
   // Migration: articles 表新增 Podcast 相关字段
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_url TEXT`);

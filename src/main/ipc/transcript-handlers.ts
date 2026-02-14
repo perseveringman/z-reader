@@ -16,6 +16,7 @@ export function registerTranscriptHandlers() {
     return {
       ...row,
       segments: JSON.parse(row.segments || '[]'),
+      speakerMap: row.speakerMap ? JSON.parse(row.speakerMap) : undefined,
     };
   });
 
@@ -27,7 +28,11 @@ export function registerTranscriptHandlers() {
     const [existing] = await db.select().from(schema.transcripts)
       .where(eq(schema.transcripts.articleId, articleId));
     if (existing) {
-      return { ...existing, segments: JSON.parse(existing.segments || '[]') };
+      return {
+        ...existing,
+        segments: JSON.parse(existing.segments || '[]'),
+        speakerMap: existing.speakerMap ? JSON.parse(existing.speakerMap) : undefined,
+      };
     }
 
     // 获取 article 的 videoId
@@ -55,6 +60,25 @@ export function registerTranscriptHandlers() {
       language: result.language,
       createdAt: now,
     };
+  });
+
+  // 更新说话人名称映射
+  ipcMain.handle(IPC_CHANNELS.TRANSCRIPT_UPDATE_SPEAKER, async (_event, articleId: string, speakerId: number, name: string) => {
+    const db = getDatabase();
+    const [row] = await db.select().from(schema.transcripts)
+      .where(eq(schema.transcripts.articleId, articleId));
+    if (!row) return;
+
+    const speakerMap: Record<string, string> = row.speakerMap ? JSON.parse(row.speakerMap) : {};
+    if (name.trim()) {
+      speakerMap[String(speakerId)] = name.trim();
+    } else {
+      delete speakerMap[String(speakerId)];
+    }
+
+    await db.update(schema.transcripts)
+      .set({ speakerMap: JSON.stringify(speakerMap) })
+      .where(eq(schema.transcripts.articleId, articleId));
   });
 
   // 获取 YouTube 视频流直链 URL
