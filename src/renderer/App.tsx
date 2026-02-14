@@ -238,9 +238,9 @@ function AppContent() {
   }, []);
 
   // 从抽屉导航到文章
-  const handleNavigateToArticle = useCallback((articleId: string) => {
+  const handleNavigateToArticle = useCallback((articleId: string, mediaType?: string) => {
     setSelectedArticleId(articleId);
-    setReaderMediaType('article');
+    setReaderMediaType((mediaType as 'article' | 'video' | 'podcast') || 'article');
     setReaderArticleId(articleId);
     setReaderMode(true);
   }, []);

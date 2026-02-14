@@ -104,21 +104,73 @@ export function registerAIHandlers() {
 
     // 获取文章内容
     const { getDatabase } = await import('../db');
-    const { articles } = await import('../db/schema');
+    const { articles, transcripts } = await import('../db/schema');
     const { eq } = await import('drizzle-orm');
     const db = getDatabase();
     const article = await db.select().from(articles).where(eq(articles.id, input.articleId)).get();
     if (!article) throw new Error('文章不存在');
 
-    const contentText = article.contentText || article.content || article.summary || '';
-    const lang = input.language || 'zh-CN';
+    // 检查是否有播客转写内容
+    const transcript = await db.select().from(transcripts)
+      .where(eq(transcripts.articleId, input.articleId)).get();
+
+    let prompt: string;
+    let schemaDesc: string;
+
+    if (transcript && transcript.segments) {
+      // 播客模式：基于转写全文生成摘要
+      const segments = JSON.parse(transcript.segments) as Array<{ text: string; speakerId?: number }>;
+      const speakerMap: Record<string, string> = transcript.speakerMap
+        ? JSON.parse(transcript.speakerMap) : {};
+
+      // 拼接转写文本，带说话人标签
+      let lastSpeaker = '';
+      const lines: string[] = [];
+      for (const seg of segments) {
+        const speakerKey = seg.speakerId != null ? String(seg.speakerId) : '';
+        const speakerName = speakerKey
+          ? (speakerMap[speakerKey] || `说话人${seg.speakerId! + 1}`)
+          : '';
+        if (speakerName && speakerName !== lastSpeaker) {
+          lines.push(`\n[${speakerName}]: ${seg.text}`);
+          lastSpeaker = speakerName;
+        } else {
+          lines.push(seg.text);
+        }
+      }
+      const transcriptText = lines.join('').slice(0, 20000);
+
+      prompt = `你是一位专业的播客内容编辑。请根据以下播客转写全文，撰写一份结构化的内容摘要，目标是让读者不用收听原节目就能完整了解本期内容。
+
+要求：
+1. 先用 1-2 句话概括本期主题
+2. 按讨论顺序梳理核心话题和关键观点（每个话题 2-3 句），标注是谁提出的
+3. 如有具体数据、案例或金句，请保留
+4. 最后总结嘉宾的主要共识或分歧
+
+篇幅：400-800 字
+语言：中文
+
+标题：${article.title}
+
+--- 转写内容 ---
+${transcriptText}`;
+
+      schemaDesc = '播客内容摘要，400-800字';
+    } else {
+      // 文章模式：原有逻辑
+      const contentText = article.contentText || article.content || article.summary || '';
+      const lang = input.language || 'zh-CN';
+      prompt = `请用${lang === 'zh-CN' ? '中文' : lang}为以下文章写一段 200-400 字的摘要：\n\n标题：${article.title}\n\n${contentText.slice(0, 8000)}`;
+      schemaDesc = '文章摘要，200-400字';
+    }
 
     const result = await generateObject({
       model: llm.getModel('smart'),
       schema: z.object({
-        summary: z.string().describe('文章摘要，200-400字'),
+        summary: z.string().describe(schemaDesc),
       }),
-      prompt: `请用${lang === 'zh-CN' ? '中文' : lang}为以下文章写一段 200-400 字的摘要：\n\n标题：${article.title}\n\n${contentText.slice(0, 8000)}`,
+      prompt,
     });
 
     const tokenCount = result.usage?.totalTokens ?? 0;

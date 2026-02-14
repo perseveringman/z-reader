@@ -103,11 +103,16 @@ export function NotificationDrawer({ open, onClose, onNavigateToArticle }: Notif
     }
   };
 
-  const handleClick = (notification: AppNotification) => {
+  const handleClick = async (notification: AppNotification) => {
     if (!notification.read) handleMarkRead(notification.id);
     if (notification.articleId && onNavigateToArticle) {
-      onNavigateToArticle(notification.articleId, 'podcast');
+      let mediaType = 'article';
+      try {
+        const article = await window.electronAPI.articleGet(notification.articleId);
+        if (article?.mediaType) mediaType = article.mediaType;
+      } catch { /* fallback to article */ }
       onClose();
+      requestAnimationFrame(() => onNavigateToArticle(notification.articleId!, mediaType));
     }
   };
 

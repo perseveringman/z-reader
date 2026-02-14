@@ -52,6 +52,20 @@ export function TaskDrawer({ open, onClose, onNavigateToArticle }: TaskDrawerPro
   const [tasks, setTasks] = useState<AppTask[]>([]);
   const [filter, setFilter] = useState<FilterTab>('all');
 
+  const handleNavigate = async (task: AppTask) => {
+    if (!task.articleId || !onNavigateToArticle) return;
+    try {
+      const article = await window.electronAPI.articleGet(task.articleId);
+      const mediaType = article?.mediaType || 'article';
+      onClose();
+      // 延迟一帧让抽屉关闭动画生效后再导航
+      requestAnimationFrame(() => onNavigateToArticle(task.articleId!, mediaType));
+    } catch {
+      onClose();
+      requestAnimationFrame(() => onNavigateToArticle(task.articleId!, 'article'));
+    }
+  };
+
   const loadTasks = useCallback(async () => {
     try {
       const list = await window.electronAPI.appTaskList();
@@ -189,7 +203,13 @@ export function TaskDrawer({ open, onClose, onNavigateToArticle }: TaskDrawerPro
                 const status = statusConfig[task.status] || statusConfig.pending;
                 const typeIcon = taskTypeIcons[task.type] || <ListTodo size={14} />;
                 return (
-                  <div key={task.id} className="px-4 py-3 hover:bg-white/[0.03] transition-colors">
+                  <div
+                    key={task.id}
+                    className={`px-4 py-3 hover:bg-white/[0.03] transition-colors ${
+                      task.articleId && onNavigateToArticle ? 'cursor-pointer' : ''
+                    }`}
+                    onClick={() => handleNavigate(task)}
+                  >
                     <div className="flex items-start gap-3">
                       {/* Type icon */}
                       <span className="shrink-0 mt-0.5 text-gray-500">{typeIcon}</span>
@@ -248,9 +268,12 @@ export function TaskDrawer({ open, onClose, onNavigateToArticle }: TaskDrawerPro
                             <RefreshCw size={14} />
                           </button>
                         )}
-                        {task.status === 'completed' && task.articleId && onNavigateToArticle && (
+                        {task.articleId && onNavigateToArticle && (
                           <button
-                            onClick={() => onNavigateToArticle(task.articleId!, 'podcast')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNavigate(task);
+                            }}
                             className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-teal-400 transition-colors cursor-pointer"
                             title="查看"
                           >

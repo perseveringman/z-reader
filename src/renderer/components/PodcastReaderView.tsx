@@ -55,6 +55,9 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const [asrError, setAsrError] = useState<string | null>(null);
   const [backgroundTask, setBackgroundTask] = useState<AppTask | null>(null);
 
+  // AI 摘要
+  const [summarizing, setSummarizing] = useState(false);
+
   // 外部触发 TranscriptView 滚动到某个 segment
   const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
   const scrollTriggerRef = useRef(0);
@@ -430,6 +433,21 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     }
   }, [highlights, segments]);
 
+  // ==================== AI 摘要 ====================
+
+  const handleGenerateSummary = useCallback(async () => {
+    if (summarizing) return;
+    setSummarizing(true);
+    try {
+      const result = await window.electronAPI.aiSummarize({ articleId });
+      setArticle((prev) => prev ? { ...prev, summary: result.summary } : prev);
+    } catch (err) {
+      console.error('[PodcastReader] AI 摘要生成失败:', err);
+    } finally {
+      setSummarizing(false);
+    }
+  }, [articleId, summarizing]);
+
   // ==================== 关闭 ====================
 
   const handleClose = useCallback(() => {
@@ -631,11 +649,46 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
 
           {contentTab === 'summary' && (
             <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
-              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <Sparkles size={32} className="mb-3 opacity-40" />
-                <p className="text-sm">摘要功能即将上线</p>
-                <p className="text-xs mt-1 text-gray-600">将自动生成播客内容摘要</p>
-              </div>
+              {summarizing ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                  <Loader2 size={32} className="mb-3 animate-spin text-teal-400" />
+                  <p className="text-sm">正在生成摘要...</p>
+                  <p className="text-xs mt-1 text-gray-600">基于转写全文分析中</p>
+                </div>
+              ) : article.summary ? (
+                <div>
+                  <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    {article.summary}
+                  </div>
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={handleGenerateSummary}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-white/5 hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={12} />
+                      重新生成
+                    </button>
+                  </div>
+                </div>
+              ) : segments.length > 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                  <Sparkles size={32} className="mb-3 opacity-40" />
+                  <p className="text-sm mb-4">已有转写内容，可生成 AI 摘要</p>
+                  <button
+                    onClick={handleGenerateSummary}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Sparkles size={14} />
+                    基于转写内容生成摘要
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                  <Mic size={32} className="mb-3 opacity-40" />
+                  <p className="text-sm">请先完成转写后再生成摘要</p>
+                  <p className="text-xs mt-1 text-gray-600">切换到"转写"标签开始转写</p>
+                </div>
+              )}
             </div>
           )}
 

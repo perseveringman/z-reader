@@ -22,9 +22,6 @@ import {
   Keyboard,
   BookOpen,
   FileText,
-  Mail,
-  FileType,
-  Twitter,
   Video,
   Podcast,
   Download,
@@ -230,27 +227,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               active={activeView === 'books'}
               collapsed={collapsed}
               onClick={() => onViewChange('books')}
-            />
-            <NavItem
-              icon={<Mail size={iconSize} />}
-              label={t('sidebar.emails')}
-              active={activeView === 'library-emails'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('library-emails')}
-            />
-            <NavItem
-              icon={<FileType size={iconSize} />}
-              label={t('sidebar.pdfs')}
-              active={activeView === 'library-pdfs'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('library-pdfs')}
-            />
-            <NavItem
-              icon={<Twitter size={iconSize} />}
-              label={t('sidebar.tweets')}
-              active={activeView === 'library-tweets'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('library-tweets')}
             />
             <NavItem
               icon={<Video size={iconSize} />}

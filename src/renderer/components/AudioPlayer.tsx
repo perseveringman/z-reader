@@ -273,10 +273,10 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
         {/* Controls row */}
         <div className="flex items-center justify-between">
           {/* Left: speed + download */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 w-28 shrink-0">
             <button
               onClick={cyclePlaybackRate}
-              className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded transition-colors cursor-pointer min-w-[40px]"
+              className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded transition-colors cursor-pointer min-w-[40px] text-center"
               title="播放速度"
             >
               {playbackRate}x
