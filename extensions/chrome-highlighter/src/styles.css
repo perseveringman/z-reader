@@ -6,6 +6,7 @@
 @import './styles/highlight-menu.css';
 @import './styles/shortcuts.css';
 @import './styles/stats-panel.css';
+@import './styles/settings-panel.css';
 
 /* 高亮文本 */
 .zr-highlight {

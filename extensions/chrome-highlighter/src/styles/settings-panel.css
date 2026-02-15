@@ -1,0 +1,392 @@
+/**
+ * 设置面板样式
+ */
+
+/* 背景遮罩 */
+.zr-settings-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999998;
+  animation: zr-fade-in 0.2s ease;
+}
+
+/* 设置面板 */
+.zr-settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: 700px;
+  max-width: 90vw;
+  max-height: 85vh;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.zr-settings-panel-show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* 头部 */
+.zr-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.zr-settings-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.zr-settings-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.zr-settings-close:hover {
+  color: #111827;
+}
+
+/* 内容区域 */
+.zr-settings-content {
+  flex: 1;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+/* 设置区块 */
+.zr-settings-section {
+  margin-bottom: 32px;
+}
+
+.zr-settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.zr-settings-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+/* 设置组 */
+.zr-settings-group {
+  margin-bottom: 20px;
+}
+
+.zr-settings-group:last-child {
+  margin-bottom: 0;
+}
+
+.zr-settings-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+/* 滑块控件 */
+.zr-settings-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.zr-settings-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.zr-settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  transition: all 0.2s;
+}
+
+.zr-settings-slider::-webkit-slider-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+.zr-settings-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  transition: all 0.2s;
+}
+
+.zr-settings-slider::-moz-range-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+.zr-settings-slider-value {
+  min-width: 45px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+/* 下拉选择 */
+.zr-settings-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zr-settings-select:hover {
+  border-color: #9ca3af;
+}
+
+.zr-settings-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 复选框 */
+.zr-settings-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zr-settings-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zr-settings-checkbox:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.zr-settings-checkbox-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 颜色选择器网格 */
+.zr-settings-color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.zr-settings-color-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.zr-settings-color-item input[type="color"] {
+  width: 60px;
+  height: 60px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zr-settings-color-item input[type="color"]:hover {
+  border-color: #3b82f6;
+  transform: scale(1.05);
+}
+
+.zr-settings-color-item span {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* 预览区域 */
+.zr-settings-preview {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.zr-settings-preview-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.zr-settings-preview-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #111827;
+}
+
+.zr-settings-preview-content .preview-highlight {
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+
+.zr-settings-preview-content .preview-yellow {
+  background-color: #fef3c7;
+}
+
+.zr-settings-preview-content .preview-blue {
+  background-color: #dbeafe;
+}
+
+.zr-settings-preview-content .preview-green {
+  background-color: #d1fae5;
+}
+
+.zr-settings-preview-content .preview-red {
+  background-color: #fee2e2;
+}
+
+/* 底部按钮区域 */
+.zr-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.zr-settings-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.zr-settings-btn-secondary {
+  background: white;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.zr-settings-btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.zr-settings-btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.zr-settings-btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* 禁用动画 */
+.zr-no-animations * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* 滚动条样式 */
+.zr-settings-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.zr-settings-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.zr-settings-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.zr-settings-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .zr-settings-panel {
+    width: 95vw;
+    max-height: 90vh;
+  }
+
+  .zr-settings-header {
+    padding: 20px;
+  }
+
+  .zr-settings-content {
+    padding: 20px;
+  }
+
+  .zr-settings-footer {
+    padding: 16px 20px;
+  }
+
+  .zr-settings-color-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

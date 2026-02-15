@@ -6,11 +6,15 @@ import { showHighlightMenu } from './highlight-menu';
 import { toast } from './toast';
 import { initShortcuts, registerShortcut, showShortcutsHelp } from './shortcuts';
 import { initStatsPanel, updateHighlightList, toggleStatsPanel } from './stats-panel';
+import { initSettings, showSettingsPanel, getPreferences } from './settings-panel';
 import type { HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
 
 async function init() {
+  // 初始化设置系统（必须首先初始化）
+  initSettings();
+  
   // 初始化快捷键系统
   initShortcuts();
   registerAllShortcuts();
@@ -333,6 +337,15 @@ function registerAllShortcuts(): void {
     action: toggleStatsPanel,
   });
 
+  // 打开设置面板
+  registerShortcut({
+    key: ',',
+    alt: true,
+    description: '打开设置面板',
+    category: '面板操作',
+    action: showSettingsPanel,
+  });
+
   // 显示帮助快捷键
   registerShortcut({
     key: '?',
@@ -342,7 +355,7 @@ function registerAllShortcuts(): void {
     action: showShortcutsHelp,
   });
 
-  console.log('[Z-Reader] 已注册 8 个快捷键');
+  console.log('[Z-Reader] 已注册 9 个快捷键');
 }
 
 init();
