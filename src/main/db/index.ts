@@ -355,6 +355,10 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
   `);
 
+
+  // Migration: sync 同步表
+  const { initSyncTables } = require('../services/sync/sync-tables');
+  initSyncTables(sqlite);
 }
 
 export { schema };
