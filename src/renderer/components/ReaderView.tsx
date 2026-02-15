@@ -674,7 +674,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       if (e.key === 'o' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         if (article?.url) {
-          window.open(article.url, '_blank');
+          void window.electronAPI.externalOpenUrl(article.url);
         }
         return;
       }

@@ -9,6 +9,7 @@ import {
   Compass,
   Globe,
   Brain,
+  BookOpen,
   Eye,
   EyeOff,
   Mic,
@@ -50,6 +51,7 @@ const PRIMARY_SECTION_ICONS: Record<PrimaryPreferenceSectionId, LucideIcon> = {
 
 const SECONDARY_SECTION_LABELS: Record<SecondaryPreferenceSectionId, string> = {
   language: '语言',
+  reading: '阅读',
   podcast: '播客设置',
   rsshub: 'RSSHub',
   download: '下载',
@@ -217,6 +219,41 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
           </select>
           <p className="text-[11px] text-gray-600 mt-1">
             更改语言后，部分界面将立即更新。
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderReadingSection = () => (
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <BookOpen size={16} className="text-green-400" />
+        <h3 className="text-sm font-medium text-white">阅读</h3>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label
+            htmlFor="reading-threshold"
+            className="block text-xs font-medium text-gray-400 mb-1.5"
+          >
+            短阅读 / 长阅读分界时长（分钟）
+          </label>
+          <input
+            id="reading-threshold"
+            type="number"
+            min={1}
+            max={120}
+            value={settings.readingThreshold ?? 10}
+            onChange={(e) => {
+              const val = parseInt(e.target.value, 10);
+              if (!isNaN(val) && val > 0) updateField('readingThreshold', val);
+            }}
+            className="w-32 px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+          <p className="text-[11px] text-gray-600 mt-1">
+            阅读时长 ≤ 该值为短阅读，&gt; 该值为长阅读。默认 10 分钟。
           </p>
         </div>
       </div>
@@ -587,6 +624,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
 
   const renderActiveSection = () => {
     if (activeSecondary === 'language') return renderLanguageSection();
+    if (activeSecondary === 'reading') return renderReadingSection();
     if (activeSecondary === 'podcast') return renderPodcastSection();
     if (activeSecondary === 'rsshub') return renderRsshubSection();
     if (activeSecondary === 'download') return renderDownloadSection();

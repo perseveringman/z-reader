@@ -35,6 +35,8 @@
     "archive": "Archive",
     "unseen": "Unseen",
     "seen": "Seen",
+    "shortRead": "Short",
+    "longRead": "Long",
     "all": "All",
     "noArticles": "No articles",
     "loading": "Loading...",

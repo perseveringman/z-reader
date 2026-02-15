@@ -25,6 +25,7 @@ import { TaskDrawer } from './components/TaskDrawer';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import type { Feed, ArticleSource, MediaType } from '../shared/types';
 import { changeLanguage } from '../i18n';
+import { findAnchorExternalUrl } from './utils/external-links';
 
 function AppContent() {
   const { showToast } = useToast();
@@ -157,6 +158,21 @@ function AppContent() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [readerMode]);
+
+  useEffect(() => {
+    const handleDocumentLinkClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0) return;
+
+      const externalUrl = findAnchorExternalUrl(e.target, window.location.href);
+      if (!externalUrl) return;
+
+      e.preventDefault();
+      void window.electronAPI.externalOpenUrl(externalUrl);
+    };
+
+    document.addEventListener('click', handleDocumentLinkClick, true);
+    return () => document.removeEventListener('click', handleDocumentLinkClick, true);
+  }, []);
 
   const handleCommandExecute = useCallback(
     (commandId: string) => {

@@ -35,6 +35,8 @@
     "archive": "归档",
     "unseen": "未读",
     "seen": "已读",
+    "shortRead": "短阅读",
+    "longRead": "长阅读",
     "all": "全部",
     "noArticles": "暂无文章",
     "loading": "加载中...",

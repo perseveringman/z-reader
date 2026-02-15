@@ -4,6 +4,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
 import { parseArticleContent } from './parser-service';
 import { estimateReadingTimeMinutes, estimateWordCount } from './text-stats';
+import { buildArticleTextStatsPatch } from './article-text-stats';
 
 const parser = new Parser({
   timeout: 15000,
@@ -385,6 +386,56 @@ export async function backfillMissingContent(): Promise<number> {
 
   console.log(`Backfill complete: ${filled}/${rows.length} articles updated`);
   return filled;
+}
+
+export interface ArticleTextStatsBackfillResult {
+  scanned: number;
+  updated: number;
+}
+
+/**
+ * 对历史文章重算 wordCount / readingTime（一次性回填）
+ */
+export async function backfillArticleTextStats(): Promise<ArticleTextStatsBackfillResult> {
+  const db = getDatabase();
+  const rows = await db.select({
+    id: schema.articles.id,
+    contentText: schema.articles.contentText,
+    content: schema.articles.content,
+    summary: schema.articles.summary,
+    wordCount: schema.articles.wordCount,
+    readingTime: schema.articles.readingTime,
+  })
+    .from(schema.articles)
+    .where(eq(schema.articles.deletedFlg, 0));
+
+  let updated = 0;
+  for (const row of rows) {
+    const patch = buildArticleTextStatsPatch(
+      {
+        contentText: row.contentText,
+        content: row.content,
+        summary: row.summary,
+      },
+      {
+        wordCount: row.wordCount,
+        readingTime: row.readingTime,
+      },
+    );
+    if (!patch) continue;
+
+    await db.update(schema.articles).set({
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(schema.articles.id, row.id));
+    updated++;
+  }
+
+  console.log(`Text stats backfill complete: ${updated}/${rows.length} articles updated`);
+  return {
+    scanned: rows.length,
+    updated,
+  };
 }
 
 let fetchTimer: ReturnType<typeof setInterval> | null = null;

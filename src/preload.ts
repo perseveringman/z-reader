@@ -94,6 +94,7 @@ const electronAPI: ElectronAPI = {
   downloadList: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_LIST),
   downloadStatus: (downloadId) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_STATUS, downloadId),
   downloadOpenDir: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_OPEN_DIR),
+  externalOpenUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.EXTERNAL_OPEN_URL, url),
 
   // Settings
   settingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),

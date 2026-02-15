@@ -26,7 +26,9 @@ interface ContentListProps {
   mediaType?: MediaType;
 }
 
-type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all';
+type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all' | 'shortRead' | 'longRead';
+
+const PAGE_SIZE = 100;
 
 const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'saved_at', label: 'Date saved' },
@@ -47,15 +49,25 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   });
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ articleId: string; x: number; y: number } | null>(null);
+  const [readingThreshold, setReadingThreshold] = useState(10);
   const { showToast } = useToast();
   const undoStack = useUndoStack();
 
   const isTrash = activeView === 'trash';
   const isFeedView = source === 'feed';
   const isLibraryView = source === 'library';
+
+  // 加载阅读时长阈值设置
+  useEffect(() => {
+    window.electronAPI.settingsGet().then((s) => {
+      if (s.readingThreshold && s.readingThreshold > 0) setReadingThreshold(s.readingThreshold);
+    }).catch(() => {});
+  }, []);
 
   // Determine which tabs to show
   const libraryTabs: { key: TabKey; label: string }[] = [
@@ -66,6 +78,8 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const feedTabs: { key: TabKey; label: string }[] = [
     { key: 'unseen', label: t('contentList.unseen').toUpperCase() },
     { key: 'seen', label: t('contentList.seen').toUpperCase() },
+    { key: 'shortRead', label: t('contentList.shortRead').toUpperCase() },
+    { key: 'longRead', label: t('contentList.longRead').toUpperCase() },
     { key: 'all', label: t('contentList.all').toUpperCase() },
   ];
   const tabs = isFeedView ? feedTabs
@@ -92,12 +106,49 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     localStorage.setItem(storageKey, activeTab);
   }, [activeTab, isFeedView]);
 
+  const buildQuery = useCallback((offset = 0): ArticleListQuery => {
+    const query: ArticleListQuery = {
+      sortBy,
+      sortOrder,
+      limit: PAGE_SIZE,
+      offset,
+    };
+
+    if (source && !isShortlisted) query.source = source;
+    if (mediaType) query.mediaType = mediaType;
+
+    if (!isShortlisted) {
+      if (activeTab !== 'all' && activeTab !== 'shortRead' && activeTab !== 'longRead') {
+        if (isFeedView || isLibraryView) {
+          query.readStatus = activeTab as ReadStatusType;
+        }
+      }
+    }
+
+    if (feedId) {
+      query.feedId = feedId;
+      query.source = 'feed';
+    }
+
+    if (isShortlisted) query.isShortlisted = true;
+
+    return query;
+  }, [sortBy, sortOrder, source, isShortlisted, mediaType, activeTab, isFeedView, isLibraryView, feedId]);
+
+  const applyReadingFilter = useCallback((list: Article[]) => {
+    if (activeTab === 'shortRead') return list.filter((a) => a.readingTime != null && a.readingTime <= readingThreshold);
+    if (activeTab === 'longRead') return list.filter((a) => a.readingTime != null && a.readingTime > readingThreshold);
+    return list;
+  }, [activeTab, readingThreshold]);
+
   const fetchArticles = useCallback(async () => {
     setLoading(true);
+    setHasMore(true);
     try {
       if (isTrash) {
         const result = await window.electronAPI.articleListDeleted();
         setArticles(result);
+        setHasMore(false);
       } else if (activeView === 'tags') {
         if (tagId) {
           const result = await window.electronAPI.articleListByTag(tagId);
@@ -105,54 +156,33 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         } else {
           setArticles([]);
         }
+        setHasMore(false);
       } else {
-        const query: ArticleListQuery = {
-          sortBy,
-          sortOrder,
-          limit: 100,
-        };
-
-        // Source filter
-        if (source && !isShortlisted) {
-          query.source = source;
-        }
-
-        // MediaType filter
-        if (mediaType) {
-          query.mediaType = mediaType;
-        }
-
-        // Tab-based readStatus filter
-        if (!isShortlisted) {
-          if (activeTab !== 'all') {
-            if (isFeedView) {
-              query.readStatus = activeTab as ReadStatusType;
-            } else if (isLibraryView) {
-              query.readStatus = activeTab as ReadStatusType;
-            }
-          }
-        }
-
-        // Feed filter
-        if (feedId) {
-          query.feedId = feedId;
-          query.source = 'feed'; // Per-feed view is always feed source
-        }
-
-        // Shortlist mode (shared across sources)
-        if (isShortlisted) {
-          query.isShortlisted = true;
-        }
-
-        const result = await window.electronAPI.articleList(query);
-        setArticles(result);
+        const result = await window.electronAPI.articleList(buildQuery(0));
+        setArticles(applyReadingFilter(result));
+        setHasMore(result.length >= PAGE_SIZE);
       }
     } catch (err) {
       console.error('Failed to fetch articles:', err);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, sortBy, sortOrder, feedId, isShortlisted, isTrash, tagId, source, isFeedView, isLibraryView, activeView, mediaType]);
+  }, [isTrash, activeView, tagId, buildQuery, applyReadingFilter]);
+
+  const fetchMore = useCallback(async () => {
+    if (loadingMore || !hasMore || isTrash || activeView === 'tags') return;
+    setLoadingMore(true);
+    try {
+      const result = await window.electronAPI.articleList(buildQuery(articles.length));
+      const filtered = applyReadingFilter(result);
+      setArticles((prev) => [...prev, ...filtered]);
+      setHasMore(result.length >= PAGE_SIZE);
+    } catch (err) {
+      console.error('Failed to load more articles:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, isTrash, activeView, buildQuery, applyReadingFilter, articles.length]);
 
   useEffect(() => {
     fetchArticles();
@@ -430,11 +460,12 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     items.push({ label: 'Delete', icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
 
     if (article.url) {
+      const browserUrl = article.url;
       items.push({ separator: true });
       items.push({
         label: 'Open in browser',
         icon: ExternalLink,
-        onClick: () => window.open(article.url!, '_blank'),
+        onClick: () => void window.electronAPI.externalOpenUrl(browserUrl),
       });
     }
 
@@ -447,6 +478,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sortBy)?.label ?? '';
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 滚动到底部时加载更多
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+        fetchMore();
+      }
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [fetchMore]);
 
   // Title
   const getTitle = () => {
@@ -594,7 +638,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           e.preventDefault();
           if (selectedArticleId) {
             const article = articles.find(a => a.id === selectedArticleId);
-            if (article?.url) window.open(article.url, '_blank');
+            if (article?.url) void window.electronAPI.externalOpenUrl(article.url);
           }
           break;
         }
@@ -759,6 +803,11 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                 />
               </div>
             ))}
+          </div>
+        )}
+        {loadingMore && (
+          <div className="flex items-center justify-center py-3">
+            <span className="text-[12px] text-[#555]">加载更多...</span>
           </div>
         )}
       </div>

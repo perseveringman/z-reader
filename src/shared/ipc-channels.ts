@@ -92,6 +92,9 @@ export const IPC_CHANNELS = {
   DOWNLOAD_STATUS: 'download:status',
   DOWNLOAD_OPEN_DIR: 'download:openDir',
 
+  // External
+  EXTERNAL_OPEN_URL: 'external:open-url',
+
   // Discover
   DISCOVER_SEARCH: 'discover:search',
   DISCOVER_RSSHUB_CATEGORIES: 'discover:rsshubCategories',

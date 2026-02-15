@@ -607,14 +607,14 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
                 <button
                   type="button"
                   onClick={() => handleAboutOutlineClick(item)}
-                  className={`w-full text-left rounded-md px-3 py-2 transition-colors cursor-pointer ${
+                  className={`w-full flex items-start gap-2 text-left rounded-md px-3 py-2 transition-colors cursor-pointer ${
                     index === activeOutlineIndex
                       ? 'bg-blue-500/15 border border-blue-500/35'
                       : 'border border-transparent hover:bg-white/5'
                   }`}
                 >
-                  <div className="text-[11px] font-mono text-blue-300 tabular-nums">{item.label}</div>
-                  <div className="text-[13px] leading-5 text-gray-300 line-clamp-2 mt-0.5">{item.title}</div>
+                  <span className="text-[11px] font-mono text-blue-300 tabular-nums shrink-0 mt-0.5 min-w-[42px]">{item.label}</span>
+                  <span className="text-[13px] leading-5 text-gray-300 line-clamp-2">{item.title}</span>
                 </button>
               </li>
             ))}

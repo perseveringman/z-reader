@@ -299,6 +299,8 @@ export interface AppSettings {
   downloadCapacityMb?: number;
   rsshubBaseUrl?: string;
   language?: string;
+  /** 短阅读/长阅读分界时长（分钟），默认 10 */
+  readingThreshold?: number;
   // ASR 通用
   asrProvider?: AsrProviderType;
   // 火山引擎
@@ -667,6 +669,9 @@ export interface ElectronAPI {
   downloadList: () => Promise<DownloadRecord[]>;
   downloadStatus: (downloadId: string) => Promise<DownloadRecord | null>;
   downloadOpenDir: () => Promise<void>;
+
+  // External 操作
+  externalOpenUrl: (url: string) => Promise<boolean>;
 
   // Settings 操作
   settingsGet: () => Promise<AppSettings>;

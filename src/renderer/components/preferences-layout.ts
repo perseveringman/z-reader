@@ -4,6 +4,7 @@ export type PrimaryPreferenceSectionId = 'general' | 'content' | 'asr' | 'ai';
 
 export type SecondaryPreferenceSectionId =
   | 'language'
+  | 'reading'
   | 'podcast'
   | 'rsshub'
   | 'download'
@@ -39,7 +40,7 @@ export function getSecondarySectionsForPrimary(
   settings: Pick<AppSettings, 'asrProvider'>,
 ): SecondaryPreferenceSection[] {
   if (primaryId === 'general') {
-    return [{ id: 'language' }];
+    return [{ id: 'language' }, { id: 'reading' }];
   }
 
   if (primaryId === 'content') {
