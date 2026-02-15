@@ -26,6 +26,23 @@ function getEngine() {
   return engine;
 }
 
+// 清理 30 天前的 changelog 文件
+function cleanupOldChangelogs() {
+  const syncDir = getSyncDirectoryPath();
+  const changelogDir = path.join(syncDir, 'changelog');
+  if (!fs.existsSync(changelogDir)) return;
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  for (const device of fs.readdirSync(changelogDir, { withFileTypes: true })) {
+    if (!device.isDirectory()) continue;
+    const deviceDir = path.join(changelogDir, device.name);
+    for (const file of fs.readdirSync(deviceDir)) {
+      if (file.endsWith('.jsonl') && file.slice(0, 10) < cutoff) {
+        fs.unlinkSync(path.join(deviceDir, file));
+      }
+    }
+  }
+}
+
 function startSyncLoop() {
   if (syncInterval) return;
   syncInterval = setInterval(() => {
@@ -33,6 +50,8 @@ function startSyncLoop() {
   }, 60_000);
   // 立即同步一次
   try { getEngine().syncNow(); } catch { /* 静默失败 */ }
+  // 启动时清理过期 changelog
+  try { cleanupOldChangelogs(); } catch { /* 静默 */ }
 }
 
 function stopSyncLoop() {

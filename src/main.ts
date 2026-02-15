@@ -5,6 +5,7 @@ import { getDatabase } from './main/db';
 import { registerAllIpcHandlers } from './main/ipc';
 import { startScheduledFetch, backfillMissingContent } from './main/services/rss-service';
 import { startApiServer, stopApiServer } from './main/services/api-server';
+import { initSyncOnStartup } from './main/ipc/sync-handlers';
 
 if (started) {
   app.quit();
@@ -49,6 +50,9 @@ app.on('ready', () => {
   );
 
   createWindow();
+
+  // 启动 iCloud 同步（如果已启用）
+  initSyncOnStartup();
 });
 
 app.on('window-all-closed', () => {
