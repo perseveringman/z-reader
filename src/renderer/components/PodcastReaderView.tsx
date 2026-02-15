@@ -41,6 +41,8 @@ function parseScrollTarget(anchorPath: string | null): number | null {
 export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
+  const [localMediaLoading, setLocalMediaLoading] = useState(false);
+  const [playbackAudioUrl, setPlaybackAudioUrl] = useState<string | null>(null);
   const [feedTitle, setFeedTitle] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [detailCollapsed, setDetailCollapsed] = useState(() =>
@@ -114,6 +116,53 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
 
     return () => { cancelled = true; };
   }, [articleId]);
+
+  // ==================== 解析本地音频可播放 URL ====================
+  useEffect(() => {
+    let cancelled = false;
+    let blobUrl: string | null = null;
+
+    const resolveAudioUrl = async () => {
+      if (!article?.audioUrl) {
+        setPlaybackAudioUrl(null);
+        setLocalMediaLoading(false);
+        return;
+      }
+
+      if (!article.audioUrl.startsWith('file://')) {
+        setPlaybackAudioUrl(article.audioUrl);
+        setLocalMediaLoading(false);
+        return;
+      }
+
+      setLocalMediaLoading(true);
+      try {
+        const media = await window.electronAPI.articleReadLocalMedia(articleId);
+        if (!media) {
+          if (!cancelled) setPlaybackAudioUrl(null);
+          return;
+        }
+
+        blobUrl = URL.createObjectURL(new Blob(
+          [media.data],
+          { type: media.mime || 'audio/mpeg' },
+        ));
+        if (!cancelled) setPlaybackAudioUrl(blobUrl);
+      } catch (err) {
+        console.error('读取本地音频失败:', err);
+        if (!cancelled) setPlaybackAudioUrl(null);
+      } finally {
+        if (!cancelled) setLocalMediaLoading(false);
+      }
+    };
+
+    void resolveAudioUrl();
+
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [articleId, article?.audioUrl]);
 
   // ==================== 加载高亮 ====================
   useEffect(() => {
@@ -626,7 +675,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     </div>
   );
 
-  if (loading || !article) {
+  if (loading || !article || localMediaLoading) {
     return (
       <div className="flex items-center justify-center h-full bg-[#0f0f0f]">
         <Loader2 size={24} className="animate-spin text-gray-500" />
@@ -634,7 +683,8 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     );
   }
 
-  const audioUrl = article.audioUrl;
+  const audioUrl = playbackAudioUrl
+    ?? (article.audioUrl?.startsWith('file://') ? null : article.audioUrl);
   if (!audioUrl) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-[#0f0f0f] gap-3">

@@ -6,14 +6,15 @@ export interface VideoPlayerRef {
 }
 
 interface VideoPlayerProps {
-  videoId: string;
+  videoId?: string;
+  videoUrl?: string;
   onTimeUpdate?: (currentTime: number) => void;
   onReady?: () => void;
   onDuration?: (duration: number) => void;
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  function VideoPlayer({ videoId, onTimeUpdate, onReady, onDuration }, ref) {
+  function VideoPlayer({ videoId, videoUrl, onTimeUpdate, onReady, onDuration }, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -28,6 +29,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const [needsLogin, setNeedsLogin] = useState(false);
     const [loggingIn, setLoggingIn] = useState(false);
 
+    const usingDirectVideoUrl = !!videoUrl && !videoId;
     // 当前 format 是否需要独立音频轨
     const needsSeparateAudio = selectedFormat != null && !selectedFormat.hasAudio;
 
@@ -45,6 +47,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     // 获取视频流
     const fetchStream = useCallback(async () => {
+      if (!videoId) {
+        setLoading(false);
+        setError('视频不可用');
+        return;
+      }
+
       setLoading(true);
       setError(null);
       setFormats([]);
@@ -76,13 +84,20 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     // 首次加载和 videoId 变化时获取流
     useEffect(() => {
+      if (usingDirectVideoUrl) {
+        setLoading(false);
+        setError(null);
+        setNeedsLogin(false);
+        return;
+      }
+
       let cancelled = false;
       (async () => {
         await fetchStream();
         if (cancelled) return;
       })();
       return () => { cancelled = true; };
-    }, [fetchStream]);
+    }, [fetchStream, usingDirectVideoUrl]);
 
     // 处理登录
     const handleLogin = useCallback(async () => {
@@ -104,7 +119,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       const audio = audioRef.current;
       if (!video || !audio || !needsSeparateAudio) return;
 
-      const onPlay = () => { audio.play().catch(() => {}); };
+      const onPlay = () => { audio.play().catch(() => undefined); };
       const onPause = () => { audio.pause(); };
       const onSeeked = () => { audio.currentTime = video.currentTime; };
 
@@ -162,7 +177,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         if (v) {
           const onCanPlay = () => {
             v.currentTime = currentTime;
-            if (wasPlaying) v.play().catch(() => {});
+            if (wasPlaying) v.play().catch(() => undefined);
             v.removeEventListener('canplay', onCanPlay);
           };
           v.addEventListener('canplay', onCanPlay);
@@ -222,6 +237,22 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-zinc-400 text-sm">加载视频中...</div>
           </div>
+        </div>
+      );
+    }
+
+    if (usingDirectVideoUrl && videoUrl) {
+      return (
+        <div className="relative w-full group" style={{ paddingBottom: '56.25%' }}>
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="absolute inset-0 w-full h-full rounded-lg bg-black"
+            controls
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
+            onDurationChange={handleDurationChange}
+          />
         </div>
       );
     }

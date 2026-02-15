@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { Article, TranscriptSegment, Highlight, HighlightTagsMap } from '../../shared/types';
+import { ArrowLeft, Loader2, Mic, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import type { Article, TranscriptSegment, Highlight, HighlightTagsMap, AppTask } from '../../shared/types';
 import { VideoPlayer, type VideoPlayerRef } from './VideoPlayer';
 import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
@@ -18,11 +18,26 @@ function parseScrollTarget(anchorPath: string | null): number | null {
   return isNaN(idx) ? null : idx;
 }
 
+export function shouldShowVideoAsrButton(params: {
+  transcriptLoading: boolean;
+  segmentsCount: number;
+  asrTaskStatus: AppTask['status'] | null;
+}): boolean {
+  const isTaskRunning = params.asrTaskStatus === 'pending' || params.asrTaskStatus === 'running';
+  return !params.transcriptLoading && params.segmentsCount === 0 && !isTaskRunning;
+}
+
+export const VIDEO_ASR_BACKGROUND_HINT = '后台转写中，可退出页面';
+
 export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
+  const [localMediaLoading, setLocalMediaLoading] = useState(false);
+  const [playableVideoUrl, setPlayableVideoUrl] = useState<string | null>(null);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [asrTask, setAsrTask] = useState<AppTask | null>(null);
+  const [asrError, setAsrError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [detailCollapsed, setDetailCollapsed] = useState(() =>
     localStorage.getItem('video-reader-detail-collapsed') === 'true'
@@ -57,24 +72,131 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     return () => { cancelled = true; };
   }, [articleId]);
 
-  // 加载字幕
+  // 解析本地视频为 blob URL（避免 file:// 访问限制）
   useEffect(() => {
-    if (!article?.videoId) return;
     let cancelled = false;
-    setTranscriptLoading(true);
+    let blobUrl: string | null = null;
 
-    window.electronAPI.transcriptFetch(articleId).then((data) => {
-      if (!cancelled && data) {
-        setSegments(data.segments);
+    const resolveVideoUrl = async () => {
+      if (!article) {
+        setPlayableVideoUrl(null);
+        setLocalMediaLoading(false);
+        return;
       }
-    }).catch((err) => {
-      console.error('加载字幕失败:', err);
-    }).finally(() => {
-      if (!cancelled) setTranscriptLoading(false);
-    });
+
+      // 有 videoId 时仍走 YouTube 流
+      if (article.videoId) {
+        setPlayableVideoUrl(null);
+        setLocalMediaLoading(false);
+        return;
+      }
+
+      if (!article.url) {
+        setPlayableVideoUrl(null);
+        setLocalMediaLoading(false);
+        return;
+      }
+
+      if (!article.url.startsWith('file://')) {
+        setPlayableVideoUrl(article.url);
+        setLocalMediaLoading(false);
+        return;
+      }
+
+      setLocalMediaLoading(true);
+      try {
+        const media = await window.electronAPI.articleReadLocalMedia(articleId);
+        if (!media) {
+          if (!cancelled) setPlayableVideoUrl(null);
+          return;
+        }
+        blobUrl = URL.createObjectURL(new Blob(
+          [media.data],
+          { type: media.mime || 'video/mp4' },
+        ));
+        if (!cancelled) setPlayableVideoUrl(blobUrl);
+      } catch (err) {
+        console.error('读取本地视频失败:', err);
+        if (!cancelled) setPlayableVideoUrl(null);
+      } finally {
+        if (!cancelled) setLocalMediaLoading(false);
+      }
+    };
+
+    void resolveVideoUrl();
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [articleId, article?.videoId, article?.url]);
+
+  // 加载字幕（优先本地缓存；视频链接存在时再尝试 YouTube 获取）
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTranscript = async () => {
+      setTranscriptLoading(true);
+      setSegments([]);
+      try {
+        const existing = await window.electronAPI.transcriptGet(articleId);
+        if (existing?.segments?.length) {
+          if (!cancelled) setSegments(existing.segments);
+          return;
+        }
+
+        if (!article?.videoId) return;
+        const data = await window.electronAPI.transcriptFetch(articleId);
+        if (!cancelled && data?.segments?.length) {
+          setSegments(data.segments);
+        }
+      } catch (err) {
+        console.error('加载字幕失败:', err);
+      } finally {
+        if (!cancelled) setTranscriptLoading(false);
+      }
+    };
+
+    void loadTranscript();
 
     return () => { cancelled = true; };
   }, [articleId, article?.videoId]);
+
+  // 加载并监听该视频的后台转写任务
+  useEffect(() => {
+    let cancelled = false;
+
+    window.electronAPI.appTaskList().then((tasks) => {
+      if (cancelled) return;
+      const running = tasks.find(
+        (t) => t.articleId === articleId && t.type === 'asr-standard' && (t.status === 'pending' || t.status === 'running'),
+      );
+      setAsrTask(running ?? null);
+    }).catch((err) => {
+      console.error('加载后台转写任务失败:', err);
+    });
+
+    const unsub = window.electronAPI.appTaskOnUpdated((task) => {
+      if (task.articleId !== articleId || task.type !== 'asr-standard') return;
+      setAsrTask(task);
+
+      if (task.status === 'completed') {
+        window.electronAPI.transcriptGet(articleId).then((data) => {
+          if (data?.segments?.length) setSegments(data.segments);
+        }).catch((err) => {
+          console.error('读取转写结果失败:', err);
+        });
+      }
+
+      if (task.status === 'failed') {
+        setAsrError(task.error || '转写失败');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [articleId]);
 
   // 加载高亮数据
   useEffect(() => {
@@ -177,6 +299,21 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     videoPlayerRef.current?.seekTo(startTime);
   }, []);
 
+  const handleStartAsr = useCallback(async () => {
+    setAsrError(null);
+    try {
+      const task = await window.electronAPI.appTaskCreate({
+        type: 'asr-standard',
+        articleId,
+        title: `转写: ${article?.title || '视频'}`,
+      });
+      setAsrTask(task);
+    } catch (err) {
+      console.error('创建视频转写任务失败:', err);
+      setAsrError(err instanceof Error ? err.message : String(err));
+    }
+  }, [articleId, article?.title]);
+
   // 关闭时保存最终进度
   const handleClose = useCallback(() => {
     const duration = durationRef.current;
@@ -214,7 +351,7 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleClose]);
 
-  if (loading || !article) {
+  if (loading || !article || localMediaLoading) {
     return (
       <div className="flex items-center justify-center h-full bg-[#0f0f0f]">
         <Loader2 size={24} className="animate-spin text-gray-500" />
@@ -224,6 +361,13 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
 
   // scrollToSegment 转为整数给 TranscriptView
   const scrollToSegmentInt = scrollToSegment != null ? Math.floor(scrollToSegment) : null;
+  const asrTaskStatus = asrTask?.status ?? null;
+  const isAsrTaskRunning = asrTaskStatus === 'pending' || asrTaskStatus === 'running';
+  const showAsrButton = shouldShowVideoAsrButton({
+    transcriptLoading,
+    segmentsCount: segments.length,
+    asrTaskStatus,
+  });
 
   return (
     <div className="flex flex-col h-full bg-[#0f0f0f]">
@@ -256,7 +400,8 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
           <div className="shrink-0 px-6 pt-4">
             <VideoPlayer
               ref={videoPlayerRef}
-              videoId={article.videoId!}
+              videoId={article.videoId ?? undefined}
+              videoUrl={!article.videoId ? playableVideoUrl ?? undefined : undefined}
               onTimeUpdate={handleTimeUpdate}
               onDuration={handleDuration}
             />
@@ -264,18 +409,47 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
 
           {/* 字幕区域 */}
           <div className="flex-1 min-h-0 mt-2">
-            <TranscriptView
-              segments={segments}
-              currentTime={currentTime}
-              onSegmentClick={handleSegmentClick}
-              loading={transcriptLoading}
-              highlights={highlights}
-              onCreateHighlight={handleCreateHighlight}
-              onDeleteHighlight={handleDeleteHighlight}
-              onUpdateHighlight={handleUpdateHighlight}
-              highlightTagsMap={highlightTagsMap}
-              scrollToSegment={scrollToSegmentInt}
-            />
+            {showAsrButton ? (
+              <div className="h-full flex items-center justify-center px-6">
+                <div className="w-full max-w-lg rounded-lg border border-white/10 bg-[#151515] p-5 text-center">
+                  <div className="text-sm text-gray-300 mb-2">暂无可用字幕</div>
+                  <p className="text-xs text-gray-500 mb-4">
+                    你可以使用语音识别生成字幕，完成后会显示在这里。
+                  </p>
+                  <button
+                    onClick={handleStartAsr}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors cursor-pointer"
+                  >
+                    <Mic size={16} />
+                    开始转写
+                  </button>
+                  {asrError && (
+                    <div className="mt-3 text-xs text-red-400">{asrError}</div>
+                  )}
+                </div>
+              </div>
+            ) : isAsrTaskRunning && segments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-sm">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>视频转写中...</span>
+                </div>
+                <div className="text-xs text-gray-500">{VIDEO_ASR_BACKGROUND_HINT}</div>
+              </div>
+            ) : (
+              <TranscriptView
+                segments={segments}
+                currentTime={currentTime}
+                onSegmentClick={handleSegmentClick}
+                loading={transcriptLoading}
+                highlights={highlights}
+                onCreateHighlight={handleCreateHighlight}
+                onDeleteHighlight={handleDeleteHighlight}
+                onUpdateHighlight={handleUpdateHighlight}
+                highlightTagsMap={highlightTagsMap}
+                scrollToSegment={scrollToSegmentInt}
+              />
+            )}
           </div>
         </div>
 

@@ -1,27 +1,23 @@
 /**
  * 后台 ASR 转写服务
  *
- * 通过 ASR Provider 抽象层对播客音频进行后台转写。
- * 如果音频尚未下载，会自动触发下载并等待完成后再开始转写。
+ * 通过 ASR Provider 抽象层对播客/视频进行后台转写。
+ * 转写源解析、视频抽轨、临时下载等由统一 source service 负责。
  *
- * 流程: 检查/下载音频 → Provider.transcribeFile() → 保存结果 → 通知
+ * 流程: 解析转写源 → Provider.transcribeFile() → 保存结果 → 通知
  */
 
 import { randomUUID } from 'node:crypto';
-import * as fs from 'node:fs';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
 import { loadSettings } from './settings-service';
 import { updateTask } from './task-service';
 import { sendNotification } from './notification-service';
-import { startDownload } from './download-service';
 import { getActiveProvider, isAsrConfigured } from './asr/index';
+import { cleanupTranscriptionTempPaths, prepareTranscriptionAudio } from './transcription-source-service';
 
 /** 活跃任务的取消控制 */
 const activeControls = new Map<string, { cancelled: boolean; abortSignal: { aborted: boolean } }>();
-
-const DOWNLOAD_POLL_INTERVAL = 2_000; // 2 秒
-const DOWNLOAD_TIMEOUT = 10 * 60 * 1000; // 10 分钟下载超时
 
 /**
  * 执行后台 ASR 转写任务
@@ -31,6 +27,7 @@ export async function runStandardAsr(taskId: string, articleId: string): Promise
   const db = getDatabase();
   const control = { cancelled: false, abortSignal: { aborted: false } };
   activeControls.set(taskId, control);
+  let sourceCleanupPaths: string[] = [];
 
   try {
     // 1. 加载设置，获取 Provider
@@ -47,17 +44,18 @@ export async function runStandardAsr(taskId: string, articleId: string): Promise
 
     // 2. 获取文章信息
     const [article] = await db.select().from(schema.articles).where(eq(schema.articles.id, articleId));
-    if (!article?.audioUrl) {
-      throw new Error('文章没有音频 URL');
+    if (!article) {
+      throw new Error('文章不存在');
     }
 
     // 3. 更新任务为 running
-    await updateTask(taskId, { status: 'running', detail: '检查音频文件...' });
+    await updateTask(taskId, { status: 'running', detail: '准备转写源文件...' });
 
     if (control.cancelled) return;
 
-    // 4. 获取已下载的音频文件，或自动下载
-    const filePath = await ensureAudioDownloaded(articleId, taskId, control);
+    // 4. 统一解析音频输入（播客/视频共用）
+    const prepared = await prepareTranscriptionAudio({ articleId, mode: 'background' });
+    sourceCleanupPaths = prepared.cleanupPaths;
 
     if (control.cancelled) return;
 
@@ -65,7 +63,7 @@ export async function runStandardAsr(taskId: string, articleId: string): Promise
     await updateTask(taskId, { detail: `正在使用 ${provider.name} 转写...`, progress: 0.05 });
 
     const allSegments = await provider.transcribeFile(
-      filePath,
+      prepared.filePath,
       settings,
       {
         onProgress: (progress) => {
@@ -74,7 +72,9 @@ export async function runStandardAsr(taskId: string, articleId: string): Promise
           updateTask(taskId, {
             progress: Math.min(mapped, 0.95),
             detail: `转写中 (${Math.round(progress * 100)}%)...`,
-          }).catch(() => {});
+          }).catch((err) => {
+            console.error('[BackgroundASR] 更新任务进度失败:', err);
+          });
         },
         onError: (error) => {
           console.error(`[BackgroundASR] Provider 错误:`, error);
@@ -140,79 +140,11 @@ export async function runStandardAsr(taskId: string, articleId: string): Promise
       await sendNotification({ type: 'error', title: '转写失败', body: errorMsg });
     }
   } finally {
+    if (sourceCleanupPaths.length > 0) {
+      await cleanupTranscriptionTempPaths(sourceCleanupPaths);
+    }
     activeControls.delete(taskId);
   }
-}
-
-/**
- * 确保音频已下载到本地。
- * 如果已有 ready 的下载记录则直接返回路径，否则触发下载并等待完成。
- */
-async function ensureAudioDownloaded(
-  articleId: string,
-  taskId: string,
-  control: { cancelled: boolean },
-): Promise<string> {
-  const db = getDatabase();
-
-  // 检查是否已有下载完成的记录
-  const [existing] = await db.select()
-    .from(schema.downloads)
-    .where(and(
-      eq(schema.downloads.articleId, articleId),
-      eq(schema.downloads.status, 'ready'),
-    ));
-
-  if (existing?.filePath) {
-    try {
-      await fs.promises.access(existing.filePath, fs.constants.R_OK);
-      return existing.filePath;
-    } catch {
-      // 文件不存在，需要重新下载
-    }
-  }
-
-  // 触发下载
-  await updateTask(taskId, { detail: '正在下载音频...', progress: 0.02 });
-  await startDownload(articleId);
-
-  // 轮询等待下载完成
-  const startTime = Date.now();
-
-  while (!control.cancelled) {
-    if (Date.now() - startTime > DOWNLOAD_TIMEOUT) {
-      throw new Error('音频下载超时（10分钟）');
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_POLL_INTERVAL));
-
-    if (control.cancelled) throw new Error('任务已取消');
-
-    const [dl] = await db.select()
-      .from(schema.downloads)
-      .where(eq(schema.downloads.articleId, articleId));
-
-    if (dl?.status === 'ready' && dl.filePath) {
-      try {
-        await fs.promises.access(dl.filePath, fs.constants.R_OK);
-        return dl.filePath;
-      } catch {
-        throw new Error('下载的音频文件无法读取');
-      }
-    }
-
-    if (dl?.status === 'failed') {
-      throw new Error('音频下载失败');
-    }
-
-    const elapsed = Math.round((Date.now() - startTime) / 1000);
-    await updateTask(taskId, {
-      detail: `正在下载音频... (${elapsed}s)`,
-      progress: Math.min(0.02 + (elapsed / 600) * 0.03, 0.05),
-    });
-  }
-
-  throw new Error('任务已取消');
 }
 
 /** 取消指定任务 */

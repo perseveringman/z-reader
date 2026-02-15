@@ -43,6 +43,11 @@ export interface SaveUrlInput {
   title?: string;
 }
 
+export interface LocalMediaReadResult {
+  data: ArrayBuffer;
+  mime: string | null;
+}
+
 // ==================== Article 相关类型 ====================
 export interface Article {
   id: string;
@@ -608,6 +613,8 @@ export interface ElectronAPI {
   articleBatchUpdate: (ids: string[], input: Partial<Omit<UpdateArticleInput, 'id'>>) => Promise<void>;
   articleBatchDelete: (ids: string[]) => Promise<void>;
   articleSaveUrl: (input: SaveUrlInput) => Promise<Article>;
+  articleImportLocalMedia: () => Promise<Article[]>;
+  articleReadLocalMedia: (articleId: string) => Promise<LocalMediaReadResult | null>;
   articleSaveToLibrary: (id: string) => Promise<Article>;
 
   // Highlight 操作

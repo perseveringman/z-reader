@@ -28,6 +28,8 @@ const electronAPI: ElectronAPI = {
   articleBatchUpdate: (ids, input) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_BATCH_UPDATE, ids, input),
   articleBatchDelete: (ids) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_BATCH_DELETE, ids),
   articleSaveUrl: (input) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_SAVE_URL, input),
+  articleImportLocalMedia: () => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_IMPORT_LOCAL_MEDIA),
+  articleReadLocalMedia: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_READ_LOCAL_MEDIA, articleId),
   articleSaveToLibrary: (id) => ipcRenderer.invoke(IPC_CHANNELS.ARTICLE_SAVE_TO_LIBRARY, id),
 
   // Highlight

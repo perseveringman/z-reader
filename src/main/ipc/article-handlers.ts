@@ -1,16 +1,42 @@
-import { ipcMain } from 'electron';
-import { eq, and, desc, asc, inArray, or, like, sql } from 'drizzle-orm';
+import { ipcMain, dialog, app } from 'electron';
+import { eq, and, desc, asc, inArray, or, like } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { getDatabase, getSqlite, schema } from '../db';
+import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
 import { isYouTubeUrl, extractYouTubeVideoId, fetchYouTubeVideoMeta } from '../services/youtube-service';
 import { isPodcastEpisodeUrl, fetchPodcastEpisodeMeta } from '../services/podcast-resolver';
+import {
+  buildImportedMediaArticle,
+  detectLocalMediaTypeFromExtension,
+  detectMediaDurationInSeconds,
+  inferMediaMimeFromPath,
+  inferTitleFromFilePath,
+} from '../services/local-media-import';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
 
 export function registerArticleHandlers() {
-  const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED, ARTICLE_BATCH_UPDATE, ARTICLE_BATCH_DELETE, ARTICLE_SAVE_URL, ARTICLE_SAVE_TO_LIBRARY } = IPC_CHANNELS;
+  const {
+    ARTICLE_LIST,
+    ARTICLE_GET,
+    ARTICLE_UPDATE,
+    ARTICLE_DELETE,
+    ARTICLE_PARSE_CONTENT,
+    ARTICLE_SEARCH,
+    ARTICLE_RESTORE,
+    ARTICLE_PERMANENT_DELETE,
+    ARTICLE_LIST_DELETED,
+    ARTICLE_BATCH_UPDATE,
+    ARTICLE_BATCH_DELETE,
+    ARTICLE_SAVE_URL,
+    ARTICLE_IMPORT_LOCAL_MEDIA,
+    ARTICLE_READ_LOCAL_MEDIA,
+    ARTICLE_SAVE_TO_LIBRARY,
+  } = IPC_CHANNELS;
 
   ipcMain.handle(ARTICLE_LIST, async (_event, query: ArticleListQuery) => {
     const db = getDatabase();
@@ -289,6 +315,94 @@ export function registerArticleHandlers() {
 
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return result;
+  });
+
+  // 导入本地音频/视频到 Library
+  ipcMain.handle(ARTICLE_IMPORT_LOCAL_MEDIA, async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: '选择音频或视频文件',
+      filters: [
+        { name: 'Media', extensions: ['mp3', 'm4a', 'wav', 'flac', 'aac', 'ogg', 'mp4', 'mov', 'webm', 'mkv'] },
+      ],
+      properties: ['openFile', 'multiSelections'],
+    });
+
+    if (canceled || filePaths.length === 0) return [];
+
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const imported = [];
+
+    for (const srcPath of filePaths) {
+      const ext = extname(srcPath).toLowerCase();
+      const mediaType = detectLocalMediaTypeFromExtension(ext);
+      if (!mediaType) continue;
+
+      const id = randomUUID();
+      const mediaDir = join(app.getPath('userData'), 'media', mediaType === 'podcast' ? 'podcasts' : 'videos');
+      await mkdir(mediaDir, { recursive: true });
+      const destPath = join(mediaDir, `${id}${ext}`);
+      await copyFile(srcPath, destPath);
+
+      const st = await stat(destPath);
+      const duration = await detectMediaDurationInSeconds(destPath);
+      const title = inferTitleFromFilePath(srcPath);
+
+      const row = buildImportedMediaArticle({
+        id,
+        title,
+        filePath: destPath,
+        mediaType,
+        fileSize: st.size,
+        duration,
+        now,
+      });
+
+      await db.insert(schema.articles).values(row);
+      getGlobalTracker()?.trackChange({
+        table: 'articles',
+        recordId: id,
+        operation: 'insert',
+        changedFields: {
+          title,
+          source: 'library',
+          mediaType,
+          url: row.url,
+          audioUrl: row.audioUrl,
+        },
+      });
+
+      const [saved] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
+      if (saved) imported.push(saved);
+    }
+
+    return imported;
+  });
+
+  ipcMain.handle(ARTICLE_READ_LOCAL_MEDIA, async (_event, articleId: string) => {
+    const db = getDatabase();
+    const [article] = await db.select().from(schema.articles).where(eq(schema.articles.id, articleId));
+    if (!article) return null;
+
+    const rawUrl = article.mediaType === 'podcast' ? article.audioUrl : article.url;
+    if (!rawUrl || !rawUrl.startsWith('file://')) return null;
+
+    let filePath: string;
+    try {
+      filePath = fileURLToPath(rawUrl);
+    } catch {
+      return null;
+    }
+
+    try {
+      const buffer = await readFile(filePath);
+      return {
+        data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+        mime: inferMediaMimeFromPath(filePath),
+      };
+    } catch {
+      return null;
+    }
   });
 
   // 将 Feed 文章保存到 Library
