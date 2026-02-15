@@ -582,12 +582,19 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   }, [aboutOutlineItems, currentTime]);
 
   const timelineSidebar = (
-    <div className={`shrink-0 flex flex-col border-r border-[#262626] bg-[#131313] transition-all duration-200 overflow-hidden ${outlineCollapsed || aboutOutlineItems.length === 0 ? 'w-0 border-r-0' : 'w-[230px]'}`}>
-      <div className="shrink-0 h-10 px-4 border-b border-white/5 flex items-center justify-between">
-        <h3 className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">时间轴</h3>
-        <span className="text-[10px] text-gray-500">{aboutOutlineItems.length}</span>
+    <div className={`shrink-0 flex flex-col border-r border-[#262626] bg-[#141414] transition-all duration-200 overflow-hidden ${outlineCollapsed || aboutOutlineItems.length === 0 ? 'w-0 border-r-0' : 'w-[220px]'}`}>
+      <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-[#262626]">
+        <button
+          onClick={handleClose}
+          className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+          title="返回列表"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <h2 className="text-[13px] font-semibold text-white tracking-wide">时间轴</h2>
+        <div className="w-6" />
       </div>
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-3">
         {aboutOutlineItems.length > 0 ? (
           <ul className="space-y-1">
             {aboutOutlineItems.map((item, index) => (
