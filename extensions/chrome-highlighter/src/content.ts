@@ -1,6 +1,6 @@
-import { highlightSelection, removeHighlight, restoreHighlight } from './highlighter';
+import { highlightSelection, removeHighlight, restoreHighlight, setHighlightNote, changeHighlightColor } from './highlighter';
 import { showToolbar, hideToolbar } from './toolbar';
-import { createHighlight, deleteHighlight, getHighlightsByUrl, saveArticle, updateHighlight } from './api';
+import { createHighlight, deleteHighlight, getHighlightsByUrl, saveArticle, updateHighlight, getHighlightTags, addTagToHighlight, removeTagFromHighlight } from './api';
 import { showNoteEditor } from './note-editor';
 import { showHighlightMenu } from './highlight-menu';
 import { toast } from './toast';
@@ -8,7 +8,7 @@ import { initShortcuts, registerShortcut, showShortcutsHelp } from './shortcuts'
 import { initStatsPanel, updateHighlightList, toggleStatsPanel } from './stats-panel';
 import { initSettings, showSettingsPanel, getPreferences } from './settings-panel';
 import { initOfflineSupport, saveHighlightOffline, addPendingOperation } from './offline';
-import type { HighlightColor } from './types';
+import { HIGHLIGHT_COLORS, type HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
 
@@ -31,7 +31,12 @@ async function init() {
     if (result.articleId) {
       currentArticleId = result.articleId;
       for (const h of result.highlights) {
-        restoreHighlight(h.id, h.text ?? '', (h.color as HighlightColor) ?? 'yellow');
+        restoreHighlight(h.id, h.text ?? '', (h.color as HighlightColor) ?? 'yellow', {
+          startOffset: h.startOffset ?? undefined,
+          endOffset: h.endOffset ?? undefined,
+          paragraphIndex: h.paragraphIndex ?? undefined,
+          note: h.note ?? undefined,
+        });
       }
       // 恢复高亮后更新统计
       updateHighlightList();
@@ -125,8 +130,9 @@ async function handleHighlightWithNote() {
 
   showNoteEditor({
     selectedText,
-    onSave: async (note) => {
-      const result = highlightSelection('yellow');
+    initialColor: 'yellow',
+    onSave: async (note, color, tagIds) => {
+      const result = highlightSelection(color);
       if (!result) return;
 
       if (!(await ensureArticleSaved())) {
@@ -139,12 +145,19 @@ async function handleHighlightWithNote() {
           articleId: currentArticleId!,
           text: result.text,
           note,
-          color: 'yellow',
+          color,
           startOffset: result.startOffset,
           endOffset: result.endOffset,
           paragraphIndex: result.paragraphIndex,
         });
         result.updateId(highlight.id);
+        setHighlightNote(highlight.id, note);
+        
+        // 保存标签
+        for (const tagId of tagIds) {
+          await addTagToHighlight(highlight.id, tagId);
+        }
+
         toast.success('笔记高亮已创建');
         updateHighlightList(); // 更新统计
       } catch (error) {
@@ -160,10 +173,10 @@ async function handleHighlightWithNote() {
 
 document.addEventListener('zr-highlight-click', (e) => {
   const detail = (e as CustomEvent).detail;
-  if (!detail?.id) return;
+  if (!detail?.id || !detail.element) return;
 
   // 获取点击位置
-  const target = e.target as HTMLElement;
+  const target = detail.element as HTMLElement;
   const rect = target.getBoundingClientRect();
   const x = rect.left + window.scrollX;
   const y = rect.bottom + window.scrollY + 5;
@@ -186,13 +199,44 @@ document.addEventListener('zr-highlight-click', (e) => {
           toast.error('删除高亮失败');
         });
     },
-    onEditNote: () => {
+    onEditNote: async () => {
+      let initialTags: Tag[] = [];
+      try {
+        initialTags = await getHighlightTags(detail.id);
+      } catch (err) {
+        console.error('Failed to fetch highlight tags:', err);
+      }
+
       showNoteEditor({
+        highlightId: detail.id,
         initialNote: detail.note,
         selectedText: detail.text,
-        onSave: async (note) => {
+        initialColor: detail.color as HighlightColor,
+        initialTags,
+        onSave: async (note, color, tagIds) => {
           try {
-            await updateHighlight(detail.id, { note });
+            await updateHighlight(detail.id, { note, color });
+            setHighlightNote(detail.id, note);
+            changeHighlightColor(detail.id, color);
+
+            // 更新标签：先删除旧的再添加新的（简单处理）
+            // 更好的做法是对比差异，但 API 限制下先这样
+            const currentTags = await getHighlightTags(detail.id);
+            const currentTagIds = currentTags.map(t => t.id);
+            
+            // 需要删除的
+            for (const tagId of currentTagIds) {
+              if (!tagIds.includes(tagId)) {
+                await removeTagFromHighlight(detail.id, tagId);
+              }
+            }
+            // 需要添加的
+            for (const tagId of tagIds) {
+              if (!currentTagIds.includes(tagId)) {
+                await addTagToHighlight(detail.id, tagId);
+              }
+            }
+
             toast.success('笔记已更新');
           } catch (error) {
             console.error('[Z-Reader] 更新笔记失败:', error);
@@ -208,7 +252,7 @@ document.addEventListener('zr-highlight-click', (e) => {
       try {
         await updateHighlight(detail.id, { color });
         // 更新页面上的高亮颜色
-        const highlightEl = document.querySelector(`[data-highlight-id="${detail.id}"]`) as HTMLElement;
+        const highlightEl = document.querySelector(`[data-zr-highlight-id="${detail.id}"]`) as HTMLElement;
         if (highlightEl) {
           highlightEl.style.backgroundColor = getColorValue(color);
         }
@@ -230,13 +274,7 @@ document.addEventListener('zr-highlight-click', (e) => {
 
 // 辅助函数：获取颜色值
 function getColorValue(color: string): string {
-  const colors: Record<string, string> = {
-    yellow: '#fef3c7',
-    blue: '#dbeafe',
-    green: '#d1fae5',
-    red: '#fee2e2',
-  };
-  return colors[color] || colors.yellow;
+  return HIGHLIGHT_COLORS[color as HighlightColor] || HIGHLIGHT_COLORS.yellow;
 }
 
 chrome.runtime.onMessage.addListener((message) => {

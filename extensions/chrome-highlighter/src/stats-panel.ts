@@ -1,14 +1,7 @@
-/**
- * 高亮统计面板
- * 显示当前页面的高亮统计信息和快速跳转
- */
-
-import type { HighlightColor } from './types';
+import { HIGHLIGHT_COLORS, type HighlightColor } from './types';
 import { exportHighlights, copyHighlightsAsRichText } from './export';
-import { debounce } from './performance';
 
-const PANEL_ID = 'zr-stats-panel';
-const TOGGLE_BUTTON_ID = 'zr-stats-toggle';
+const CONTAINER_ID = 'zr-stats-panel-container';
 
 interface HighlightStats {
   total: number;
@@ -19,33 +12,66 @@ interface HighlightStats {
 let isPanelVisible = false;
 let highlightElements: HTMLElement[] = [];
 
+const ICONS = {
+  stats: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`,
+  export: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+  close: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  jump: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>`,
+  note: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
+  toggle: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+};
+
 /**
  * 初始化统计面板
  */
 export function initStatsPanel(): void {
-  createToggleButton();
+  ensureContainer();
   updateHighlightList();
+}
+
+function ensureContainer() {
+  let container = document.getElementById(CONTAINER_ID);
+  if (!container) {
+    container = document.createElement('div');
+    container.id = CONTAINER_ID;
+    const shadow = container.attachShadow({ mode: 'open' });
+    
+    // Inject styles
+    const style = document.createElement('style');
+    // We will read the CSS file and inject it, or just use a reference if we can't easily read it here.
+    // Since I just wrote stats-panel.css, I'll assume it's bundled or I can inject its critical parts.
+    // For robust Shadow DOM, I'll fetch/inject the CSS content.
+    fetch(chrome.runtime.getURL('dist/styles.css'))
+      .then(r => r.text())
+      .then(css => {
+        style.textContent = css;
+      });
+    shadow.appendChild(style);
+    
+    document.body.appendChild(container);
+  }
+  return container;
 }
 
 /**
  * 创建切换按钮
  */
-function createToggleButton(): void {
-  if (document.getElementById(TOGGLE_BUTTON_ID)) return;
+function renderToggleButton(count: number): void {
+  const container = ensureContainer();
+  const shadow = container.shadowRoot!;
+  
+  let button = shadow.querySelector('.zr-stats-toggle') as HTMLButtonElement;
+  if (!button) {
+    button = document.createElement('button');
+    button.className = 'zr-stats-toggle';
+    button.onclick = toggleStatsPanel;
+    shadow.appendChild(button);
+  }
 
-  const button = document.createElement('button');
-  button.id = TOGGLE_BUTTON_ID;
-  button.className = 'zr-stats-toggle';
   button.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <span class="zr-stats-badge" id="zr-stats-badge">0</span>
+    ${ICONS.toggle}
+    <span class="zr-stats-badge" style="display: ${count > 0 ? 'flex' : 'none'}">${count}</span>
   `;
-  button.title = '高亮统计 (点击查看)';
-  button.addEventListener('click', toggleStatsPanel);
-
-  document.body.appendChild(button);
 }
 
 /**
@@ -65,71 +91,128 @@ export function toggleStatsPanel(): void {
 function showStatsPanel(): void {
   if (isPanelVisible) return;
 
-  updateHighlightList();
+  const container = ensureContainer();
+  const shadow = container.shadowRoot!;
 
   const panel = document.createElement('div');
-  panel.id = PANEL_ID;
   panel.className = 'zr-stats-panel';
 
-  // 头部
+  // Header
   const header = document.createElement('div');
   header.className = 'zr-stats-header';
-
-  const title = document.createElement('h3');
-  title.textContent = '📊 高亮统计';
-  header.appendChild(title);
-
-  // 导出按钮
+  header.innerHTML = `<h3>${ICONS.stats} 高亮统计</h3>`;
+  
+  const actions = document.createElement('div');
+  actions.className = 'zr-header-actions';
+  
   const exportBtn = document.createElement('button');
-  exportBtn.className = 'zr-stats-export';
-  exportBtn.innerHTML = '📥';
+  exportBtn.className = 'zr-icon-btn';
+  exportBtn.innerHTML = ICONS.export;
   exportBtn.title = '导出高亮';
-  exportBtn.addEventListener('click', (e) => {
+  exportBtn.onclick = (e) => {
     e.stopPropagation();
     showExportMenu(exportBtn);
-  });
-  header.appendChild(exportBtn);
-
+  };
+  
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'zr-stats-close';
-  closeBtn.innerHTML = '✕';
-  closeBtn.addEventListener('click', hideStatsPanel);
-  header.appendChild(closeBtn);
-
+  closeBtn.className = 'zr-icon-btn';
+  closeBtn.innerHTML = ICONS.close;
+  closeBtn.onclick = hideStatsPanel;
+  
+  actions.append(exportBtn, closeBtn);
+  header.appendChild(actions);
   panel.appendChild(header);
 
-  // 统计卡片
+  // Stats Grid
   const stats = calculateStats();
-  const statsCards = createStatsCards(stats);
-  panel.appendChild(statsCards);
-
-  // 高亮列表
-  const list = createHighlightList();
-  panel.appendChild(list);
-
-  document.body.appendChild(panel);
-
-  // 动画
-  requestAnimationFrame(() => {
-    panel.classList.add('zr-stats-panel-show');
+  const grid = document.createElement('div');
+  grid.className = 'zr-stats-cards';
+  
+  const cards = [
+    { label: 'Total', value: stats.total, color: 'var(--zr-blue)' },
+    { label: 'Notes', value: stats.withNotes, color: '#a78bfa' },
+    { label: 'Yellow', value: stats.byColor.yellow, color: '#facc15' },
+  ];
+  
+  cards.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'zr-stats-card';
+    card.innerHTML = `
+      <div class="zr-stats-value" style="color: ${c.color}">${c.value}</div>
+      <div class="zr-stats-label">${c.label}</div>
+    `;
+    grid.appendChild(card);
   });
+  panel.appendChild(grid);
 
+  // List
+  const listContainer = document.createElement('div');
+  listContainer.className = 'zr-stats-list-container';
+  listContainer.innerHTML = '<div class="zr-stats-list-header">高亮列表</div>';
+  
+  const list = document.createElement('div');
+  list.className = 'zr-stats-list';
+  
+  if (highlightElements.length === 0) {
+    list.innerHTML = '<div class="zr-stats-empty">当前页面没有高亮内容</div>';
+  } else {
+    highlightElements.forEach(el => {
+      const item = document.createElement('div');
+      item.className = 'zr-stats-item';
+      
+      const indicator = document.createElement('div');
+      indicator.className = 'zr-stats-indicator';
+      indicator.style.backgroundColor = el.style.backgroundColor;
+      
+      const content = document.createElement('div');
+      content.className = 'zr-stats-item-content';
+      content.innerHTML = `<div class="zr-stats-item-text">${el.textContent || ''}</div>`;
+      
+      if (el.dataset.note) {
+        const note = document.createElement('div');
+        note.className = 'zr-stats-item-note';
+        note.innerHTML = `${ICONS.note} <span>${el.dataset.note}</span>`;
+        content.appendChild(note);
+      }
+      
+      const jump = document.createElement('div');
+      jump.className = 'zr-stats-jump';
+      jump.innerHTML = ICONS.jump;
+      
+      item.append(indicator, content, jump);
+      item.onclick = () => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid var(--zr-blue)';
+        el.style.outlineOffset = '2px';
+        setTimeout(() => { el.style.outline = 'none'; }, 2000);
+        hideStatsPanel();
+      };
+      
+      list.appendChild(item);
+    });
+  }
+  listContainer.appendChild(list);
+  panel.appendChild(listContainer);
+
+  shadow.appendChild(panel);
   isPanelVisible = true;
 }
 
 /**
  * 隐藏统计面板
  */
-function hideStatsPanel(): void {
-  const panel = document.getElementById(PANEL_ID);
-  if (!panel) return;
-
-  panel.classList.remove('zr-stats-panel-show');
-
-  setTimeout(() => {
-    panel.remove();
-    isPanelVisible = false;
-  }, 300);
+export function hideStatsPanel(): void {
+  const container = document.getElementById(CONTAINER_ID);
+  if (!container) return;
+  
+  const panel = container.shadowRoot?.querySelector('.zr-stats-panel') as HTMLElement;
+  if (panel) {
+    panel.classList.add('zr-panel-fade-out');
+    setTimeout(() => {
+      panel.remove();
+      isPanelVisible = false;
+    }, 200);
+  }
 }
 
 /**
@@ -137,194 +220,46 @@ function hideStatsPanel(): void {
  */
 export function updateHighlightList(): void {
   highlightElements = Array.from(
-    document.querySelectorAll('[data-highlight-id]')
+    document.querySelectorAll('[data-zr-highlight-id]')
   ) as HTMLElement[];
 
-  // 更新徽章数字
-  const badge = document.getElementById('zr-stats-badge');
-  if (badge) {
-    badge.textContent = highlightElements.length.toString();
-    badge.style.display = highlightElements.length > 0 ? 'flex' : 'none';
-  }
+  renderToggleButton(highlightElements.length);
 
-  // 如果面板已打开，刷新内容
   if (isPanelVisible) {
-    const panel = document.getElementById(PANEL_ID);
+    const container = document.getElementById(CONTAINER_ID);
+    const panel = container?.shadowRoot?.querySelector('.zr-stats-panel');
     if (panel) {
-      // 更新统计卡片
-      const oldCards = panel.querySelector('.zr-stats-cards');
-      const stats = calculateStats();
-      const newCards = createStatsCards(stats);
-      if (oldCards) {
-        oldCards.replaceWith(newCards);
-      }
-
-      // 更新列表
-      const oldList = panel.querySelector('.zr-stats-list-container');
-      const newList = createHighlightList();
-      if (oldList) {
-        oldList.replaceWith(newList);
-      }
+      panel.remove();
+      isPanelVisible = false;
+      showStatsPanel();
     }
   }
 }
 
-/**
- * 计算统计数据
- */
 function calculateStats(): HighlightStats {
   const stats: HighlightStats = {
     total: highlightElements.length,
-    byColor: {
-      yellow: 0,
-      blue: 0,
-      green: 0,
-      red: 0,
-    },
+    byColor: { yellow: 0, blue: 0, green: 0, red: 0 },
     withNotes: 0,
   };
 
   highlightElements.forEach((el) => {
-    const color = el.style.backgroundColor;
-    if (color.includes('254, 243, 199')) stats.byColor.yellow++;
-    else if (color.includes('219, 234, 254')) stats.byColor.blue++;
-    else if (color.includes('209, 250, 229')) stats.byColor.green++;
-    else if (color.includes('254, 226, 226')) stats.byColor.red++;
-
-    if (el.dataset.note) {
-      stats.withNotes++;
-    }
+    const color = el.getAttribute('data-zr-color') as HighlightColor || 'yellow';
+    if (stats.byColor[color] !== undefined) stats.byColor[color]++;
+    if (el.dataset.note) stats.withNotes++;
   });
 
   return stats;
 }
 
 /**
- * 创建统计卡片
- */
-function createStatsCards(stats: HighlightStats): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'zr-stats-cards';
-
-  const cards = [
-    { label: '总计', value: stats.total, color: '#3b82f6' },
-    { label: '黄色', value: stats.byColor.yellow, color: '#fbbf24' },
-    { label: '蓝色', value: stats.byColor.blue, color: '#60a5fa' },
-    { label: '绿色', value: stats.byColor.green, color: '#34d399' },
-    { label: '红色', value: stats.byColor.red, color: '#f87171' },
-    { label: '含笔记', value: stats.withNotes, color: '#8b5cf6' },
-  ];
-
-  cards.forEach((cardData) => {
-    const card = document.createElement('div');
-    card.className = 'zr-stats-card';
-
-    const value = document.createElement('div');
-    value.className = 'zr-stats-value';
-    value.textContent = cardData.value.toString();
-    value.style.color = cardData.color;
-    card.appendChild(value);
-
-    const label = document.createElement('div');
-    label.className = 'zr-stats-label';
-    label.textContent = cardData.label;
-    card.appendChild(label);
-
-    container.appendChild(card);
-  });
-
-  return container;
-}
-
-/**
- * 创建高亮列表
- */
-function createHighlightList(): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'zr-stats-list-container';
-
-  const header = document.createElement('div');
-  header.className = 'zr-stats-list-header';
-  header.textContent = '高亮列表';
-  container.appendChild(header);
-
-  const list = document.createElement('div');
-  list.className = 'zr-stats-list';
-
-  if (highlightElements.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'zr-stats-empty';
-    empty.textContent = '当前页面没有高亮';
-    list.appendChild(empty);
-  } else {
-    highlightElements.forEach((el, index) => {
-      const item = createHighlightItem(el, index);
-      list.appendChild(item);
-    });
-  }
-
-  container.appendChild(list);
-
-  return container;
-}
-
-/**
- * 创建高亮列表项
- */
-function createHighlightItem(el: HTMLElement, index: number): HTMLElement {
-  const item = document.createElement('div');
-  item.className = 'zr-stats-item';
-
-  // 颜色指示器
-  const indicator = document.createElement('div');
-  indicator.className = 'zr-stats-indicator';
-  indicator.style.backgroundColor = el.style.backgroundColor;
-  item.appendChild(indicator);
-
-  // 内容
-  const content = document.createElement('div');
-  content.className = 'zr-stats-item-content';
-
-  const text = document.createElement('div');
-  text.className = 'zr-stats-item-text';
-  const fullText = el.textContent || '';
-  text.textContent = fullText.length > 80 ? fullText.slice(0, 80) + '...' : fullText;
-  content.appendChild(text);
-
-  if (el.dataset.note) {
-    const note = document.createElement('div');
-    note.className = 'zr-stats-item-note';
-    note.innerHTML = `📝 ${el.dataset.note}`;
-    content.appendChild(note);
-  }
-
-  item.appendChild(content);
-
-  // 跳转按钮
-  const jumpBtn = document.createElement('button');
-  jumpBtn.className = 'zr-stats-jump';
-  jumpBtn.innerHTML = '↗';
-  jumpBtn.title = '跳转到此高亮';
-  jumpBtn.addEventListener('click', () => {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    // 高亮闪烁效果
-    el.classList.add('zr-highlight-flash');
-    setTimeout(() => {
-      el.classList.remove('zr-highlight-flash');
-    }, 2000);
-    
-    hideStatsPanel();
-  });
-  item.appendChild(jumpBtn);
-
-  return item;
-}
-
-/**
  * 显示导出菜单
  */
 function showExportMenu(button: HTMLElement): void {
+  const container = document.getElementById(CONTAINER_ID);
+  const shadow = container?.shadowRoot;
+  if (!shadow) return;
+
   const menu = document.createElement('div');
   menu.className = 'zr-export-menu';
 
@@ -332,7 +267,6 @@ function showExportMenu(button: HTMLElement): void {
     { icon: '📝', text: 'Markdown', action: () => exportHighlights({ format: 'markdown', includeNotes: true, groupByColor: true }) },
     { icon: '📄', text: '纯文本', action: () => exportHighlights({ format: 'text', includeNotes: true, groupByColor: true }) },
     { icon: '🌐', text: 'HTML', action: () => exportHighlights({ format: 'html', includeNotes: true, groupByColor: true }) },
-    { icon: '💾', text: 'JSON', action: () => exportHighlights({ format: 'json', includeNotes: true }) },
     { type: 'divider' },
     { icon: '📋', text: '复制富文本', action: copyHighlightsAsRichText },
   ];
@@ -345,42 +279,31 @@ function showExportMenu(button: HTMLElement): void {
     } else {
       const item = document.createElement('div');
       item.className = 'zr-export-item';
-      item.innerHTML = `${option.icon} ${option.text}`;
-      item.addEventListener('click', () => {
+      item.innerHTML = `<span>${option.icon}</span> <span>${option.text}</span>`;
+      item.onclick = () => {
         option.action!();
         menu.remove();
-      });
+      };
       menu.appendChild(item);
     }
   });
 
-  // 定位菜单
   const rect = button.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + 5}px`;
+  menu.style.top = `${rect.bottom + 8}px`;
   menu.style.right = `${window.innerWidth - rect.right}px`;
 
-  document.body.appendChild(menu);
+  shadow.appendChild(menu);
 
-  // 点击外部关闭
   const closeMenu = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node) && e.target !== button) {
+    if (!menu.contains(e.target as Node)) {
       menu.remove();
-      document.removeEventListener('click', closeMenu);
+      document.removeEventListener('mousedown', closeMenu);
     }
   };
-  setTimeout(() => {
-    document.addEventListener('click', closeMenu);
-  }, 0);
+  setTimeout(() => document.addEventListener('mousedown', closeMenu), 0);
 }
 
-/**
- * 销毁统计面板
- */
 export function destroyStatsPanel(): void {
-  hideStatsPanel();
-  const button = document.getElementById(TOGGLE_BUTTON_ID);
-  if (button) {
-    button.remove();
-  }
+  const container = document.getElementById(CONTAINER_ID);
+  container?.remove();
 }

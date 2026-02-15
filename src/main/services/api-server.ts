@@ -72,13 +72,29 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return await handleCreateHighlight(req, res);
     }
 
-    if (method === 'GET' && pathname === '/api/highlights') {
-      return await handleGetHighlightsByUrl(url, res);
+    if (method === 'GET' && pathname === '/api/tags') {
+      return await handleGetTags(res);
+    }
+
+    if (method === 'POST' && pathname === '/api/tags') {
+      return await handleCreateTag(req, res);
     }
 
     const highlightMatch = pathname.match(/^\/api\/highlights\/(.+)$/);
     if (highlightMatch) {
       const id = highlightMatch[1];
+      
+      const tagMatch = pathname.match(/^\/api\/highlights\/(.+)\/tags$/);
+      if (tagMatch) {
+        if (method === 'GET') return await handleGetHighlightTags(tagMatch[1], res);
+        if (method === 'POST') return await handleAddTagToHighlight(tagMatch[1], req, res);
+      }
+
+      const specificTagMatch = pathname.match(/^\/api\/highlights\/(.+)\/tags\/(.+)$/);
+      if (specificTagMatch && method === 'DELETE') {
+        return await handleRemoveTagFromHighlight(specificTagMatch[1], specificTagMatch[2], res);
+      }
+
       if (method === 'DELETE') return await handleDeleteHighlight(id, res);
       if (method === 'PUT') return await handleUpdateHighlight(id, req, res);
     }
@@ -235,6 +251,101 @@ async function handleUpdateHighlight(id: string, req: http.IncomingMessage, res:
   }
 
   json(res, result);
+}
+
+async function handleGetTags(res: http.ServerResponse) {
+  const db = getDatabase();
+  const tags = await db
+    .select()
+    .from(schema.tags)
+    .where(eq(schema.tags.deletedFlg, 0))
+    .orderBy(schema.tags.name);
+  json(res, tags);
+}
+
+async function handleCreateTag(req: http.IncomingMessage, res: http.ServerResponse) {
+  const body = await parseBody(req);
+  const name = body.name as string | undefined;
+
+  if (!name) {
+    return error(res, 'name 为必填字段');
+  }
+
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const id = randomUUID();
+
+  await db.insert(schema.tags).values({
+    id,
+    name,
+    parentId: (body.parentId as string) || null,
+    createdAt: now,
+    updatedAt: now,
+    deletedFlg: 0,
+  });
+
+  const [result] = await db.select().from(schema.tags).where(eq(schema.tags.id, id));
+  json(res, result, 201);
+}
+
+async function handleGetHighlightTags(highlightId: string, res: http.ServerResponse) {
+  const sqlite = getDatabase(); // Actually I need to use getSqlite() for complex joins if possible, but let's try with drizzle
+  // Wait, api-server.ts already has getDatabase. Let's use it.
+  
+  // Or use the same logic as highlight-tag-handlers.ts
+  const db = getDatabase();
+  // Drizzle join:
+  const result = await db
+    .select({
+      id: schema.tags.id,
+      name: schema.tags.name,
+      parentId: schema.tags.parentId,
+      createdAt: schema.tags.createdAt,
+      updatedAt: schema.tags.updatedAt,
+    })
+    .from(schema.tags)
+    .innerJoin(schema.highlightTags, eq(schema.highlightTags.tagId, schema.tags.id))
+    .where(and(eq(schema.highlightTags.highlightId, highlightId), eq(schema.tags.deletedFlg, 0)));
+
+  json(res, result);
+}
+
+async function handleAddTagToHighlight(highlightId: string, req: http.IncomingMessage, res: http.ServerResponse) {
+  const body = await parseBody(req);
+  const tagId = body.tagId as string | undefined;
+
+  if (!tagId) {
+    return error(res, 'tagId 为必填字段');
+  }
+
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const existing = await db.select().from(schema.highlightTags)
+    .where(and(
+      eq(schema.highlightTags.highlightId, highlightId),
+      eq(schema.highlightTags.tagId, tagId),
+    ));
+
+  if (existing.length === 0) {
+    await db.insert(schema.highlightTags).values({
+      highlightId,
+      tagId,
+      createdAt: now,
+    });
+  }
+
+  json(res, { success: true });
+}
+
+async function handleRemoveTagFromHighlight(highlightId: string, tagId: string, res: http.ServerResponse) {
+  const db = getDatabase();
+  await db.delete(schema.highlightTags)
+    .where(and(
+      eq(schema.highlightTags.highlightId, highlightId),
+      eq(schema.highlightTags.tagId, tagId),
+    ));
+  json(res, { success: true });
 }
 
 export function startApiServer() {

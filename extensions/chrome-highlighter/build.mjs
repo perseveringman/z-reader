@@ -15,12 +15,12 @@ const configs = [
   { ...commonOptions, entryPoints: ['src/background.ts'], format: 'esm' },
   { ...commonOptions, entryPoints: ['src/content.ts'], format: 'iife' },
   { ...commonOptions, entryPoints: ['src/popup.ts'], format: 'iife' },
+  { ...commonOptions, entryPoints: ['src/styles.css'], outdir: 'dist', loader: { '.css': 'css' } },
 ];
 
 // 复制静态资源到 dist
 function copyStatic() {
   mkdirSync('dist', { recursive: true });
-  copyFileSync('src/styles.css', 'dist/styles.css');
   copyFileSync('src/popup.css', 'dist/popup.css');
 }
 

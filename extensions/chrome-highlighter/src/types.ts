@@ -48,6 +48,11 @@ export interface SaveArticleInput {
 
 export type HighlightColor = 'yellow' | 'blue' | 'green' | 'red';
 
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 export const HIGHLIGHT_COLORS: Record<HighlightColor, string> = {
   yellow: '#fef08a',
   blue: '#93c5fd',

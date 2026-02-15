@@ -4,6 +4,7 @@
  */
 
 import { toast } from './toast';
+import { HIGHLIGHT_COLORS } from './types';
 
 const PANEL_ID = 'zr-settings-panel';
 const STORAGE_KEY = 'zr-user-preferences';
@@ -41,10 +42,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   highlightBorderStyle: 'none',
   highlightBorderWidth: 0,
   customColors: {
-    yellow: '#fef3c7',
-    blue: '#dbeafe',
-    green: '#d1fae5',
-    red: '#fee2e2',
+    yellow: HIGHLIGHT_COLORS.yellow,  // #fef08a
+    blue: HIGHLIGHT_COLORS.blue,      // #93c5fd
+    green: HIGHLIGHT_COLORS.green,    // #86efac
+    red: HIGHLIGHT_COLORS.red,        // #fca5a5
   },
   highlightFontWeight: 'normal',
   highlightFontStyle: 'normal',
@@ -616,7 +617,7 @@ export function applyPreferences(): void {
           highlightFontWeight, highlightFontStyle, highlightTextDecoration } = currentPreferences;
 
   style.textContent = `
-    [data-highlight-id] {
+    [data-zr-highlight-id] {
       opacity: ${highlightOpacity / 100} !important;
       border-style: ${highlightBorderStyle} !important;
       border-width: ${highlightBorderWidth}px !important;
@@ -625,22 +626,22 @@ export function applyPreferences(): void {
       text-decoration: ${highlightTextDecoration} !important;
     }
     
-    [data-highlight-id][style*="rgb(254, 243, 199)"] {
+    [data-zr-highlight-id][style*="rgb(254, 240, 138)"] {
       background-color: ${customColors.yellow} !important;
       border-color: ${adjustColorBrightness(customColors.yellow, -20)} !important;
     }
     
-    [data-highlight-id][style*="rgb(219, 234, 254)"] {
+    [data-zr-highlight-id][style*="rgb(147, 197, 253)"] {
       background-color: ${customColors.blue} !important;
       border-color: ${adjustColorBrightness(customColors.blue, -20)} !important;
     }
     
-    [data-highlight-id][style*="rgb(209, 250, 229)"] {
+    [data-zr-highlight-id][style*="rgb(134, 239, 172)"] {
       background-color: ${customColors.green} !important;
       border-color: ${adjustColorBrightness(customColors.green, -20)} !important;
     }
     
-    [data-highlight-id][style*="rgb(254, 226, 226)"] {
+    [data-zr-highlight-id][style*="rgb(252, 165, 165)"] {
       background-color: ${customColors.red} !important;
       border-color: ${adjustColorBrightness(customColors.red, -20)} !important;
     }

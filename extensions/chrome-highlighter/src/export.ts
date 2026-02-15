@@ -4,6 +4,7 @@
  */
 
 import { toast } from './toast';
+import { HIGHLIGHT_COLORS, type HighlightColor } from './types';
 
 interface ExportOptions {
   format: 'markdown' | 'text' | 'html' | 'json';
@@ -80,8 +81,8 @@ export async function copyHighlightsAsRichText(): Promise<void> {
     return;
   }
 
-  const html = exportAsHTML(highlights, { includeNotes: true, groupByColor: true });
-  const text = exportAsText(highlights, { includeNotes: true, groupByColor: true });
+  const html = exportAsHTML(highlights, { format: 'html', includeNotes: true, groupByColor: true });
+  const text = exportAsText(highlights, { format: 'text', includeNotes: true, groupByColor: true });
 
   try {
     // 使用 Clipboard API 复制富文本
@@ -108,11 +109,11 @@ export async function copyHighlightsAsRichText(): Promise<void> {
  */
 function collectHighlights(): HighlightData[] {
   const elements = Array.from(
-    document.querySelectorAll('[data-highlight-id]')
+    document.querySelectorAll('[data-zr-highlight-id]')
   ) as HTMLElement[];
 
   return elements.map((el) => ({
-    id: el.dataset.highlightId || '',
+    id: el.dataset.zrHighlightId || '',
     text: el.textContent || '',
     note: el.dataset.note,
     color: getColorName(el.style.backgroundColor),
@@ -318,13 +319,24 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 }
 
 /**
+ * HEX 颜色转 RGB 字符串
+ */
+function hexToRgbString(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+/**
  * 获取颜色名称
  */
 function getColorName(backgroundColor: string): string {
-  if (backgroundColor.includes('254, 243, 199')) return 'yellow';
-  if (backgroundColor.includes('219, 234, 254')) return 'blue';
-  if (backgroundColor.includes('209, 250, 229')) return 'green';
-  if (backgroundColor.includes('254, 226, 226')) return 'red';
+  for (const [name, hex] of Object.entries(HIGHLIGHT_COLORS)) {
+    if (backgroundColor === hex || backgroundColor.includes(hexToRgbString(hex))) {
+      return name;
+    }
+  }
   return 'yellow';
 }
 

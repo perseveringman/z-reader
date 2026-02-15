@@ -58,3 +58,31 @@ export async function updateHighlight(highlightId: string, data: { note?: string
     body: JSON.stringify(data),
   });
 }
+
+export async function getAllTags(): Promise<Tag[]> {
+  return request<Tag[]>('/tags');
+}
+
+export async function createTag(name: string): Promise<Tag> {
+  return request<Tag>('/tags', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function getHighlightTags(highlightId: string): Promise<Tag[]> {
+  return request<Tag[]>(`/highlights/${highlightId}/tags`);
+}
+
+export async function addTagToHighlight(highlightId: string, tagId: string): Promise<void> {
+  await request<unknown>(`/highlights/${highlightId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tagId }),
+  });
+}
+
+export async function removeTagFromHighlight(highlightId: string, tagId: string): Promise<void> {
+  await request<unknown>(`/highlights/${highlightId}/tags/${tagId}`, {
+    method: 'DELETE',
+  });
+}

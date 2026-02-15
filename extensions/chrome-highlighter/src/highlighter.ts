@@ -49,9 +49,24 @@ export function highlightSelection(color: HighlightColor = 'yellow'): HighlightR
   };
 }
 
-export function restoreHighlight(id: string, text: string, color: HighlightColor): boolean {
-  const body = document.body;
-  const treeWalker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+export interface RestoreHighlightOptions {
+  startOffset?: number;
+  endOffset?: number;
+  paragraphIndex?: number;
+  note?: string;
+}
+
+export function restoreHighlight(id: string, text: string, color: HighlightColor, options?: RestoreHighlightOptions): boolean {
+  // 如果提供了 paragraphIndex，先定位到对应段落再搜索，提高准确性
+  let searchRoot: Node = document.body;
+  if (options?.paragraphIndex !== undefined) {
+    const allBlocks = document.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, pre');
+    if (options.paragraphIndex < allBlocks.length) {
+      searchRoot = allBlocks[options.paragraphIndex];
+    }
+  }
+
+  const treeWalker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_TEXT);
   let node: Node | null;
 
   while ((node = treeWalker.nextNode())) {
@@ -76,8 +91,19 @@ export function restoreHighlight(id: string, text: string, color: HighlightColor
       range.insertNode(wrapper);
     }
 
+    // 如果有笔记，设置 data-note 属性
+    if (options?.note) {
+      wrapper.setAttribute('data-note', options.note);
+    }
+    wrapper.setAttribute('data-zr-color', color);
+
     attachClickHandler(wrapper);
     return true;
+  }
+
+  // 如果在段落内未找到，回退到全文搜索
+  if (searchRoot !== document.body) {
+    return restoreHighlight(id, text, color);
   }
 
   return false;
@@ -96,10 +122,22 @@ export function removeHighlight(highlightId: string): void {
   });
 }
 
+export function setHighlightNote(highlightId: string, note: string | null): void {
+  const marks = document.querySelectorAll(`[${HIGHLIGHT_ATTR}="${highlightId}"]`);
+  marks.forEach((mark) => {
+    if (note) {
+      mark.setAttribute('data-note', note);
+    } else {
+      mark.removeAttribute('data-note');
+    }
+  });
+}
+
 export function changeHighlightColor(highlightId: string, color: HighlightColor): void {
   const marks = document.querySelectorAll(`[${HIGHLIGHT_ATTR}="${highlightId}"]`);
   marks.forEach((mark) => {
     (mark as HTMLElement).style.backgroundColor = HIGHLIGHT_COLORS[color];
+    mark.setAttribute('data-zr-color', color);
   });
 }
 
@@ -107,6 +145,7 @@ function createMarkElement(id: string, color: HighlightColor): HTMLElement {
   const wrapper = document.createElement('mark');
   wrapper.className = HIGHLIGHT_CLASS;
   wrapper.setAttribute(HIGHLIGHT_ATTR, id);
+  wrapper.setAttribute('data-zr-color', color);
   wrapper.style.backgroundColor = HIGHLIGHT_COLORS[color];
   wrapper.style.borderRadius = '2px';
   wrapper.style.padding = '0 1px';
@@ -118,8 +157,10 @@ function attachClickHandler(element: HTMLElement): void {
   element.addEventListener('click', () => {
     const id = element.getAttribute(HIGHLIGHT_ATTR);
     const text = element.textContent;
+    const note = element.getAttribute('data-note');
+    const color = element.getAttribute('data-zr-color');
     document.dispatchEvent(new CustomEvent('zr-highlight-click', {
-      detail: { id, text },
+      detail: { id, text, note, color, element },
     }));
   });
 }

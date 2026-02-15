@@ -303,7 +303,7 @@ async function executePendingOperation(operation: PendingOperation): Promise<voi
   // 由于依赖注入的复杂性，这里只是示例
   // 实际使用时需要从 api.ts 导入相应函数
   
-  const API_BASE = 'http://localhost:15621';
+  const API_BASE = 'http://127.0.0.1:21897/api';
   
   switch (operation.type) {
     case 'create':
