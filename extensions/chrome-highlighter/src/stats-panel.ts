@@ -4,6 +4,7 @@
  */
 
 import type { HighlightColor } from './types';
+import { exportHighlights, copyHighlightsAsRichText } from './export';
 
 const PANEL_ID = 'zr-stats-panel';
 const TOGGLE_BUTTON_ID = 'zr-stats-toggle';
@@ -76,6 +77,17 @@ function showStatsPanel(): void {
   const title = document.createElement('h3');
   title.textContent = '📊 高亮统计';
   header.appendChild(title);
+
+  // 导出按钮
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'zr-stats-export';
+  exportBtn.innerHTML = '📥';
+  exportBtn.title = '导出高亮';
+  exportBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showExportMenu(exportBtn);
+  });
+  header.appendChild(exportBtn);
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'zr-stats-close';
@@ -306,6 +318,59 @@ function createHighlightItem(el: HTMLElement, index: number): HTMLElement {
   item.appendChild(jumpBtn);
 
   return item;
+}
+
+/**
+ * 显示导出菜单
+ */
+function showExportMenu(button: HTMLElement): void {
+  const menu = document.createElement('div');
+  menu.className = 'zr-export-menu';
+
+  const options = [
+    { icon: '📝', text: 'Markdown', action: () => exportHighlights({ format: 'markdown', includeNotes: true, groupByColor: true }) },
+    { icon: '📄', text: '纯文本', action: () => exportHighlights({ format: 'text', includeNotes: true, groupByColor: true }) },
+    { icon: '🌐', text: 'HTML', action: () => exportHighlights({ format: 'html', includeNotes: true, groupByColor: true }) },
+    { icon: '💾', text: 'JSON', action: () => exportHighlights({ format: 'json', includeNotes: true }) },
+    { type: 'divider' },
+    { icon: '📋', text: '复制富文本', action: copyHighlightsAsRichText },
+  ];
+
+  options.forEach((option) => {
+    if (option.type === 'divider') {
+      const divider = document.createElement('div');
+      divider.className = 'zr-export-divider';
+      menu.appendChild(divider);
+    } else {
+      const item = document.createElement('div');
+      item.className = 'zr-export-item';
+      item.innerHTML = `${option.icon} ${option.text}`;
+      item.addEventListener('click', () => {
+        option.action!();
+        menu.remove();
+      });
+      menu.appendChild(item);
+    }
+  });
+
+  // 定位菜单
+  const rect = button.getBoundingClientRect();
+  menu.style.position = 'absolute';
+  menu.style.top = `${rect.bottom + 5}px`;
+  menu.style.right = `${window.innerWidth - rect.right}px`;
+
+  document.body.appendChild(menu);
+
+  // 点击外部关闭
+  const closeMenu = (e: MouseEvent) => {
+    if (!menu.contains(e.target as Node) && e.target !== button) {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('click', closeMenu);
+  }, 0);
 }
 
 /**

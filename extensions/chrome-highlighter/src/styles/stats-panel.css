@@ -90,6 +90,19 @@
   color: #111827;
 }
 
+.zr-stats-export {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: transform 0.2s;
+}
+
+.zr-stats-export:hover {
+  transform: scale(1.1);
+}
+
 .zr-stats-close {
   background: none;
   border: none;
@@ -263,6 +276,51 @@
 
 .zr-stats-list::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+/* 导出菜单 */
+.zr-export-menu {
+  position: fixed;
+  min-width: 180px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  z-index: 1000000;
+  animation: zr-fade-in 0.15s ease;
+}
+
+.zr-export-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #111827;
+  transition: background 0.15s;
+}
+
+.zr-export-item:hover {
+  background: #f3f4f6;
+}
+
+.zr-export-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 8px;
+}
+
+@keyframes zr-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* 响应式 */
