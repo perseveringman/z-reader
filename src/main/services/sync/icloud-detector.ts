@@ -21,7 +21,9 @@ export function getSyncDirectoryPath(icloudBasePath?: string): string {
 export function checkICloudAvailability(mobileDocumentsPath?: string): ICloudStatus {
   const dir = mobileDocumentsPath || getDefaultICloudBasePath();
   try {
-    fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
+    // 只检查可读性，Mobile Documents 目录本身在 macOS 上是只读的
+    // 实际写入发生在容器子目录中（由 ensureSyncDirectory 创建）
+    fs.accessSync(dir, fs.constants.R_OK);
     return { available: true, path: dir };
   } catch {
     return { available: false };
