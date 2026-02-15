@@ -34,6 +34,7 @@ describe('AIDatabase - Prompt Presets', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].title).toBe('A');
     expect(rows[1].title).toBe('B');
+    expect(rows[0].icon_key).toBe('message-square');
   });
 
   it('支持按 target 与 enabledOnly 过滤', () => {
@@ -79,6 +80,7 @@ describe('AIDatabase - Prompt Presets', () => {
       prompt: 'after-prompt',
       enabled: false,
       targets: ['chat', 'summarize'],
+      iconKey: 'brain',
     });
 
     const updated = aiDb.getPromptPreset(created.id);
@@ -87,6 +89,7 @@ describe('AIDatabase - Prompt Presets', () => {
     expect(updated!.prompt).toBe('after-prompt');
     expect(updated!.enabled).toBe(0);
     expect(JSON.parse(updated!.targets_json)).toEqual(['chat', 'summarize']);
+    expect(updated!.icon_key).toBe('brain');
     expect(updated!.updated_at).not.toBe(beforeUpdatedAt);
 
     aiDb.deletePromptPreset(created.id);

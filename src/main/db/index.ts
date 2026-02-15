@@ -325,6 +325,7 @@ function initTables(sqlite: Database.Database) {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       prompt TEXT NOT NULL,
+      icon_key TEXT NOT NULL DEFAULT 'message-square',
       enabled INTEGER NOT NULL DEFAULT 1,
       display_order INTEGER NOT NULL DEFAULT 0,
       targets_json TEXT NOT NULL,
@@ -336,6 +337,14 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_enabled ON ai_prompt_presets(enabled);
     CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_order ON ai_prompt_presets(display_order);
   `);
+
+  // Migration: ai_prompt_presets 表新增 icon_key 字段
+  try {
+    sqlite.exec(`ALTER TABLE ai_prompt_presets ADD COLUMN icon_key TEXT NOT NULL DEFAULT 'message-square'`);
+  } catch {
+    // Column already exists
+  }
+  sqlite.exec(`UPDATE ai_prompt_presets SET icon_key = 'message-square' WHERE icon_key IS NULL OR icon_key = ''`);
 
   // Migration: app_tasks 通用任务表
   sqlite.exec(`

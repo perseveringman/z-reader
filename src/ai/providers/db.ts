@@ -44,6 +44,7 @@ export interface PromptPresetRow {
   id: string;
   title: string;
   prompt: string;
+  icon_key: string;
   enabled: number;
   display_order: number;
   targets_json: string;
@@ -56,6 +57,7 @@ export interface CreatePromptPresetInput {
   id?: string;
   title: string;
   prompt: string;
+  iconKey?: string;
   enabled?: boolean;
   displayOrder?: number;
   targets: string[];
@@ -65,6 +67,7 @@ export interface CreatePromptPresetInput {
 export interface UpdatePromptPresetInput {
   title?: string;
   prompt?: string;
+  iconKey?: string;
   enabled?: boolean;
   displayOrder?: number;
   targets?: string[];
@@ -120,6 +123,7 @@ export class AIDatabase {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         prompt TEXT NOT NULL,
+        icon_key TEXT NOT NULL DEFAULT 'message-square',
         enabled INTEGER NOT NULL DEFAULT 1,
         display_order INTEGER NOT NULL DEFAULT 0,
         targets_json TEXT NOT NULL,
@@ -131,6 +135,14 @@ export class AIDatabase {
       CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_enabled ON ai_prompt_presets(enabled);
       CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_order ON ai_prompt_presets(display_order);
     `);
+
+    // Migration: ai_prompt_presets 表新增 icon_key 字段
+    try {
+      this.sqlite.exec(`ALTER TABLE ai_prompt_presets ADD COLUMN icon_key TEXT NOT NULL DEFAULT 'message-square'`);
+    } catch {
+      // Column already exists
+    }
+    this.sqlite.exec(`UPDATE ai_prompt_presets SET icon_key = 'message-square' WHERE icon_key IS NULL OR icon_key = ''`);
   }
 
   /** 读取设置，不存在则返回 null */
@@ -273,13 +285,14 @@ export class AIDatabase {
 
     this.sqlite.prepare(`
       INSERT INTO ai_prompt_presets (
-        id, title, prompt, enabled, display_order, targets_json, is_builtin, created_at, updated_at
+        id, title, prompt, icon_key, enabled, display_order, targets_json, is_builtin, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.title,
       input.prompt,
+      input.iconKey ?? 'message-square',
       enabled,
       displayOrder,
       targetsJson,
@@ -292,6 +305,7 @@ export class AIDatabase {
       id,
       title: input.title,
       prompt: input.prompt,
+      icon_key: input.iconKey ?? 'message-square',
       enabled,
       display_order: displayOrder,
       targets_json: targetsJson,
@@ -339,6 +353,10 @@ export class AIDatabase {
     if (updates.prompt !== undefined) {
       fields.push('prompt = ?');
       values.push(updates.prompt);
+    }
+    if (updates.iconKey !== undefined) {
+      fields.push('icon_key = ?');
+      values.push(updates.iconKey);
     }
     if (updates.enabled !== undefined) {
       fields.push('enabled = ?');
@@ -391,9 +409,9 @@ export class AIDatabase {
     const getStmt = this.sqlite.prepare('SELECT id FROM ai_prompt_presets WHERE id = ?');
     const insertStmt = this.sqlite.prepare(`
       INSERT INTO ai_prompt_presets (
-        id, title, prompt, enabled, display_order, targets_json, is_builtin, created_at, updated_at
+        id, title, prompt, icon_key, enabled, display_order, targets_json, is_builtin, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const tx = this.sqlite.transaction((rows: CreatePromptPresetInput[]) => {
@@ -407,6 +425,7 @@ export class AIDatabase {
           row.id,
           row.title,
           row.prompt,
+          row.iconKey ?? 'message-square',
           row.enabled === false ? 0 : 1,
           row.displayOrder ?? 0,
           JSON.stringify(row.targets),

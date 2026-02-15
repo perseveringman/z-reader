@@ -79,12 +79,74 @@ function mapChatSessionRow(row: ChatSessionRow): ChatSession {
 }
 
 const SUPPORTED_PROMPT_TARGETS: AIPromptPresetTarget[] = ['chat', 'summarize', 'translate', 'autoTag', 'extractTopics'];
+const SUPPORTED_PROMPT_ICON_KEYS = [
+  'message-square',
+  'compass',
+  'lightbulb',
+  'atom',
+  'help-circle',
+  'graduation-cap',
+  'brain',
+  'target',
+  'scale',
+  'book-open',
+  'briefcase',
+  'sparkles',
+] as const;
+type PromptIconKey = (typeof SUPPORTED_PROMPT_ICON_KEYS)[number];
+
+async function suggestPromptIconByAI(
+  aiDb: AIDatabase,
+  title: string,
+  prompt: string,
+): Promise<PromptIconKey> {
+  const config = loadAIConfig(aiDb);
+  if (!config.apiKey) return 'message-square';
+
+  try {
+    const llm = createLLMProvider(config);
+    const { generateObject } = await import('ai');
+    const { z } = await import('zod');
+
+    const result = await generateObject({
+      model: llm.getModel('fast'),
+      schema: z.object({
+        iconKey: z.enum(SUPPORTED_PROMPT_ICON_KEYS),
+      }),
+      prompt: `你是图标选择助手。请根据提示词语义，从候选图标中选择最合适的一个。
+
+标题：${title}
+提示词内容：${prompt}
+
+候选图标：
+- message-square: 通用对话/默认
+- compass: 方向、价值、探索
+- lightbulb: 创意、洞察、思考
+- atom: 第一性原理、科学、底层原理
+- help-circle: 提问、反思、质疑
+- graduation-cap: 教学、解释、学习
+- brain: 深度分析、认知、复杂推理
+- target: 目标、聚焦、行动计划
+- scale: 权衡、利弊、决策
+- book-open: 阅读、总结、知识提炼
+- briefcase: 商业、职业、策略
+- sparkles: 灵感、优化、改写
+
+仅返回 iconKey。`,
+    });
+
+    return result.object.iconKey;
+  } catch {
+    return 'message-square';
+  }
+}
 
 const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
   {
     id: 'builtin-value-clarification',
     title: '价值澄清',
     prompt: '请用**价值澄清法**分析这篇文章：识别文章传达的核心价值观，分析这些价值观之间是否存在冲突，帮我厘清哪些是我真正认同的。',
+    iconKey: 'compass',
     enabled: true,
     displayOrder: 0,
     targets: ['chat'],
@@ -94,6 +156,7 @@ const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
     id: 'builtin-six-thinking-hats',
     title: '六顶思考帽',
     prompt: '请用**六顶思考帽**方法分析这篇文章：分别从白帽（事实）、红帽（情感）、黑帽（风险）、黄帽（价值）、绿帽（创新）、蓝帽（全局）六个角度展开分析。',
+    iconKey: 'lightbulb',
     enabled: true,
     displayOrder: 1,
     targets: ['chat'],
@@ -103,6 +166,7 @@ const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
     id: 'builtin-first-principles',
     title: '第一性原理',
     prompt: '请用**第一性原理**分析这篇文章：剥离表面假设，回归最基本的事实和原理，重新推导文章的核心论点是否成立。',
+    iconKey: 'atom',
     enabled: true,
     displayOrder: 2,
     targets: ['chat'],
@@ -112,6 +176,7 @@ const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
     id: 'builtin-socratic-method',
     title: '苏格拉底提问',
     prompt: '请用**苏格拉底提问法**分析这篇文章：通过层层追问的方式，挑战文章的假设、证据和推理逻辑，帮我深入思考。',
+    iconKey: 'help-circle',
     enabled: true,
     displayOrder: 3,
     targets: ['chat'],
@@ -121,6 +186,7 @@ const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
     id: 'builtin-feynman-technique',
     title: '费曼教学法',
     prompt: '请用**费曼教学法**解读这篇文章：用最简单易懂的语言重新解释文章的核心概念，指出我可能存在的理解盲区。',
+    iconKey: 'graduation-cap',
     enabled: true,
     displayOrder: 4,
     targets: ['chat'],
@@ -184,6 +250,7 @@ function mapPromptPresetRow(row: PromptPresetRow): AIPromptPreset {
     id: row.id,
     title: row.title,
     prompt: row.prompt,
+    iconKey: row.icon_key || 'message-square',
     enabled: row.enabled === 1,
     displayOrder: row.display_order,
     targets,
@@ -242,6 +309,7 @@ export function registerAIHandlers() {
       const title = normalizeTitle(input.title);
       const prompt = normalizePrompt(input.prompt);
       const targets = normalizeTargets(input.targets, 'create')!;
+      const iconKey = await suggestPromptIconByAI(aiDb, title, prompt);
 
       let displayOrder = input.displayOrder;
       if (displayOrder === undefined || displayOrder === null) {
@@ -253,6 +321,7 @@ export function registerAIHandlers() {
       const row = aiDb.createPromptPreset({
         title,
         prompt,
+        iconKey,
         enabled: input.enabled !== false,
         targets,
         displayOrder,
@@ -293,6 +362,11 @@ export function registerAIHandlers() {
       }
       if (input.targets !== undefined) {
         updates.targets = normalizeTargets(input.targets, 'update');
+      }
+      if (updates.prompt !== undefined || updates.title !== undefined) {
+        const nextTitle = updates.title ?? existing.title;
+        const nextPrompt = updates.prompt ?? existing.prompt;
+        updates.iconKey = await suggestPromptIconByAI(aiDb, nextTitle, nextPrompt);
       }
 
       aiDb.updatePromptPreset(input.id, updates);

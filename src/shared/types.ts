@@ -430,6 +430,7 @@ export interface AIPromptPreset {
   id: string;
   title: string;
   prompt: string;
+  iconKey: string;
   enabled: boolean;
   displayOrder: number;
   targets: AIPromptPresetTarget[];

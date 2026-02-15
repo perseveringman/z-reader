@@ -1,6 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Plus, Loader2, ChevronDown, ChevronRight, MessageSquare, Settings, Trash2 } from 'lucide-react';
+import {
+  Send,
+  Plus,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
+  Settings,
+  Trash2,
+  Compass,
+  Lightbulb,
+  Atom,
+  HelpCircle,
+  GraduationCap,
+  Brain,
+  Target,
+  Scale,
+  BookOpen,
+  Briefcase,
+  Sparkles,
+} from 'lucide-react';
 import type { ChatMessage, ChatSession, ChatStreamChunk, AIPromptPreset } from '../../shared/types';
 
 // ==================== 简单 Markdown 渲染 ====================
@@ -96,6 +116,27 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function PromptIcon({
+  iconKey,
+  className,
+}: {
+  iconKey: string;
+  className?: string;
+}) {
+  if (iconKey === 'compass') return <Compass className={className} />;
+  if (iconKey === 'lightbulb') return <Lightbulb className={className} />;
+  if (iconKey === 'atom') return <Atom className={className} />;
+  if (iconKey === 'help-circle') return <HelpCircle className={className} />;
+  if (iconKey === 'graduation-cap') return <GraduationCap className={className} />;
+  if (iconKey === 'brain') return <Brain className={className} />;
+  if (iconKey === 'target') return <Target className={className} />;
+  if (iconKey === 'scale') return <Scale className={className} />;
+  if (iconKey === 'book-open') return <BookOpen className={className} />;
+  if (iconKey === 'briefcase') return <Briefcase className={className} />;
+  if (iconKey === 'sparkles') return <Sparkles className={className} />;
+  return <MessageSquare className={className} />;
+}
+
 // ==================== 子组件 ====================
 
 /** 空状态：展示预设分析卡片 */
@@ -125,10 +166,10 @@ function EmptyState({
             <button
               key={preset.id}
               onClick={() => onSelectPreset(preset.prompt)}
-              className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
-            >
-              <div className="flex items-center gap-1.5">
-                <MessageSquare className="w-4 h-4 text-blue-400" />
+            className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
+          >
+            <div className="flex items-center gap-1.5">
+                <PromptIcon iconKey={preset.iconKey} className="w-4 h-4 text-blue-400" />
                 <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
                   {preset.title}
                 </span>
@@ -164,7 +205,7 @@ function PromptPills({
           disabled={disabled}
           className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20"
         >
-          <MessageSquare className="w-3 h-3" />
+          <PromptIcon iconKey={preset.iconKey} className="w-3 h-3" />
           {preset.title}
         </button>
       ))}

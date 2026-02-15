@@ -166,6 +166,7 @@ export const aiPromptPresets = sqliteTable('ai_prompt_presets', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   prompt: text('prompt').notNull(),
+  iconKey: text('icon_key').notNull().default('message-square'),
   enabled: integer('enabled').notNull().default(1),
   displayOrder: integer('display_order').notNull().default(0),
   targetsJson: text('targets_json').notNull(),
