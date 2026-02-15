@@ -5,6 +5,7 @@
 
 import type { HighlightColor } from './types';
 import { exportHighlights, copyHighlightsAsRichText } from './export';
+import { debounce } from './performance';
 
 const PANEL_ID = 'zr-stats-panel';
 const TOGGLE_BUTTON_ID = 'zr-stats-toggle';
