@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { app } from 'electron';
 import path from 'node:path';
 import * as schema from './schema';
+import { initSyncTables } from '../services/sync/sync-tables';
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let sqliteInstance: Database.Database | null = null;
@@ -357,7 +358,6 @@ function initTables(sqlite: Database.Database) {
 
 
   // Migration: sync 同步表
-  const { initSyncTables } = require('../services/sync/sync-tables');
   initSyncTables(sqlite);
 }
 
