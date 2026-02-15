@@ -55,14 +55,96 @@ async function getAuthedClient(cookie: string): Promise<Innertube> {
 }
 
 /**
- * 判断是否为 YouTube 域名
+ * 判断是否为 YouTube 域名（含 youtu.be 短链）
  */
 export function isYouTubeUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return ['www.youtube.com', 'youtube.com', 'm.youtube.com'].includes(parsed.hostname);
+    return ['www.youtube.com', 'youtube.com', 'm.youtube.com', 'youtu.be'].includes(parsed.hostname);
   } catch {
     return false;
+  }
+}
+
+/**
+ * 从 YouTube URL 中提取视频 ID
+ * 支持: youtube.com/watch?v=xxx, youtu.be/xxx, m.youtube.com/watch?v=xxx,
+ *       youtube.com/shorts/xxx, youtube.com/embed/xxx
+ * 返回 videoId 或 null
+ */
+export function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    // youtu.be/VIDEO_ID
+    if (hostname === 'youtu.be') {
+      const id = parsed.pathname.slice(1).split('/')[0];
+      return id || null;
+    }
+
+    // youtube.com 系列
+    if (['www.youtube.com', 'youtube.com', 'm.youtube.com'].includes(hostname)) {
+      // /watch?v=VIDEO_ID
+      const v = parsed.searchParams.get('v');
+      if (v) return v;
+
+      // /shorts/VIDEO_ID, /embed/VIDEO_ID, /live/VIDEO_ID
+      const pathMatch = parsed.pathname.match(/^\/(shorts|embed|live)\/([a-zA-Z0-9_-]+)/);
+      if (pathMatch) return pathMatch[2];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 通过 YouTube oEmbed API 获取视频元数据（标题、作者），
+ * 再通过 Innertube 获取视频时长。
+ * 无需 API key，无需 JS 渲染
+ */
+export async function fetchYouTubeVideoMeta(videoId: string): Promise<{
+  title: string;
+  author: string | null;
+  duration: number | null; // 秒
+} | null> {
+  try {
+    // 1. oEmbed 获取标题和作者（轻量、可靠）
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const response = await fetch(oembedUrl, {
+      headers: {
+        'User-Agent': 'Z-Reader/1.0',
+      },
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      title?: string;
+      author_name?: string;
+    };
+
+    // 2. Innertube 获取视频时长（无需认证）
+    let duration: number | null = null;
+    try {
+      const client = await getClient();
+      const info = await client.getBasicInfo(videoId);
+      const lengthSeconds = info.basic_info?.duration;
+      if (lengthSeconds && lengthSeconds > 0) {
+        duration = lengthSeconds;
+      }
+    } catch {
+      // 时长获取失败不影响其余元数据
+    }
+
+    return {
+      title: data.title ?? videoId,
+      author: data.author_name ?? null,
+      duration,
+    };
+  } catch {
+    return null;
   }
 }
 

@@ -83,7 +83,12 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
   const metaParts: string[] = [];
   if (displayName) metaParts.push(displayName.replace(/^www\./, ''));
   if (article.author) metaParts.push(article.author);
-  if (article.readingTime != null && article.readingTime > 0) {
+  const isVideoOrPodcast = article.mediaType === 'video' || article.mediaType === 'podcast';
+  const effectiveDuration = article.audioDuration || article.duration;
+  if (isVideoOrPodcast && effectiveDuration) {
+    const durationStr = formatDuration(effectiveDuration);
+    if (durationStr) metaParts.push(durationStr);
+  } else if (article.readingTime != null && article.readingTime > 0) {
     metaParts.push(`${article.readingTime} min`);
   }
 
@@ -139,9 +144,9 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
                 alt=""
                 className={`w-14 h-14 rounded-md object-cover ${isRead ? 'opacity-60' : ''}`}
               />
-              {article.mediaType === 'video' && article.duration && (
+              {isVideoOrPodcast && effectiveDuration && (
                 <span className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/80 text-white text-[10px] font-medium rounded">
-                  {formatDuration(article.duration)}
+                  {formatDuration(effectiveDuration)}
                 </span>
               )}
             </>
