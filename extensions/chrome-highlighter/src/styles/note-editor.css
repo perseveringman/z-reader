@@ -1,0 +1,262 @@
+/**
+ * 笔记编辑器样式
+ */
+
+/* 背景遮罩 */
+.zr-editor-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999998;
+  animation: zr-fade-in 0.2s ease;
+}
+
+/* 编辑器容器 */
+.zr-note-editor {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  animation: zr-slide-up 0.3s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 编辑器头部 */
+.zr-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.zr-editor-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.zr-editor-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.zr-editor-close:hover {
+  color: #111827;
+}
+
+/* 引用区域 */
+.zr-editor-quote {
+  margin: 16px 20px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-left: 3px solid #fbbf24;
+  border-radius: 4px;
+  color: #6b7280;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* 工具栏 */
+.zr-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.zr-toolbar-btn {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.zr-toolbar-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.zr-toolbar-btn:active {
+  background: #e5e7eb;
+}
+
+.zr-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #d1d5db;
+  margin: 0 4px;
+}
+
+/* 编辑区域 */
+.zr-editor-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: 400px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #111827;
+  outline: none;
+}
+
+.zr-editor-content:empty::before {
+  content: attr(placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.zr-editor-content b,
+.zr-editor-content strong {
+  font-weight: 600;
+}
+
+.zr-editor-content i,
+.zr-editor-content em {
+  font-style: italic;
+}
+
+.zr-editor-content u {
+  text-decoration: underline;
+}
+
+.zr-editor-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.zr-editor-content ul,
+.zr-editor-content ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.zr-editor-content li {
+  margin: 4px 0;
+}
+
+/* 底部操作栏 */
+.zr-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.zr-editor-hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.zr-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.zr-editor-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zr-editor-btn-secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.zr-editor-btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.zr-editor-btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.zr-editor-btn-primary:hover {
+  background: #2563eb;
+}
+
+.zr-editor-btn-primary:active {
+  background: #1d4ed8;
+}
+
+/* 动画 */
+@keyframes zr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zr-slide-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* 滚动条样式 */
+.zr-editor-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.zr-editor-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.zr-editor-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.zr-editor-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

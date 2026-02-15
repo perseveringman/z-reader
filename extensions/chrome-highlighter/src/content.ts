@@ -1,6 +1,9 @@
 import { highlightSelection, removeHighlight, restoreHighlight } from './highlighter';
 import { showToolbar, hideToolbar } from './toolbar';
-import { createHighlight, deleteHighlight, getHighlightsByUrl, saveArticle } from './api';
+import { createHighlight, deleteHighlight, getHighlightsByUrl, saveArticle, updateHighlight } from './api';
+import { showNoteEditor } from './note-editor';
+import { showHighlightMenu } from './highlight-menu';
+import { toast } from './toast';
 import type { HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
@@ -65,7 +68,10 @@ async function handleHighlight(color: HighlightColor) {
   const result = highlightSelection(color);
   if (!result) return;
 
-  if (!(await ensureArticleSaved())) return;
+  if (!(await ensureArticleSaved())) {
+    toast.error('保存文章失败，无法创建高亮');
+    return;
+  }
 
   try {
     const highlight = await createHighlight({
@@ -77,51 +83,139 @@ async function handleHighlight(color: HighlightColor) {
       paragraphIndex: result.paragraphIndex,
     });
     result.updateId(highlight.id);
+    toast.success('高亮已创建');
   } catch (error) {
     console.error('[Z-Reader] 创建高亮失败:', error);
+    toast.error('创建高亮失败');
   }
 }
 
 async function handleSaveArticle() {
-  await ensureArticleSaved();
+  const saved = await ensureArticleSaved();
+  if (saved) {
+    toast.success('文章已保存到 Z-Reader');
+  } else {
+    toast.error('保存文章失败');
+  }
 }
 
 async function handleHighlightWithNote() {
-  const note = prompt('输入笔记:');
-  if (note === null) return;
+  const selection = window.getSelection();
+  const selectedText = selection?.toString().trim() || '';
 
-  const result = highlightSelection('yellow');
-  if (!result) return;
+  showNoteEditor({
+    selectedText,
+    onSave: async (note) => {
+      const result = highlightSelection('yellow');
+      if (!result) return;
 
-  if (!(await ensureArticleSaved())) return;
+      if (!(await ensureArticleSaved())) {
+        toast.error('保存文章失败，无法创建高亮');
+        return;
+      }
 
-  try {
-    const highlight = await createHighlight({
-      articleId: currentArticleId!,
-      text: result.text,
-      note,
-      color: 'yellow',
-      startOffset: result.startOffset,
-      endOffset: result.endOffset,
-      paragraphIndex: result.paragraphIndex,
-    });
-    result.updateId(highlight.id);
-  } catch (error) {
-    console.error('[Z-Reader] 创建带笔记高亮失败:', error);
-  }
+      try {
+        const highlight = await createHighlight({
+          articleId: currentArticleId!,
+          text: result.text,
+          note,
+          color: 'yellow',
+          startOffset: result.startOffset,
+          endOffset: result.endOffset,
+          paragraphIndex: result.paragraphIndex,
+        });
+        result.updateId(highlight.id);
+        toast.success('笔记高亮已创建');
+      } catch (error) {
+        console.error('[Z-Reader] 创建带笔记高亮失败:', error);
+        toast.error('创建笔记高亮失败');
+      }
+    },
+    onCancel: () => {
+      // 用户取消，不做任何操作
+    },
+  });
 }
 
 document.addEventListener('zr-highlight-click', (e) => {
   const detail = (e as CustomEvent).detail;
   if (!detail?.id) return;
 
-  if (confirm('是否删除此高亮？')) {
-    removeHighlight(detail.id);
-    deleteHighlight(detail.id).catch((error) => {
-      console.error('[Z-Reader] 删除高亮失败:', error);
-    });
-  }
+  // 获取点击位置
+  const target = e.target as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  const x = rect.left + window.scrollX;
+  const y = rect.bottom + window.scrollY + 5;
+
+  // 显示高亮菜单
+  showHighlightMenu({
+    x,
+    y,
+    highlightId: detail.id,
+    note: detail.note,
+    onDelete: () => {
+      removeHighlight(detail.id);
+      deleteHighlight(detail.id)
+        .then(() => {
+          toast.success('高亮已删除');
+        })
+        .catch((error) => {
+          console.error('[Z-Reader] 删除高亮失败:', error);
+          toast.error('删除高亮失败');
+        });
+    },
+    onEditNote: () => {
+      showNoteEditor({
+        initialNote: detail.note,
+        selectedText: detail.text,
+        onSave: async (note) => {
+          try {
+            await updateHighlight(detail.id, { note });
+            toast.success('笔记已更新');
+          } catch (error) {
+            console.error('[Z-Reader] 更新笔记失败:', error);
+            toast.error('更新笔记失败');
+          }
+        },
+        onCancel: () => {
+          // 用户取消
+        },
+      });
+    },
+    onChangeColor: async (color) => {
+      try {
+        await updateHighlight(detail.id, { color });
+        // 更新页面上的高亮颜色
+        const highlightEl = document.querySelector(`[data-highlight-id="${detail.id}"]`) as HTMLElement;
+        if (highlightEl) {
+          highlightEl.style.backgroundColor = getColorValue(color);
+        }
+        toast.success('颜色已更改');
+      } catch (error) {
+        console.error('[Z-Reader] 更改颜色失败:', error);
+        toast.error('更改颜色失败');
+      }
+    },
+    onCopy: () => {
+      navigator.clipboard.writeText(detail.text).then(() => {
+        toast.success('已复制到剪贴板');
+      }).catch(() => {
+        toast.error('复制失败');
+      });
+    },
+  });
 });
+
+// 辅助函数：获取颜色值
+function getColorValue(color: string): string {
+  const colors: Record<string, string> = {
+    yellow: '#fef3c7',
+    blue: '#dbeafe',
+    green: '#d1fae5',
+    red: '#fee2e2',
+  };
+  return colors[color] || colors.yellow;
+}
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'ARTICLE_SAVED') {

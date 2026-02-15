@@ -1,5 +1,10 @@
 /* Z-Reader Web Highlighter 注入样式 */
 
+/* 导入模块样式 */
+@import './styles/note-editor.css';
+@import './styles/toast.css';
+@import './styles/highlight-menu.css';
+
 /* 高亮文本 */
 .zr-highlight {
   border-radius: 2px;
