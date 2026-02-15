@@ -17,6 +17,7 @@ import { registerAsrHandlers } from './asr-handlers';
 import { registerAppTaskHandlers } from './app-task-handlers';
 import { registerNotificationHandlers } from './notification-handlers';
 import { registerExternalHandlers } from './external-handlers';
+import { registerSyncHandlers } from './sync-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -38,4 +39,5 @@ export function registerAllIpcHandlers() {
   registerAppTaskHandlers();
   registerNotificationHandlers();
   registerExternalHandlers();
+  registerSyncHandlers();
 }

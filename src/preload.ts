@@ -195,6 +195,13 @@ const electronAPI: ElectronAPI = {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.NOTIFICATION_NEW, handler);
   },
   notificationUnreadCount: () => ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_UNREAD_COUNT),
+
+  // Sync (iCloud 同步)
+  syncGetStatus: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_GET_STATUS),
+  syncEnable: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_ENABLE),
+  syncDisable: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_DISABLE),
+  syncNow: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_NOW),
+  syncGetDevices: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_GET_DEVICES),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -151,4 +151,11 @@ export const IPC_CHANNELS = {
   NOTIFICATION_CLEAR: 'notification:clear',
   NOTIFICATION_NEW: 'notification:new',
   NOTIFICATION_UNREAD_COUNT: 'notification:unread-count',
+
+  // Sync (iCloud 同步)
+  SYNC_GET_STATUS: 'sync:getStatus',
+  SYNC_ENABLE: 'sync:enable',
+  SYNC_DISABLE: 'sync:disable',
+  SYNC_NOW: 'sync:now',
+  SYNC_GET_DEVICES: 'sync:getDevices',
 } as const;

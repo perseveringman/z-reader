@@ -310,6 +310,10 @@ export interface AppSettings {
   tencentAsrAppId?: string;
   tencentAsrSecretId?: string;
   tencentAsrSecretKey?: string;
+  // iCloud 同步
+  syncEnabled?: boolean;
+  syncBooks?: boolean;
+  syncPodcasts?: boolean;
 }
 
 // ==================== Discover 相关类型 ====================
@@ -735,4 +739,27 @@ export interface ElectronAPI {
   notificationClear: () => Promise<void>;
   notificationOnNew: (callback: (notification: AppNotification) => void) => () => void;
   notificationUnreadCount: () => Promise<number>;
+
+  // Sync (iCloud 同步)
+  syncGetStatus: () => Promise<SyncStatus>;
+  syncEnable: () => Promise<SyncStatus>;
+  syncDisable: () => Promise<void>;
+  syncNow: () => Promise<{ pushed: number }>;
+  syncGetDevices: () => Promise<SyncDevice[]>;
+}
+
+// ── Sync ──
+export interface SyncStatus {
+  enabled: boolean;
+  deviceId: string;
+  lastSyncAt: string | null;
+  remoteDevices: string[];
+  icloudAvailable: boolean;
+}
+
+export interface SyncDevice {
+  deviceId: string;
+  name: string;
+  platform: string;
+  lastSeen?: string;
 }
