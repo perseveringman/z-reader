@@ -438,11 +438,11 @@ export function TranscriptView({
               `}
             >
               {/* 左侧进度指示条 */}
-              <div className="flex flex-col items-center shrink-0 w-1 mt-1">
+              <div className="flex flex-col items-center shrink-0 w-1 mt-1.5">
                 <div
                   className={`
                     w-[2px] h-full rounded-full transition-colors duration-200
-                    ${isActive ? 'bg-blue-500 animate-pulse' : isPast ? 'bg-blue-500' : 'bg-gray-700'}
+                    ${isActive ? 'bg-blue-500 animate-pulse' : isPast ? 'bg-blue-500/40' : 'bg-white/10'}
                   `}
                 />
               </div>
@@ -450,7 +450,7 @@ export function TranscriptView({
               {/* 时间戳 */}
               <span
                 className={`
-                  text-[11px] font-mono shrink-0 w-10 pt-0.5
+                  text-[11px] font-mono shrink-0 w-10 pt-1 tabular-nums
                   ${isActive ? 'text-blue-400' : 'text-gray-600'}
                 `}
                 onClick={(e) => {
@@ -465,8 +465,8 @@ export function TranscriptView({
               <span
                 data-seg-idx={index}
                 className={`
-                  text-[14px] leading-relaxed flex-1 select-text
-                  ${isActive ? 'text-white font-medium' : isPast ? 'text-gray-400' : 'text-gray-300'}
+                  text-[13px] leading-relaxed flex-1 select-text
+                  ${isActive ? 'text-white font-medium' : isPast ? 'text-gray-500' : 'text-gray-300'}
                 `}
                 onClick={(e) => {
                   // 仅在非选中状态下触发跳转
@@ -479,7 +479,7 @@ export function TranscriptView({
               >
                 {showSpeakerLabel && (
                   <span
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-400/80 bg-teal-400/10 rounded px-1.5 py-0.5 mr-2 align-middle select-none cursor-pointer hover:bg-teal-400/20 transition-colors group"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400/80 bg-blue-400/10 rounded px-1.5 py-0.5 mr-2 align-middle select-none cursor-pointer hover:bg-blue-400/20 transition-colors group uppercase tracking-tight"
                     onClick={(e) => {
                       e.stopPropagation();
                       const sid = segment.speakerId ?? 0;
@@ -490,7 +490,7 @@ export function TranscriptView({
                     }}
                     title="点击修改说话人名称"
                   >
-                    {speakerMap[String(segment.speakerId ?? 0)] || `说话人 ${(segment.speakerId ?? 0) + 1}`}
+                    {speakerMap[String(segment.speakerId ?? 0)] || `Speaker ${(segment.speakerId ?? 0) + 1}`}
                     <Pencil size={10} className="opacity-0 group-hover:opacity-60 transition-opacity" />
                   </span>
                 )}

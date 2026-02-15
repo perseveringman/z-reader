@@ -119,12 +119,21 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
     setShareCardOpen(true);
   }, []);
 
+  const isVideo = article?.mediaType === 'video';
+  const isPodcast = article?.mediaType === 'podcast';
+  const effectiveDuration = article?.audioDuration || article?.duration;
+  const readingTimeValue = (isVideo || isPodcast) && effectiveDuration
+    ? (effectiveDuration >= 3600 
+        ? `${Math.floor(effectiveDuration / 3600)}h ${Math.floor((effectiveDuration % 3600) / 60)}m`
+        : `${Math.floor(effectiveDuration / 60)} min`)
+    : article?.readingTime ? `${article.readingTime} min` : null;
+
   const metaRows: MetaRow[] = article
     ? [
-        { label: 'Type', value: 'Article', icon: <FileText className="w-3.5 h-3.5" /> },
+        { label: 'Type', value: article.mediaType.charAt(0).toUpperCase() + article.mediaType.slice(1), icon: <FileText className="w-3.5 h-3.5" /> },
         { label: 'Domain', value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
         { label: 'Published', value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
-        { label: 'Length', value: article.readingTime ? `${article.readingTime} min` : null, icon: <Clock className="w-3.5 h-3.5" /> },
+        { label: isVideo || isPodcast ? 'Duration' : 'Length', value: readingTimeValue, icon: <Clock className="w-3.5 h-3.5" /> },
         { label: 'Progress', value: `${Math.round(readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> },
         { label: 'Saved', value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
         { label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> },

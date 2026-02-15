@@ -277,19 +277,22 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   }, [articleId, checkAiConfigured, t]);
 
   const isVideo = article?.mediaType === 'video';
+  const isPodcast = article?.mediaType === 'podcast';
+  const effectiveDuration = article?.audioDuration || article?.duration;
+  const readingTimeValue = (isVideo || isPodcast) && effectiveDuration
+    ? formatDuration(effectiveDuration)
+    : article?.readingTime ? `${article.readingTime} min` : null;
+
   const metaRows: MetaRow[] = article
     ? [
         { label: 'Published', value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
         ...(!isVideo ? [{ label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> }] : []),
         { label: 'Domain', value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
-        ...(isVideo && article.duration
-          ? [{ label: 'Length', value: formatDuration(article.duration), icon: <Clock className="w-3.5 h-3.5" /> }]
-          : []),
+        { label: isVideo || isPodcast ? 'Duration' : 'Reading Time', value: readingTimeValue, icon: <Clock className="w-3.5 h-3.5" /> },
         ...(isVideo
           ? [{ label: 'Progress', value: `${Math.round(article.readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> }]
           : []),
-        ...(!isVideo ? [{ label: 'Reading Time', value: article.readingTime ? `${article.readingTime} min` : null, icon: <Clock className="w-3.5 h-3.5" /> }] : []),
-        ...(!isVideo ? [{ label: 'Word Count', value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> }] : []),
+        ...(!isVideo && !isPodcast ? [{ label: 'Word Count', value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> }] : []),
         { label: 'Saved', value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
       ]
     : [];

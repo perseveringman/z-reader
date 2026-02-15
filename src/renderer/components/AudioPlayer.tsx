@@ -212,7 +212,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     return (
-      <div className="flex flex-col gap-3 bg-[#1a1a1a] rounded-lg p-4 border border-white/5">
+      <div className="flex flex-col gap-3 bg-[#141414] rounded-lg p-4 border border-[#262626]">
         {/* Hidden audio element */}
         <audio
           ref={audioRef}
@@ -233,28 +233,28 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
               <img
                 src={artworkUrl}
                 alt=""
-                className="w-12 h-12 rounded-md object-cover shrink-0"
+                className="w-12 h-12 rounded-md object-cover shrink-0 border border-white/5"
               />
             )}
             <div className="flex-1 min-w-0">
               {title && (
-                <div className="text-sm font-medium text-gray-200 truncate">{title}</div>
+                <div className="text-[13px] font-medium text-gray-200 truncate leading-snug">{title}</div>
               )}
               {showName && (
-                <div className="text-xs text-gray-500 truncate">{showName}</div>
+                <div className="text-[11px] text-gray-500 truncate mt-0.5">{showName}</div>
               )}
             </div>
           </div>
         )}
 
         {/* Progress bar */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 w-12 text-right tabular-nums shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-gray-500 w-10 text-right tabular-nums shrink-0 font-mono">
             {formatTime(currentTime)}
           </span>
           <div
             ref={progressBarRef}
-            className="flex-1 h-1.5 bg-white/10 rounded-full cursor-pointer group relative"
+            className="flex-1 h-1 bg-white/10 rounded-full cursor-pointer group relative"
             onClick={handleProgressClick}
           >
             <div
@@ -262,10 +262,10 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
               style={{ width: `${progress}%` }}
             >
               {/* Seek handle */}
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
             </div>
           </div>
-          <span className="text-xs text-gray-500 w-12 tabular-nums shrink-0">
+          <span className="text-[11px] text-gray-500 w-10 tabular-nums shrink-0 font-mono">
             {formatTime(duration)}
           </span>
         </div>
@@ -276,7 +276,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
           <div className="flex items-center gap-1 w-28 shrink-0">
             <button
               onClick={cyclePlaybackRate}
-              className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded transition-colors cursor-pointer min-w-[40px] text-center"
+              className="px-2 py-1 text-[11px] font-bold text-gray-500 hover:text-gray-300 bg-white/5 hover:bg-white/10 rounded transition-colors cursor-pointer min-w-[36px] text-center"
               title="播放速度"
             >
               {playbackRate}x
@@ -286,8 +286,8 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
                 onClick={onDownload}
                 className={`p-1.5 rounded transition-colors cursor-pointer ${
                   downloaded
-                    ? 'text-green-400 hover:text-green-300'
-                    : 'text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'text-green-500 hover:text-green-400'
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
                 }`}
                 title={downloaded ? '已下载' : '下载'}
               >
@@ -297,10 +297,10 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
           </div>
 
           {/* Center: transport controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={skipBack}
-              className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer relative"
+              className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors cursor-pointer relative"
               title={`后退 ${SKIP_BACK_SECONDS} 秒`}
             >
               <RotateCcw size={20} />
@@ -312,25 +312,25 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
             <button
               onClick={togglePlay}
               disabled={loading && !playing}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-black hover:bg-gray-200 disabled:bg-gray-600 disabled:text-gray-400 transition-colors cursor-pointer"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 transition-colors cursor-pointer shadow-lg shadow-blue-900/20"
               title={playing ? '暂停' : '播放'}
             >
               {loading && !playing ? (
                 <Loader2 size={20} className="animate-spin" />
               ) : playing ? (
-                <Pause size={20} />
+                <Pause size={20} fill="currentColor" />
               ) : (
-                <Play size={20} className="ml-0.5" />
+                <Play size={20} className="ml-0.5" fill="currentColor" />
               )}
             </button>
 
             <button
               onClick={skipForward}
-              className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer relative"
+              className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors cursor-pointer relative"
               title={`前进 ${SKIP_FORWARD_SECONDS} 秒`}
             >
               <RotateCw size={20} />
-              <span className="absolute bottom-0 right-0 text-[8px] font-bold">
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold mt-[1px]">
                 {SKIP_FORWARD_SECONDS}
               </span>
             </button>
@@ -340,7 +340,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
           <div className="flex items-center justify-end gap-2 w-28 shrink-0">
             <button
               onClick={toggleMute}
-              className="p-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
               title={muted ? '取消静音' : '静音'}
             >
               {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -353,7 +353,7 @@ export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
                 step="0.05"
                 value={muted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 h-1 accent-blue-500 cursor-pointer"
+                className="w-16 h-1 accent-blue-500 cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
               />
             </div>
           </div>
