@@ -424,6 +424,47 @@ export interface AISettingsData {
   };
 }
 
+export type AIPromptPresetTarget = 'chat' | 'summarize' | 'translate' | 'autoTag' | 'extractTopics';
+
+export interface AIPromptPreset {
+  id: string;
+  title: string;
+  prompt: string;
+  enabled: boolean;
+  displayOrder: number;
+  targets: AIPromptPresetTarget[];
+  isBuiltin: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIPromptPresetListQuery {
+  target?: AIPromptPresetTarget;
+  enabledOnly?: boolean;
+}
+
+export interface AICreatePromptPresetInput {
+  title: string;
+  prompt: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets?: AIPromptPresetTarget[];
+}
+
+export interface AIUpdatePromptPresetInput {
+  id: string;
+  title?: string;
+  prompt?: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets?: AIPromptPresetTarget[];
+}
+
+export interface AIReorderPromptPresetsInput {
+  id: string;
+  displayOrder: number;
+}
+
 export interface AISummarizeInput {
   articleId: string;
   language?: string;
@@ -699,6 +740,12 @@ export interface ElectronAPI {
   // AI 操作
   aiSettingsGet: () => Promise<AISettingsData>;
   aiSettingsSet: (settings: Partial<AISettingsData>) => Promise<void>;
+  aiPromptPresetList: (query?: AIPromptPresetListQuery) => Promise<AIPromptPreset[]>;
+  aiPromptPresetCreate: (input: AICreatePromptPresetInput) => Promise<AIPromptPreset>;
+  aiPromptPresetUpdate: (input: AIUpdatePromptPresetInput) => Promise<void>;
+  aiPromptPresetDelete: (id: string) => Promise<void>;
+  aiPromptPresetReorder: (items: AIReorderPromptPresetsInput[]) => Promise<void>;
+  aiPromptPresetResetBuiltins: () => Promise<AIPromptPreset[]>;
   aiSummarize: (input: AISummarizeInput) => Promise<AISummarizeResult>;
   aiTranslate: (input: AITranslateInput) => Promise<AITranslateResult>;
   aiAutoTag: (input: AIAutoTagInput) => Promise<AIAutoTagResult>;

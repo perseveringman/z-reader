@@ -320,6 +320,21 @@ function initTables(sqlite: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_ai_task_logs_type ON ai_task_logs(task_type);
     CREATE INDEX IF NOT EXISTS idx_ai_task_logs_created ON ai_task_logs(created_at);
+
+    CREATE TABLE IF NOT EXISTS ai_prompt_presets (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      targets_json TEXT NOT NULL,
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_enabled ON ai_prompt_presets(enabled);
+    CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_order ON ai_prompt_presets(display_order);
   `);
 
   // Migration: app_tasks 通用任务表

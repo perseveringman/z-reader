@@ -39,9 +39,41 @@ export interface ChatSessionRow {
   updated_at: string;
 }
 
+/** Prompt 预设行（匹配 SQLite 原生 snake_case 列名） */
+export interface PromptPresetRow {
+  id: string;
+  title: string;
+  prompt: string;
+  enabled: number;
+  display_order: number;
+  targets_json: string;
+  is_builtin: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePromptPresetInput {
+  id?: string;
+  title: string;
+  prompt: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets: string[];
+  isBuiltin?: boolean;
+}
+
+export interface UpdatePromptPresetInput {
+  title?: string;
+  prompt?: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets?: string[];
+  isBuiltin?: boolean;
+}
+
 /**
  * AI 模块数据库操作层
- * 负责 ai_settings、ai_task_logs 和 ai_chat_sessions 三张表的 CRUD
+ * 负责 ai_settings、ai_task_logs、ai_chat_sessions、ai_prompt_presets 四张表的 CRUD
  */
 export class AIDatabase {
   constructor(private sqlite: Database.Database) {}
@@ -83,6 +115,21 @@ export class AIDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_updated ON ai_chat_sessions(updated_at);
       CREATE INDEX IF NOT EXISTS idx_ai_chat_sessions_article ON ai_chat_sessions(article_id);
+
+      CREATE TABLE IF NOT EXISTS ai_prompt_presets (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        targets_json TEXT NOT NULL,
+        is_builtin INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_enabled ON ai_prompt_presets(enabled);
+      CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_order ON ai_prompt_presets(display_order);
     `);
   }
 
@@ -212,5 +259,164 @@ export class AIDatabase {
     this.sqlite.prepare(
       'DELETE FROM ai_chat_sessions WHERE id = ?'
     ).run(id);
+  }
+
+  // ==================== Prompt Presets CRUD ====================
+
+  createPromptPreset(input: CreatePromptPresetInput): PromptPresetRow {
+    const id = input.id ?? crypto.randomUUID();
+    const now = new Date().toISOString();
+    const enabled = input.enabled === false ? 0 : 1;
+    const displayOrder = input.displayOrder ?? 0;
+    const targetsJson = JSON.stringify(input.targets);
+    const isBuiltin = input.isBuiltin ? 1 : 0;
+
+    this.sqlite.prepare(`
+      INSERT INTO ai_prompt_presets (
+        id, title, prompt, enabled, display_order, targets_json, is_builtin, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      input.title,
+      input.prompt,
+      enabled,
+      displayOrder,
+      targetsJson,
+      isBuiltin,
+      now,
+      now,
+    );
+
+    return {
+      id,
+      title: input.title,
+      prompt: input.prompt,
+      enabled,
+      display_order: displayOrder,
+      targets_json: targetsJson,
+      is_builtin: isBuiltin,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  listPromptPresets(options?: { target?: string; enabledOnly?: boolean }): PromptPresetRow[] {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+
+    if (options?.enabledOnly) {
+      conditions.push('enabled = 1');
+    }
+    if (options?.target) {
+      conditions.push('EXISTS (SELECT 1 FROM json_each(targets_json) WHERE value = ?)');
+      values.push(options.target);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    return this.sqlite.prepare(`
+      SELECT * FROM ai_prompt_presets
+      ${whereClause}
+      ORDER BY display_order ASC, created_at ASC
+    `).all(...values) as PromptPresetRow[];
+  }
+
+  getPromptPreset(id: string): PromptPresetRow | null {
+    const row = this.sqlite.prepare(
+      'SELECT * FROM ai_prompt_presets WHERE id = ?'
+    ).get(id) as PromptPresetRow | undefined;
+    return row ?? null;
+  }
+
+  updatePromptPreset(id: string, updates: UpdatePromptPresetInput): void {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (updates.title !== undefined) {
+      fields.push('title = ?');
+      values.push(updates.title);
+    }
+    if (updates.prompt !== undefined) {
+      fields.push('prompt = ?');
+      values.push(updates.prompt);
+    }
+    if (updates.enabled !== undefined) {
+      fields.push('enabled = ?');
+      values.push(updates.enabled ? 1 : 0);
+    }
+    if (updates.displayOrder !== undefined) {
+      fields.push('display_order = ?');
+      values.push(updates.displayOrder);
+    }
+    if (updates.targets !== undefined) {
+      fields.push('targets_json = ?');
+      values.push(JSON.stringify(updates.targets));
+    }
+    if (updates.isBuiltin !== undefined) {
+      fields.push('is_builtin = ?');
+      values.push(updates.isBuiltin ? 1 : 0);
+    }
+
+    if (fields.length === 0) return;
+
+    fields.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    this.sqlite.prepare(
+      `UPDATE ai_prompt_presets SET ${fields.join(', ')} WHERE id = ?`
+    ).run(...values);
+  }
+
+  deletePromptPreset(id: string): void {
+    this.sqlite.prepare(
+      'DELETE FROM ai_prompt_presets WHERE id = ?'
+    ).run(id);
+  }
+
+  reorderPromptPresets(items: Array<{ id: string; displayOrder: number }>): void {
+    const updateStmt = this.sqlite.prepare(
+      'UPDATE ai_prompt_presets SET display_order = ?, updated_at = ? WHERE id = ?'
+    );
+    const now = new Date().toISOString();
+    const tx = this.sqlite.transaction((rows: Array<{ id: string; displayOrder: number }>) => {
+      for (const row of rows) {
+        updateStmt.run(row.displayOrder, now, row.id);
+      }
+    });
+    tx(items);
+  }
+
+  upsertBuiltinPromptPresets(items: CreatePromptPresetInput[]): void {
+    const getStmt = this.sqlite.prepare('SELECT id FROM ai_prompt_presets WHERE id = ?');
+    const insertStmt = this.sqlite.prepare(`
+      INSERT INTO ai_prompt_presets (
+        id, title, prompt, enabled, display_order, targets_json, is_builtin, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const tx = this.sqlite.transaction((rows: CreatePromptPresetInput[]) => {
+      for (const row of rows) {
+        if (!row.id) continue;
+        const exists = getStmt.get(row.id) as { id: string } | undefined;
+        if (exists) continue;
+
+        const now = new Date().toISOString();
+        insertStmt.run(
+          row.id,
+          row.title,
+          row.prompt,
+          row.enabled === false ? 0 : 1,
+          row.displayOrder ?? 0,
+          JSON.stringify(row.targets),
+          1,
+          now,
+          now,
+        );
+      }
+    });
+
+    tx(items);
   }
 }

@@ -161,6 +161,19 @@ export const aiSettings = sqliteTable('ai_settings', {
   updatedAt: text('updated_at').notNull(),
 });
 
+/** AI 快捷提示词 */
+export const aiPromptPresets = sqliteTable('ai_prompt_presets', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  prompt: text('prompt').notNull(),
+  enabled: integer('enabled').notNull().default(1),
+  displayOrder: integer('display_order').notNull().default(0),
+  targetsJson: text('targets_json').notNull(),
+  isBuiltin: integer('is_builtin').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 // ==================== app_tasks 通用任务表 ====================
 export const appTasks = sqliteTable('app_tasks', {
   id: text('id').primaryKey(),

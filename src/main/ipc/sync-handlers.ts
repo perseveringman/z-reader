@@ -10,7 +10,7 @@ import { checkICloudAvailability, getSyncDirectoryPath, ensureSyncDirectory } fr
 import { loadSettings, updateSettings } from '../services/settings-service';
 import type { SyncStatus, SyncDevice } from '../../shared/types';
 
-const SYNC_TABLES = ['feeds', 'articles', 'highlights', 'tags', 'article_tags', 'highlight_tags', 'books', 'views', 'transcripts', 'ai_settings', 'ai_task_logs'];
+const SYNC_TABLES = ['feeds', 'articles', 'highlights', 'tags', 'article_tags', 'highlight_tags', 'books', 'views', 'transcripts', 'ai_settings', 'ai_task_logs', 'ai_prompt_presets'];
 
 let engine: ReturnType<typeof createSyncEngine> | null = null;
 let syncInterval: ReturnType<typeof setInterval> | null = null;

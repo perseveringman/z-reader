@@ -10,6 +10,12 @@ import { ChatService } from '../../ai/services/chat';
 import { createToolContext } from '../ai/tool-context-factory';
 import type { AIProviderConfig } from '../../ai/providers/config';
 import type {
+  AICreatePromptPresetInput,
+  AIPromptPreset,
+  AIPromptPresetListQuery,
+  AIPromptPresetTarget,
+  AIReorderPromptPresetsInput,
+  AIUpdatePromptPresetInput,
   AISummarizeInput,
   AITranslateInput,
   AIAutoTagInput,
@@ -19,7 +25,7 @@ import type {
   ChatSendInput,
   ChatSession,
 } from '../../shared/types';
-import type { TaskLogRow, ChatSessionRow } from '../../ai/providers/db';
+import type { TaskLogRow, ChatSessionRow, PromptPresetRow, CreatePromptPresetInput, UpdatePromptPresetInput } from '../../ai/providers/db';
 
 /** 获取 AI 数据库实例 */
 function getAIDatabase(): AIDatabase {
@@ -72,6 +78,125 @@ function mapChatSessionRow(row: ChatSessionRow): ChatSession {
   };
 }
 
+const SUPPORTED_PROMPT_TARGETS: AIPromptPresetTarget[] = ['chat', 'summarize', 'translate', 'autoTag', 'extractTopics'];
+
+const DEFAULT_CHAT_PROMPT_PRESETS: CreatePromptPresetInput[] = [
+  {
+    id: 'builtin-value-clarification',
+    title: '价值澄清',
+    prompt: '请用**价值澄清法**分析这篇文章：识别文章传达的核心价值观，分析这些价值观之间是否存在冲突，帮我厘清哪些是我真正认同的。',
+    enabled: true,
+    displayOrder: 0,
+    targets: ['chat'],
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin-six-thinking-hats',
+    title: '六顶思考帽',
+    prompt: '请用**六顶思考帽**方法分析这篇文章：分别从白帽（事实）、红帽（情感）、黑帽（风险）、黄帽（价值）、绿帽（创新）、蓝帽（全局）六个角度展开分析。',
+    enabled: true,
+    displayOrder: 1,
+    targets: ['chat'],
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin-first-principles',
+    title: '第一性原理',
+    prompt: '请用**第一性原理**分析这篇文章：剥离表面假设，回归最基本的事实和原理，重新推导文章的核心论点是否成立。',
+    enabled: true,
+    displayOrder: 2,
+    targets: ['chat'],
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin-socratic-method',
+    title: '苏格拉底提问',
+    prompt: '请用**苏格拉底提问法**分析这篇文章：通过层层追问的方式，挑战文章的假设、证据和推理逻辑，帮我深入思考。',
+    enabled: true,
+    displayOrder: 3,
+    targets: ['chat'],
+    isBuiltin: true,
+  },
+  {
+    id: 'builtin-feynman-technique',
+    title: '费曼教学法',
+    prompt: '请用**费曼教学法**解读这篇文章：用最简单易懂的语言重新解释文章的核心概念，指出我可能存在的理解盲区。',
+    enabled: true,
+    displayOrder: 4,
+    targets: ['chat'],
+    isBuiltin: true,
+  },
+];
+
+function normalizeTitle(value: string): string {
+  const title = value.trim();
+  if (!title) throw new Error('提示词标题不能为空');
+  if (title.length > 40) throw new Error('提示词标题不能超过 40 字符');
+  return title;
+}
+
+function normalizePrompt(value: string): string {
+  const prompt = value.trim();
+  if (!prompt) throw new Error('提示词内容不能为空');
+  if (prompt.length > 2000) throw new Error('提示词内容不能超过 2000 字符');
+  return prompt;
+}
+
+function normalizeTargets(
+  targets: unknown,
+  mode: 'create' | 'update',
+): AIPromptPresetTarget[] | undefined {
+  if (targets === undefined) {
+    return mode === 'create' ? ['chat'] : undefined;
+  }
+  if (!Array.isArray(targets)) {
+    throw new Error('提示词目标场景格式错误');
+  }
+
+  const normalized = targets
+    .filter((item): item is string => typeof item === 'string')
+    .filter((item, index, arr) => arr.indexOf(item) === index)
+    .filter((item): item is AIPromptPresetTarget => SUPPORTED_PROMPT_TARGETS.includes(item as AIPromptPresetTarget));
+
+  if (normalized.length === 0) {
+    throw new Error('至少选择一个目标场景');
+  }
+  return normalized;
+}
+
+function mapPromptPresetRow(row: PromptPresetRow): AIPromptPreset {
+  let targets: AIPromptPresetTarget[] = ['chat'];
+  try {
+    const parsed = JSON.parse(row.targets_json) as unknown;
+    if (Array.isArray(parsed)) {
+      const normalized = parsed
+        .filter((item): item is string => typeof item === 'string')
+        .filter((item): item is AIPromptPresetTarget => SUPPORTED_PROMPT_TARGETS.includes(item as AIPromptPresetTarget));
+      if (normalized.length > 0) {
+        targets = normalized;
+      }
+    }
+  } catch {
+    targets = ['chat'];
+  }
+
+  return {
+    id: row.id,
+    title: row.title,
+    prompt: row.prompt,
+    enabled: row.enabled === 1,
+    displayOrder: row.display_order,
+    targets,
+    isBuiltin: row.is_builtin === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function ensureBuiltinPromptPresets(aiDb: AIDatabase): void {
+  aiDb.upsertBuiltinPromptPresets(DEFAULT_CHAT_PROMPT_PRESETS);
+}
+
 export function registerAIHandlers() {
   // 获取 AI 设置
   ipcMain.handle(IPC_CHANNELS.AI_SETTINGS_GET, async () => {
@@ -91,6 +216,129 @@ export function registerAIHandlers() {
     const updated = { ...current, ...partial };
     aiDb.setSetting('aiConfig', updated);
   });
+
+  // 列出快捷提示词
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_LIST,
+    async (_event, query?: AIPromptPresetListQuery) => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+      ensureBuiltinPromptPresets(aiDb);
+      const rows = aiDb.listPromptPresets({
+        target: query?.target,
+        enabledOnly: query?.enabledOnly,
+      });
+      return rows.map(mapPromptPresetRow);
+    },
+  );
+
+  // 创建快捷提示词
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_CREATE,
+    async (_event, input: AICreatePromptPresetInput) => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+
+      const title = normalizeTitle(input.title);
+      const prompt = normalizePrompt(input.prompt);
+      const targets = normalizeTargets(input.targets, 'create')!;
+
+      let displayOrder = input.displayOrder;
+      if (displayOrder === undefined || displayOrder === null) {
+        const rows = aiDb.listPromptPresets();
+        const maxOrder = rows.reduce((max, row) => Math.max(max, row.display_order), -1);
+        displayOrder = maxOrder + 1;
+      }
+
+      const row = aiDb.createPromptPreset({
+        title,
+        prompt,
+        enabled: input.enabled !== false,
+        targets,
+        displayOrder,
+        isBuiltin: false,
+      });
+      return mapPromptPresetRow(row);
+    },
+  );
+
+  // 更新快捷提示词
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_UPDATE,
+    async (_event, input: AIUpdatePromptPresetInput) => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+
+      if (!input.id) {
+        throw new Error('提示词 ID 不能为空');
+      }
+
+      const existing = aiDb.getPromptPreset(input.id);
+      if (!existing) {
+        throw new Error('提示词不存在');
+      }
+
+      const updates: UpdatePromptPresetInput = {};
+      if (input.title !== undefined) {
+        updates.title = normalizeTitle(input.title);
+      }
+      if (input.prompt !== undefined) {
+        updates.prompt = normalizePrompt(input.prompt);
+      }
+      if (input.enabled !== undefined) {
+        updates.enabled = input.enabled;
+      }
+      if (input.displayOrder !== undefined) {
+        updates.displayOrder = input.displayOrder;
+      }
+      if (input.targets !== undefined) {
+        updates.targets = normalizeTargets(input.targets, 'update');
+      }
+
+      aiDb.updatePromptPreset(input.id, updates);
+    },
+  );
+
+  // 删除快捷提示词
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_DELETE,
+    async (_event, id: string) => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+      aiDb.deletePromptPreset(id);
+    },
+  );
+
+  // 批量重排快捷提示词
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_REORDER,
+    async (_event, items: AIReorderPromptPresetsInput[]) => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+
+      if (!Array.isArray(items)) {
+        throw new Error('排序参数格式错误');
+      }
+
+      const normalized = items.map((item, idx) => ({
+        id: item.id,
+        displayOrder: Number.isFinite(item.displayOrder) ? item.displayOrder : idx,
+      }));
+
+      aiDb.reorderPromptPresets(normalized);
+    },
+  );
+
+  // 恢复默认提示词模板（补齐缺失内置项）
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROMPT_PRESET_RESET_BUILTINS,
+    async () => {
+      const aiDb = getAIDatabase();
+      aiDb.initTables();
+      ensureBuiltinPromptPresets(aiDb);
+      return aiDb.listPromptPresets().map(mapPromptPresetRow);
+    },
+  );
 
   // 摘要生成
   ipcMain.handle(IPC_CHANNELS.AI_SUMMARIZE, async (_event, input: AISummarizeInput) => {

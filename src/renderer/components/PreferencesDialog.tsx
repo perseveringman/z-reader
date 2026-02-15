@@ -16,11 +16,20 @@ import {
   Settings,
   Cloud,
   RefreshCw,
+  MessageSquare,
+  Plus,
+  RotateCcw,
   type LucideIcon,
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { AIDebugPanel } from './AIDebugPanel';
-import type { AppSettings, AISettingsData, SyncStatus, SyncDevice } from '../../shared/types';
+import type {
+  AppSettings,
+  AISettingsData,
+  AIPromptPreset,
+  AIPromptPresetTarget,
+  SyncStatus,
+} from '../../shared/types';
 import { changeLanguage, supportedLanguages } from '../../i18n';
 import {
   PRIMARY_PREFERENCE_SECTIONS,
@@ -63,6 +72,7 @@ const SECONDARY_SECTION_LABELS: Record<SecondaryPreferenceSectionId, string> = {
   'asr-credentials-volcengine': '火山引擎凭据',
   'asr-credentials-tencent': '腾讯云凭据',
   'ai-models': '模型与密钥',
+  'ai-prompts': '快捷提示词',
   'ai-debug': '调试面板',
   'sync-general': 'iCloud 同步',
 };
@@ -84,6 +94,16 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [aiDirty, setAiDirty] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [promptPresets, setPromptPresets] = useState<AIPromptPreset[]>([]);
+  const [promptPresetsLoading, setPromptPresetsLoading] = useState(false);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const [newPromptTitle, setNewPromptTitle] = useState('');
+  const [newPromptContent, setNewPromptContent] = useState('');
+  const [newPromptEnabled, setNewPromptEnabled] = useState(true);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [editingPromptTitle, setEditingPromptTitle] = useState('');
+  const [editingPromptContent, setEditingPromptContent] = useState('');
+  const [draggingPromptId, setDraggingPromptId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
 
@@ -97,23 +117,35 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setShowApiKey(false);
       setActivePrimary('general');
       setActiveSecondary('language');
+      setEditingPromptId(null);
+      setEditingPromptTitle('');
+      setEditingPromptContent('');
+      setNewPromptTitle('');
+      setNewPromptContent('');
+      setNewPromptEnabled(true);
+      setPromptPresetsLoading(true);
 
       Promise.all([
         window.electronAPI.settingsGet(),
         window.electronAPI.aiSettingsGet().catch(() => null),
+        window.electronAPI.aiPromptPresetList().catch(() => []),
         window.electronAPI.syncGetStatus().catch(() => null),
       ])
-        .then(([s, ai, sync]) => {
+        .then(([s, ai, presets, sync]) => {
           setSettings(s);
           if (ai) {
             setAiSettings(ai);
           }
+          setPromptPresets(presets as AIPromptPreset[]);
           if (sync) {
             setSyncStatus(sync);
           }
         })
         .catch((err) => console.error('Failed to load settings:', err))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          setPromptPresetsLoading(false);
+        });
     }
   }, [open]);
 
@@ -191,6 +223,180 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setAiSaving(false);
     }
   };
+
+  const refreshPromptPresets = useCallback(async () => {
+    setPromptPresetsLoading(true);
+    try {
+      const rows = await window.electronAPI.aiPromptPresetList();
+      setPromptPresets(rows);
+    } catch (err) {
+      console.error('Failed to load prompt presets:', err);
+      showToast('加载快捷提示词失败');
+    } finally {
+      setPromptPresetsLoading(false);
+    }
+  }, [showToast]);
+
+  const persistPromptOrder = useCallback(async (next: AIPromptPreset[]) => {
+    await window.electronAPI.aiPromptPresetReorder(
+      next.map((item, index) => ({ id: item.id, displayOrder: index })),
+    );
+  }, []);
+
+  const handleCreatePrompt = useCallback(async () => {
+    const title = newPromptTitle.trim();
+    const prompt = newPromptContent.trim();
+    if (!title || !prompt) {
+      showToast('请填写标题和提示词内容');
+      return;
+    }
+
+    setPromptSaving(true);
+    try {
+      const created = await window.electronAPI.aiPromptPresetCreate({
+        title,
+        prompt,
+        enabled: newPromptEnabled,
+        targets: ['chat'],
+      });
+
+      const next = [...promptPresets, created];
+      setPromptPresets(next);
+      await persistPromptOrder(next);
+
+      setNewPromptTitle('');
+      setNewPromptContent('');
+      setNewPromptEnabled(true);
+    } catch (err) {
+      console.error('Failed to create prompt preset:', err);
+      showToast('创建提示词失败');
+      await refreshPromptPresets();
+    } finally {
+      setPromptSaving(false);
+    }
+  }, [newPromptTitle, newPromptContent, newPromptEnabled, promptPresets, persistPromptOrder, refreshPromptPresets, showToast]);
+
+  const handleDeletePrompt = useCallback(async (id: string) => {
+    const prev = promptPresets;
+    const next = prev.filter((item) => item.id !== id);
+    setPromptPresets(next);
+    try {
+      await window.electronAPI.aiPromptPresetDelete(id);
+      await persistPromptOrder(next);
+    } catch (err) {
+      console.error('Failed to delete prompt preset:', err);
+      showToast('删除提示词失败');
+      setPromptPresets(prev);
+    }
+  }, [persistPromptOrder, promptPresets, showToast]);
+
+  const handleToggleEnabled = useCallback(async (preset: AIPromptPreset, enabled: boolean) => {
+    const prev = promptPresets;
+    const next = prev.map((item) => (item.id === preset.id ? { ...item, enabled } : item));
+    setPromptPresets(next);
+    try {
+      await window.electronAPI.aiPromptPresetUpdate({ id: preset.id, enabled });
+    } catch (err) {
+      console.error('Failed to toggle prompt preset:', err);
+      showToast('更新提示词失败');
+      setPromptPresets(prev);
+    }
+  }, [promptPresets, showToast]);
+
+  const handleToggleTarget = useCallback(async (preset: AIPromptPreset, target: AIPromptPresetTarget, checked: boolean) => {
+    const nextTargets = checked
+      ? Array.from(new Set([...preset.targets, target]))
+      : preset.targets.filter((item) => item !== target);
+    if (nextTargets.length === 0) {
+      showToast('至少保留一个目标场景');
+      return;
+    }
+
+    const prev = promptPresets;
+    const next = prev.map((item) => (item.id === preset.id ? { ...item, targets: nextTargets } : item));
+    setPromptPresets(next);
+    try {
+      await window.electronAPI.aiPromptPresetUpdate({ id: preset.id, targets: nextTargets });
+    } catch (err) {
+      console.error('Failed to update prompt preset targets:', err);
+      showToast('更新目标场景失败');
+      setPromptPresets(prev);
+    }
+  }, [promptPresets, showToast]);
+
+  const beginEditPrompt = useCallback((preset: AIPromptPreset) => {
+    setEditingPromptId(preset.id);
+    setEditingPromptTitle(preset.title);
+    setEditingPromptContent(preset.prompt);
+  }, []);
+
+  const handleSaveEditPrompt = useCallback(async () => {
+    if (!editingPromptId) return;
+    const title = editingPromptTitle.trim();
+    const prompt = editingPromptContent.trim();
+    if (!title || !prompt) {
+      showToast('请填写标题和提示词内容');
+      return;
+    }
+
+    const prev = promptPresets;
+    const next = prev.map((item) =>
+      item.id === editingPromptId ? { ...item, title, prompt } : item,
+    );
+    setPromptPresets(next);
+
+    try {
+      await window.electronAPI.aiPromptPresetUpdate({
+        id: editingPromptId,
+        title,
+        prompt,
+      });
+      setEditingPromptId(null);
+      setEditingPromptTitle('');
+      setEditingPromptContent('');
+    } catch (err) {
+      console.error('Failed to save prompt preset:', err);
+      showToast('保存提示词失败');
+      setPromptPresets(prev);
+    }
+  }, [editingPromptContent, editingPromptId, editingPromptTitle, promptPresets, showToast]);
+
+  const handleDropPrompt = useCallback(async (dropId: string) => {
+    if (!draggingPromptId || draggingPromptId === dropId) return;
+
+    const prev = promptPresets;
+    const fromIndex = prev.findIndex((item) => item.id === draggingPromptId);
+    const toIndex = prev.findIndex((item) => item.id === dropId);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const next = [...prev];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setPromptPresets(next);
+    setDraggingPromptId(null);
+
+    try {
+      await persistPromptOrder(next);
+    } catch (err) {
+      console.error('Failed to reorder prompt presets:', err);
+      showToast('排序保存失败');
+      setPromptPresets(prev);
+    }
+  }, [draggingPromptId, persistPromptOrder, promptPresets, showToast]);
+
+  const handleResetBuiltins = useCallback(async () => {
+    setPromptSaving(true);
+    try {
+      const rows = await window.electronAPI.aiPromptPresetResetBuiltins();
+      setPromptPresets(rows);
+      showToast('默认提示词已补齐');
+    } catch (err) {
+      console.error('Failed to reset built-in prompt presets:', err);
+      showToast('恢复默认提示词失败');
+    } finally {
+      setPromptSaving(false);
+    }
+  }, [showToast]);
 
   const onPrimaryChange = (id: PrimaryPreferenceSectionId) => {
     setActivePrimary(id);
@@ -633,6 +839,186 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     </section>
   );
 
+  const renderAiPromptsSection = () => (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={16} className="text-purple-400" />
+          <h3 className="text-sm font-medium text-white">快捷提示词</h3>
+        </div>
+        <button
+          onClick={handleResetBuiltins}
+          disabled={promptSaving}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-md border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          <RotateCcw size={12} />
+          <span>恢复默认模板</span>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="rounded-md border border-white/10 bg-[#111] p-3 space-y-2">
+          <div className="text-xs text-gray-400 font-medium">新建提示词</div>
+          <input
+            type="text"
+            value={newPromptTitle}
+            onChange={(e) => setNewPromptTitle(e.target.value)}
+            placeholder="提示词标题"
+            className="w-full px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <textarea
+            value={newPromptContent}
+            onChange={(e) => setNewPromptContent(e.target.value)}
+            placeholder="输入完整提示词内容"
+            rows={4}
+            className="w-full px-3 py-2 bg-[#0a0a0a] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y"
+          />
+          <div className="flex items-center justify-between">
+            <label className="inline-flex items-center gap-2 text-xs text-gray-300">
+              <input
+                type="checkbox"
+                checked={newPromptEnabled}
+                onChange={(e) => setNewPromptEnabled(e.target.checked)}
+                className="accent-purple-500"
+              />
+              在会话中默认显示
+            </label>
+            <button
+              onClick={handleCreatePrompt}
+              disabled={promptSaving}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus size={12} />
+              <span>添加</span>
+            </button>
+          </div>
+        </div>
+
+        {promptPresetsLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 size={16} className="animate-spin text-gray-500" />
+          </div>
+        ) : promptPresets.length === 0 ? (
+          <div className="text-xs text-gray-500 py-4 text-center border border-dashed border-white/10 rounded-md">
+            暂无提示词，可先创建一个。
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {promptPresets.map((preset) => {
+              const editing = editingPromptId === preset.id;
+              return (
+                <div
+                  key={preset.id}
+                  draggable
+                  onDragStart={() => setDraggingPromptId(preset.id)}
+                  onDragEnd={() => setDraggingPromptId(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDropPrompt(preset.id)}
+                  className={`rounded-md border p-3 transition-colors ${
+                    draggingPromptId === preset.id
+                      ? 'border-purple-400/60 bg-purple-500/5'
+                      : 'border-white/10 bg-[#111]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {editing ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editingPromptTitle}
+                            onChange={(e) => setEditingPromptTitle(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-[#0a0a0a] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                          <textarea
+                            value={editingPromptContent}
+                            onChange={(e) => setEditingPromptContent(e.target.value)}
+                            rows={4}
+                            className="w-full px-2.5 py-1.5 bg-[#0a0a0a] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-sm font-medium text-white">{preset.title}</div>
+                          <div className="text-xs text-gray-500 whitespace-pre-wrap">{preset.prompt}</div>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-600 whitespace-nowrap select-none">拖拽排序</div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={preset.enabled}
+                        onChange={(e) => handleToggleEnabled(preset, e.target.checked)}
+                        className="accent-purple-500"
+                      />
+                      显示
+                    </label>
+
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={preset.targets.includes('chat')}
+                        onChange={(e) => handleToggleTarget(preset, 'chat', e.target.checked)}
+                        className="accent-purple-500"
+                      />
+                      会话场景
+                    </label>
+
+                    {preset.isBuiltin && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                        默认
+                      </span>
+                    )}
+
+                    <div className="ml-auto flex items-center gap-2">
+                      {editing ? (
+                        <>
+                          <button
+                            onClick={handleSaveEditPrompt}
+                            className="text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                          >
+                            保存
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPromptId(null);
+                              setEditingPromptTitle('');
+                              setEditingPromptContent('');
+                            }}
+                            className="text-xs px-2 py-1 rounded border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                          >
+                            取消
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => beginEditPrompt(preset)}
+                          className="text-xs px-2 py-1 rounded border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                        >
+                          编辑
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeletePrompt(preset.id)}
+                        className="text-xs px-2 py-1 rounded border border-red-400/40 text-red-300 hover:bg-red-500/15 transition-colors"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
   const renderSyncSection = () => {
     const icloudAvailable = syncStatus?.icloudAvailable ?? false;
     const enabled = syncStatus?.enabled ?? false;
@@ -750,6 +1136,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     if (activeSecondary === 'asr-credentials-volcengine') return renderAsrVolcSection();
     if (activeSecondary === 'asr-credentials-tencent') return renderAsrTencentSection();
     if (activeSecondary === 'ai-models') return renderAiModelsSection();
+    if (activeSecondary === 'ai-prompts') return renderAiPromptsSection();
     if (activeSecondary === 'sync-general') return renderSyncSection();
     return <AIDebugPanel />;
   };
@@ -823,7 +1210,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               <div className="flex-1 overflow-y-auto px-5 py-5">{renderActiveSection()}</div>
 
               <div className="border-t border-white/10 p-4">
-                {activePrimary === 'ai' ? (
+                {activePrimary === 'ai' && activeSecondary === 'ai-models' ? (
                   <button
                     onClick={handleAiSave}
                     disabled={aiSaving || !aiDirty}
@@ -840,7 +1227,11 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                         <span>{aiDirty ? t('ai.save') : t('ai.saved')}</span>
                       </>
                     )}
-                  </button>
+                    </button>
+                ) : activePrimary === 'ai' ? (
+                  <div className="w-full text-center text-[11px] text-gray-500 py-2">
+                    此页面操作自动保存
+                  </div>
                 ) : (
                   <button
                     onClick={handleSave}

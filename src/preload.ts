@@ -118,6 +118,12 @@ const electronAPI: ElectronAPI = {
   // AI
   aiSettingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.AI_SETTINGS_GET),
   aiSettingsSet: (settings) => ipcRenderer.invoke(IPC_CHANNELS.AI_SETTINGS_SET, settings),
+  aiPromptPresetList: (query) => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_LIST, query),
+  aiPromptPresetCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_CREATE, input),
+  aiPromptPresetUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_UPDATE, input),
+  aiPromptPresetDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_DELETE, id),
+  aiPromptPresetReorder: (items) => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_REORDER, items),
+  aiPromptPresetResetBuiltins: () => ipcRenderer.invoke(IPC_CHANNELS.AI_PROMPT_PRESET_RESET_BUILTINS),
   aiSummarize: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE, input),
   aiTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_TRANSLATE, input),
   aiAutoTag: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_AUTO_TAG, input),

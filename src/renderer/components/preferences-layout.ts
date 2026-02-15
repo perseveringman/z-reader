@@ -12,6 +12,7 @@ export type SecondaryPreferenceSectionId =
   | 'asr-credentials-volcengine'
   | 'asr-credentials-tencent'
   | 'ai-models'
+  | 'ai-prompts'
   | 'ai-debug'
   | 'sync-general';
 
@@ -61,7 +62,7 @@ export function getSecondarySectionsForPrimary(
     return [{ id: 'sync-general' }];
   }
 
-  return [{ id: 'ai-models' }, { id: 'ai-debug' }];
+  return [{ id: 'ai-models' }, { id: 'ai-prompts' }, { id: 'ai-debug' }];
 }
 
 export function getFirstSecondarySection(

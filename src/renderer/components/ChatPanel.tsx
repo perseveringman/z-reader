@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Plus, Loader2, ChevronDown, ChevronRight, MessageSquare, Settings, Trash2, Compass, Lightbulb, Atom, HelpCircle, GraduationCap } from 'lucide-react';
-import type { ChatMessage, ChatSession, ChatStreamChunk } from '../../shared/types';
+import { Send, Plus, Loader2, ChevronDown, ChevronRight, MessageSquare, Settings, Trash2 } from 'lucide-react';
+import type { ChatMessage, ChatSession, ChatStreamChunk, AIPromptPreset } from '../../shared/types';
 
 // ==================== 简单 Markdown 渲染 ====================
 
@@ -96,107 +96,76 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// ==================== 预设分析框架 ====================
-
-interface AnalysisPreset {
-  key: string;
-  icon: React.ReactNode;
-  color: string;
-  pillColor: string;
-  prompt: string;
-}
-
-function useAnalysisPresets(): AnalysisPreset[] {
-  return [
-    {
-      key: 'valueClarification',
-      icon: <Compass className="w-5 h-5" />,
-      color: 'text-amber-400',
-      pillColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20',
-      prompt: '请用**价值澄清法**分析这篇文章：识别文章传达的核心价值观，分析这些价值观之间是否存在冲突，帮我厘清哪些是我真正认同的。',
-    },
-    {
-      key: 'sixThinkingHats',
-      icon: <Lightbulb className="w-5 h-5" />,
-      color: 'text-blue-400',
-      pillColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20',
-      prompt: '请用**六顶思考帽**方法分析这篇文章：分别从白帽（事实）、红帽（情感）、黑帽（风险）、黄帽（价值）、绿帽（创新）、蓝帽（全局）六个角度展开分析。',
-    },
-    {
-      key: 'firstPrinciples',
-      icon: <Atom className="w-5 h-5" />,
-      color: 'text-emerald-400',
-      pillColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20',
-      prompt: '请用**第一性原理**分析这篇文章：剥离表面假设，回归最基本的事实和原理，重新推导文章的核心论点是否成立。',
-    },
-    {
-      key: 'socraticMethod',
-      icon: <HelpCircle className="w-5 h-5" />,
-      color: 'text-purple-400',
-      pillColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:bg-purple-500/20',
-      prompt: '请用**苏格拉底提问法**分析这篇文章：通过层层追问的方式，挑战文章的假设、证据和推理逻辑，帮我深入思考。',
-    },
-    {
-      key: 'feynmanTechnique',
-      icon: <GraduationCap className="w-5 h-5" />,
-      color: 'text-rose-400',
-      pillColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20',
-      prompt: '请用**费曼教学法**解读这篇文章：用最简单易懂的语言重新解释文章的核心概念，指出我可能存在的理解盲区。',
-    },
-  ];
-}
-
 // ==================== 子组件 ====================
 
 /** 空状态：展示预设分析卡片 */
-function EmptyState({ onSelectPreset }: { onSelectPreset: (prompt: string) => void }) {
+function EmptyState({
+  onSelectPreset,
+  presets,
+  loading,
+}: {
+  onSelectPreset: (prompt: string) => void;
+  presets: AIPromptPreset[];
+  loading: boolean;
+}) {
   const { t } = useTranslation();
-  const presets = useAnalysisPresets();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-2">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquare className="w-5 h-5 text-gray-600 opacity-30" />
         <p className="text-sm text-gray-500">{t('chat.empty')}</p>
       </div>
-      <div className="grid grid-cols-2 gap-2 w-full">
-        {presets.map((preset) => (
-          <button
-            key={preset.key}
-            onClick={() => onSelectPreset(preset.prompt)}
-            className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
-          >
-            <div className="flex items-center gap-1.5">
-              <span className={preset.color}>{preset.icon}</span>
-              <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
-                {t(`chat.analysis.${preset.key}`)}
+      {loading ? (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+        </div>
+      ) : presets.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              onClick={() => onSelectPreset(preset.prompt)}
+              className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
+            >
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-blue-400" />
+                <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
+                  {preset.title}
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-600 leading-tight line-clamp-2">
+                {preset.prompt}
               </span>
-            </div>
-            <span className="text-[11px] text-gray-600 leading-tight">
-              {t(`chat.analysis.${preset.key}Desc`)}
-            </span>
-          </button>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <p className="text-[11px] text-gray-600 mt-3">{t('chat.analysisHint')}</p>
     </div>
   );
 }
 
 /** 对话中的快捷标签栏 */
-function AnalysisPills({ onSelectPreset, disabled }: { onSelectPreset: (prompt: string) => void; disabled: boolean }) {
-  const { t } = useTranslation();
-  const presets = useAnalysisPresets();
+function PromptPills({
+  presets,
+  onSelectPreset,
+  disabled,
+}: {
+  presets: AIPromptPreset[];
+  onSelectPreset: (prompt: string) => void;
+  disabled: boolean;
+}) {
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
       {presets.map((preset) => (
         <button
-          key={preset.key}
+          key={preset.id}
           onClick={() => onSelectPreset(preset.prompt)}
           disabled={disabled}
-          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${preset.pillColor}`}
+          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20"
         >
-          {preset.icon && <span className="w-3 h-3 [&>svg]:w-3 [&>svg]:h-3">{preset.icon}</span>}
-          {t(`chat.analysis.${preset.key}`)}
+          <MessageSquare className="w-3 h-3" />
+          {preset.title}
         </button>
       ))}
     </div>
@@ -431,6 +400,8 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
   const [showSessionList, setShowSessionList] = useState(false);
   const [apiConfigured, setApiConfigured] = useState<boolean | null>(null); // null = 检查中
   const [error, setError] = useState<string | null>(null);
+  const [promptPresets, setPromptPresets] = useState<AIPromptPreset[]>([]);
+  const [loadingPromptPresets, setLoadingPromptPresets] = useState(false);
 
   // 引用
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -449,6 +420,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, streamingText, scrollToBottom]);
+
+  const loadPromptPresets = useCallback(async () => {
+    setLoadingPromptPresets(true);
+    try {
+      const presets = await window.electronAPI.aiPromptPresetList({
+        target: 'chat',
+        enabledOnly: true,
+      });
+      setPromptPresets(presets);
+    } catch {
+      setPromptPresets([]);
+    } finally {
+      setLoadingPromptPresets(false);
+    }
+  }, []);
 
   // 检查 API Key 配置
   useEffect(() => {
@@ -469,6 +455,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
         // 仅加载会话列表，不创建新会话
         const list = await window.electronAPI.aiChatSessionList();
         setSessions(list);
+        await loadPromptPresets();
         // 重置当前会话状态
         setSessionId(null);
         setMessages([]);
@@ -477,7 +464,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
       }
     };
     initSession();
-  }, [articleId, apiConfigured, t]);
+  }, [articleId, apiConfigured, t, loadPromptPresets]);
 
   // 监听流式回复
   useEffect(() => {
@@ -710,7 +697,13 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
 
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.length === 0 && !isStreaming && <EmptyState onSelectPreset={handlePresetSend} />}
+        {messages.length === 0 && !isStreaming && (
+          <EmptyState
+            onSelectPreset={handlePresetSend}
+            presets={promptPresets}
+            loading={loadingPromptPresets}
+          />
+        )}
         {messages.map((msg, i) => (
           <ChatBubble key={i} message={msg} />
         ))}
@@ -729,9 +722,13 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
       {/* 输入框 */}
       <div className="shrink-0 border-t border-white/5 p-3">
         {/* 对话中显示快捷标签 */}
-        {messages.length > 0 && (
+        {messages.length > 0 && promptPresets.length > 0 && (
           <div className="mb-2">
-            <AnalysisPills onSelectPreset={handlePresetSend} disabled={isStreaming} />
+            <PromptPills
+              presets={promptPresets}
+              onSelectPreset={handlePresetSend}
+              disabled={isStreaming}
+            />
           </div>
         )}
         <div className="flex gap-2">
