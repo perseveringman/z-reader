@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { eq, and } from 'drizzle-orm';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerHighlightTagHandlers() {
   const {
@@ -28,6 +29,7 @@ export function registerHighlightTagHandlers() {
         tagId,
         createdAt: now,
       });
+      getGlobalTracker()?.trackChange({ table: 'highlight_tags', recordId: `${highlightId}:${tagId}`, operation: 'insert', changedFields: { highlightId, tagId, createdAt: now } });
     }
   });
 
@@ -39,6 +41,7 @@ export function registerHighlightTagHandlers() {
         eq(schema.highlightTags.highlightId, highlightId),
         eq(schema.highlightTags.tagId, tagId),
       ));
+    getGlobalTracker()?.trackChange({ table: 'highlight_tags', recordId: `${highlightId}:${tagId}`, operation: 'delete', changedFields: {} });
   });
 
   // 获取单个高亮的标签

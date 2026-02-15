@@ -220,6 +220,7 @@ export function registerBookHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.books).set({ deletedFlg: 0, updatedAt: now }).where(eq(schema.books.id, id));
+    getGlobalTracker()?.trackChange({ table: 'books', recordId: id, operation: 'update', changedFields: { deletedFlg: 0, updatedAt: now } });
     const [result] = await db.select().from(schema.books).where(eq(schema.books.id, id));
     return result;
   });

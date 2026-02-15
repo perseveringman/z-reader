@@ -167,6 +167,9 @@ export function registerArticleHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.articles).set({ deletedFlg: 1, updatedAt: now }).where(inArray(schema.articles.id, ids));
+    for (const id of ids) {
+      getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
+    }
   });
 
   // 手动保存 URL 到 Library

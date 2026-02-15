@@ -29,6 +29,12 @@ export function createSyncEngine(config: SyncEngineConfig) {
 
   let lastSyncAt: string | null = null;
 
+  // 校验字段名，防止 SQL 注入（changelog 文件可能被篡改）
+  const VALID_COLUMN_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+  function validateColumns(columns: string[]): boolean {
+    return columns.every(col => VALID_COLUMN_NAME.test(col));
+  }
+
   // 从 sync_cursors 表加载指定远端设备的读取游标
   function getCursor(remoteDeviceId: string): Cursor | undefined {
     const row = sqlite.prepare(
@@ -82,6 +88,7 @@ export function createSyncEngine(config: SyncEngineConfig) {
               const fields = change.changedFields;
               const keys = Object.keys(fields);
               if (keys.length === 0) continue;
+              if (!validateColumns(keys)) continue; // 防止 SQL 注入
               const placeholders = keys.map(() => '?').join(', ');
               try {
                 sqlite.prepare(
@@ -114,6 +121,7 @@ export function createSyncEngine(config: SyncEngineConfig) {
 
             const updateKeys = Object.keys(change.changedFields);
             if (updateKeys.length === 0) continue;
+            if (!validateColumns(updateKeys)) continue; // 防止 SQL 注入
 
             const sets = updateKeys.map(k => `${k} = ?`).join(', ');
             const values = updateKeys.map(k => merged[k]);
