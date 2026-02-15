@@ -429,6 +429,48 @@ export interface AISettingsData {
   };
 }
 
+export type AIPromptPresetTarget = 'chat' | 'summarize' | 'translate' | 'autoTag' | 'extractTopics';
+
+export interface AIPromptPreset {
+  id: string;
+  title: string;
+  prompt: string;
+  iconKey: string;
+  enabled: boolean;
+  displayOrder: number;
+  targets: AIPromptPresetTarget[];
+  isBuiltin: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIPromptPresetListQuery {
+  target?: AIPromptPresetTarget;
+  enabledOnly?: boolean;
+}
+
+export interface AICreatePromptPresetInput {
+  title: string;
+  prompt: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets?: AIPromptPresetTarget[];
+}
+
+export interface AIUpdatePromptPresetInput {
+  id: string;
+  title?: string;
+  prompt?: string;
+  enabled?: boolean;
+  displayOrder?: number;
+  targets?: AIPromptPresetTarget[];
+}
+
+export interface AIReorderPromptPresetsInput {
+  id: string;
+  displayOrder: number;
+}
+
 export interface AISummarizeInput {
   articleId: string;
   language?: string;
@@ -498,13 +540,15 @@ export interface ChatSession {
 
 /** 流式 Chunk */
 export interface ChatStreamChunk {
-  type: 'text-delta' | 'tool-call' | 'tool-result' | 'done' | 'error';
+  type: 'text-delta' | 'tool-call' | 'tool-result' | 'done' | 'error' | 'title-generated';
   textDelta?: string;
   toolCall?: { name: string; args: Record<string, unknown> };
   toolResult?: { name: string; result: string };
   error?: string;
   tokenCount?: number;
   fullText?: string;
+  /** 自动生成的会话标题（首次对话后生成） */
+  title?: string;
 }
 
 /** 发送消息输入 */
@@ -704,6 +748,12 @@ export interface ElectronAPI {
   // AI 操作
   aiSettingsGet: () => Promise<AISettingsData>;
   aiSettingsSet: (settings: Partial<AISettingsData>) => Promise<void>;
+  aiPromptPresetList: (query?: AIPromptPresetListQuery) => Promise<AIPromptPreset[]>;
+  aiPromptPresetCreate: (input: AICreatePromptPresetInput) => Promise<AIPromptPreset>;
+  aiPromptPresetUpdate: (input: AIUpdatePromptPresetInput) => Promise<void>;
+  aiPromptPresetDelete: (id: string) => Promise<void>;
+  aiPromptPresetReorder: (items: AIReorderPromptPresetsInput[]) => Promise<void>;
+  aiPromptPresetResetBuiltins: () => Promise<AIPromptPreset[]>;
   aiSummarize: (input: AISummarizeInput) => Promise<AISummarizeResult>;
   aiTranslate: (input: AITranslateInput) => Promise<AITranslateResult>;
   aiAutoTag: (input: AIAutoTagInput) => Promise<AIAutoTagResult>;

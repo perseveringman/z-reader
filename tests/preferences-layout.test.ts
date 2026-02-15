@@ -13,6 +13,7 @@ describe('preferences layout model', () => {
       'content',
       'asr',
       'ai',
+      'sync',
     ]);
   });
 
@@ -32,6 +33,16 @@ describe('preferences layout model', () => {
     expect(sections.map((section) => section.id)).toEqual([
       'asr-provider',
       'asr-credentials-volcengine',
+    ]);
+  });
+
+  it('exposes prompt presets section under AI', () => {
+    const sections = getSecondarySectionsForPrimary('ai', {});
+
+    expect(sections.map((section) => section.id)).toEqual([
+      'ai-models',
+      'ai-prompts',
+      'ai-debug',
     ]);
   });
 

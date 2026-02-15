@@ -8,7 +8,7 @@
  * - 对话完成后持久化消息到 ai_chat_sessions
  */
 
-import { streamText, stepCountIs } from 'ai';
+import { streamText, generateText, stepCountIs } from 'ai';
 import type { LanguageModel } from 'ai';
 import type { ToolContext } from '../tools/types';
 import type { AIDatabase } from '../providers/db';
@@ -127,6 +127,14 @@ export class ChatService {
 
     // 7. 持久化消息（用户消息 + AI 回复）
     this.persistMessages(sessionId, history, userMessage, fullText);
+
+    // 8. 首次对话后自动生成会话标题
+    const isFirstMessage = history.length === 0;
+    if (isFirstMessage && fullText) {
+      this.generateTitle(sessionId, userMessage, fullText, onChunk).catch(() => {
+        // 标题生成失败不影响主流程
+      });
+    }
   }
 
   /**
@@ -182,5 +190,32 @@ export class ChatService {
     this.deps.aiDb.updateChatSession(sessionId, {
       messagesJson: JSON.stringify(newMessages),
     });
+  }
+
+  /**
+   * 根据首轮对话内容自动生成会话标题
+   * 使用 fast 模型生成简短标题，并持久化到数据库
+   */
+  private async generateTitle(
+    sessionId: string,
+    userMessage: string,
+    aiReply: string,
+    onChunk: (chunk: ChatStreamChunk) => void,
+  ): Promise<void> {
+    const snippet = (userMessage + '\n' + aiReply).slice(0, 500);
+    const { text } = await generateText({
+      model: this.deps.getModel('fast'),
+      messages: [
+        {
+          role: 'user',
+          content: `请根据以下对话内容，生成一个简短的对话标题（不超过20个字，不要加引号和标点）：\n\n${snippet}`,
+        },
+      ],
+    });
+    const title = text.trim().slice(0, 30);
+    if (title) {
+      this.deps.aiDb.updateChatSession(sessionId, { title });
+      onChunk({ type: 'title-generated', title });
+    }
   }
 }

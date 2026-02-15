@@ -115,6 +115,12 @@ export const IPC_CHANNELS = {
   // AI
   AI_SETTINGS_GET: 'ai:settings:get',
   AI_SETTINGS_SET: 'ai:settings:set',
+  AI_PROMPT_PRESET_LIST: 'ai:promptPreset:list',
+  AI_PROMPT_PRESET_CREATE: 'ai:promptPreset:create',
+  AI_PROMPT_PRESET_UPDATE: 'ai:promptPreset:update',
+  AI_PROMPT_PRESET_DELETE: 'ai:promptPreset:delete',
+  AI_PROMPT_PRESET_REORDER: 'ai:promptPreset:reorder',
+  AI_PROMPT_PRESET_RESET_BUILTINS: 'ai:promptPreset:resetBuiltins',
   AI_SUMMARIZE: 'ai:summarize',
   AI_TRANSLATE: 'ai:translate',
   AI_AUTO_TAG: 'ai:autoTag',

@@ -1,7 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Plus, Loader2, ChevronDown, ChevronRight, MessageSquare, Settings, Trash2, Compass, Lightbulb, Atom, HelpCircle, GraduationCap } from 'lucide-react';
-import type { ChatMessage, ChatSession, ChatStreamChunk } from '../../shared/types';
+import {
+  Send,
+  Plus,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
+  Settings,
+  Trash2,
+  Compass,
+  Lightbulb,
+  Atom,
+  HelpCircle,
+  GraduationCap,
+  Brain,
+  Target,
+  Scale,
+  BookOpen,
+  Briefcase,
+  Sparkles,
+} from 'lucide-react';
+import type { ChatMessage, ChatSession, ChatStreamChunk, AIPromptPreset } from '../../shared/types';
 
 // ==================== 简单 Markdown 渲染 ====================
 
@@ -96,107 +116,97 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-// ==================== 预设分析框架 ====================
-
-interface AnalysisPreset {
-  key: string;
-  icon: React.ReactNode;
-  color: string;
-  pillColor: string;
-  prompt: string;
-}
-
-function useAnalysisPresets(): AnalysisPreset[] {
-  return [
-    {
-      key: 'valueClarification',
-      icon: <Compass className="w-5 h-5" />,
-      color: 'text-amber-400',
-      pillColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20',
-      prompt: '请用**价值澄清法**分析这篇文章：识别文章传达的核心价值观，分析这些价值观之间是否存在冲突，帮我厘清哪些是我真正认同的。',
-    },
-    {
-      key: 'sixThinkingHats',
-      icon: <Lightbulb className="w-5 h-5" />,
-      color: 'text-blue-400',
-      pillColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20',
-      prompt: '请用**六顶思考帽**方法分析这篇文章：分别从白帽（事实）、红帽（情感）、黑帽（风险）、黄帽（价值）、绿帽（创新）、蓝帽（全局）六个角度展开分析。',
-    },
-    {
-      key: 'firstPrinciples',
-      icon: <Atom className="w-5 h-5" />,
-      color: 'text-emerald-400',
-      pillColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20',
-      prompt: '请用**第一性原理**分析这篇文章：剥离表面假设，回归最基本的事实和原理，重新推导文章的核心论点是否成立。',
-    },
-    {
-      key: 'socraticMethod',
-      icon: <HelpCircle className="w-5 h-5" />,
-      color: 'text-purple-400',
-      pillColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:bg-purple-500/20',
-      prompt: '请用**苏格拉底提问法**分析这篇文章：通过层层追问的方式，挑战文章的假设、证据和推理逻辑，帮我深入思考。',
-    },
-    {
-      key: 'feynmanTechnique',
-      icon: <GraduationCap className="w-5 h-5" />,
-      color: 'text-rose-400',
-      pillColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20',
-      prompt: '请用**费曼教学法**解读这篇文章：用最简单易懂的语言重新解释文章的核心概念，指出我可能存在的理解盲区。',
-    },
-  ];
+function PromptIcon({
+  iconKey,
+  className,
+}: {
+  iconKey: string;
+  className?: string;
+}) {
+  if (iconKey === 'compass') return <Compass className={className} />;
+  if (iconKey === 'lightbulb') return <Lightbulb className={className} />;
+  if (iconKey === 'atom') return <Atom className={className} />;
+  if (iconKey === 'help-circle') return <HelpCircle className={className} />;
+  if (iconKey === 'graduation-cap') return <GraduationCap className={className} />;
+  if (iconKey === 'brain') return <Brain className={className} />;
+  if (iconKey === 'target') return <Target className={className} />;
+  if (iconKey === 'scale') return <Scale className={className} />;
+  if (iconKey === 'book-open') return <BookOpen className={className} />;
+  if (iconKey === 'briefcase') return <Briefcase className={className} />;
+  if (iconKey === 'sparkles') return <Sparkles className={className} />;
+  return <MessageSquare className={className} />;
 }
 
 // ==================== 子组件 ====================
 
 /** 空状态：展示预设分析卡片 */
-function EmptyState({ onSelectPreset }: { onSelectPreset: (prompt: string) => void }) {
+function EmptyState({
+  onSelectPreset,
+  presets,
+  loading,
+}: {
+  onSelectPreset: (prompt: string) => void;
+  presets: AIPromptPreset[];
+  loading: boolean;
+}) {
   const { t } = useTranslation();
-  const presets = useAnalysisPresets();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-2">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquare className="w-5 h-5 text-gray-600 opacity-30" />
         <p className="text-sm text-gray-500">{t('chat.empty')}</p>
       </div>
-      <div className="grid grid-cols-2 gap-2 w-full">
-        {presets.map((preset) => (
-          <button
-            key={preset.key}
-            onClick={() => onSelectPreset(preset.prompt)}
+      {loading ? (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+        </div>
+      ) : presets.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              onClick={() => onSelectPreset(preset.prompt)}
             className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
           >
             <div className="flex items-center gap-1.5">
-              <span className={preset.color}>{preset.icon}</span>
-              <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
-                {t(`chat.analysis.${preset.key}`)}
+                <PromptIcon iconKey={preset.iconKey} className="w-4 h-4 text-blue-400" />
+                <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
+                  {preset.title}
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-600 leading-tight line-clamp-2">
+                {preset.prompt}
               </span>
-            </div>
-            <span className="text-[11px] text-gray-600 leading-tight">
-              {t(`chat.analysis.${preset.key}Desc`)}
-            </span>
-          </button>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <p className="text-[11px] text-gray-600 mt-3">{t('chat.analysisHint')}</p>
     </div>
   );
 }
 
 /** 对话中的快捷标签栏 */
-function AnalysisPills({ onSelectPreset, disabled }: { onSelectPreset: (prompt: string) => void; disabled: boolean }) {
-  const { t } = useTranslation();
-  const presets = useAnalysisPresets();
+function PromptPills({
+  presets,
+  onSelectPreset,
+  disabled,
+}: {
+  presets: AIPromptPreset[];
+  onSelectPreset: (prompt: string) => void;
+  disabled: boolean;
+}) {
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
       {presets.map((preset) => (
         <button
-          key={preset.key}
+          key={preset.id}
           onClick={() => onSelectPreset(preset.prompt)}
           disabled={disabled}
-          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${preset.pillColor}`}
+          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20"
         >
-          {preset.icon && <span className="w-3 h-3 [&>svg]:w-3 [&>svg]:h-3">{preset.icon}</span>}
-          {t(`chat.analysis.${preset.key}`)}
+          <PromptIcon iconKey={preset.iconKey} className="w-3 h-3" />
+          {preset.title}
         </button>
       ))}
     </div>
@@ -367,7 +377,7 @@ function SessionDropdown({
     >
       {/* 新建会话 */}
       <button
-        onClick={onNew}
+        onClick={() => { onNew(); onClose(); }}
         className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-gray-400 hover:bg-white/5 hover:text-white transition-colors cursor-pointer border-b border-white/5"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -395,6 +405,7 @@ function SessionDropdown({
               </p>
             </div>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(s.id);
@@ -430,13 +441,17 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
   const [showSessionList, setShowSessionList] = useState(false);
   const [apiConfigured, setApiConfigured] = useState<boolean | null>(null); // null = 检查中
   const [error, setError] = useState<string | null>(null);
+  const [promptPresets, setPromptPresets] = useState<AIPromptPreset[]>([]);
+  const [loadingPromptPresets, setLoadingPromptPresets] = useState(false);
 
   // 引用
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // 使用 ref 保存 toolCalls 最新值，避免 useEffect 依赖循环
+  // 使用 ref 保存最新值，避免 useEffect 依赖循环
   const toolCallsRef = useRef(toolCalls);
   toolCallsRef.current = toolCalls;
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
@@ -447,6 +462,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     scrollToBottom();
   }, [messages, streamingText, scrollToBottom]);
 
+  const loadPromptPresets = useCallback(async () => {
+    setLoadingPromptPresets(true);
+    try {
+      const presets = await window.electronAPI.aiPromptPresetList({
+        target: 'chat',
+        enabledOnly: true,
+      });
+      setPromptPresets(presets);
+    } catch {
+      setPromptPresets([]);
+    } finally {
+      setLoadingPromptPresets(false);
+    }
+  }, []);
+
   // 检查 API Key 配置
   useEffect(() => {
     window.electronAPI.aiSettingsGet().then((settings) => {
@@ -456,25 +486,26 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     });
   }, []);
 
-  // 初始化：按 articleId 创建或恢复会话
+  // 初始化：仅加载会话列表，不立即创建会话（延迟到第一次发消息时创建）
   useEffect(() => {
     if (apiConfigured === false) return;
     if (apiConfigured === null) return;
 
     const initSession = async () => {
       try {
-        const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
-        setSessionId(session.id);
-        setMessages(session.messages);
-        // 加载会话列表
+        // 仅加载会话列表，不创建新会话
         const list = await window.electronAPI.aiChatSessionList();
         setSessions(list);
+        await loadPromptPresets();
+        // 重置当前会话状态
+        setSessionId(null);
+        setMessages([]);
       } catch {
         setError(t('chat.error'));
       }
     };
     initSession();
-  }, [articleId, apiConfigured, t]);
+  }, [articleId, apiConfigured, t, loadPromptPresets]);
 
   // 监听流式回复
   useEffect(() => {
@@ -507,14 +538,40 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
         setStreamingText('');
         setToolCalls([]);
         setIsStreaming(false);
+      } else if (chunk.type === 'title-generated') {
+        // AI 自动生成的会话标题，更新会话列表中对应条目
+        if (chunk.title) {
+          const currentId = sessionIdRef.current;
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === currentId ? { ...s, title: chunk.title! } : s,
+            ),
+          );
+        }
       }
     });
     return unsubscribe;
   }, [t]);
 
+  // 确保会话已创建（延迟创建），返回 sessionId
+  const ensureSession = useCallback(async (): Promise<string | null> => {
+    if (sessionId) return sessionId;
+    try {
+      const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
+      setSessionId(session.id);
+      // 刷新会话列表
+      const list = await window.electronAPI.aiChatSessionList();
+      setSessions(list);
+      return session.id;
+    } catch {
+      setError(t('chat.error'));
+      return null;
+    }
+  }, [sessionId, articleId, t]);
+
   // 发送消息
-  const handleSend = useCallback(() => {
-    if (!input.trim() || !sessionId || isStreaming) return;
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isStreaming) return;
 
     const userMsg: ChatMessage = {
       role: 'user',
@@ -523,20 +580,26 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setError(null);
-
-    window.electronAPI.aiChatSend({
-      sessionId,
-      message: input.trim(),
-      articleId: articleId ?? undefined,
-    });
-
     setInput('');
     setIsStreaming(true);
-  }, [input, sessionId, isStreaming, articleId]);
+
+    // 延迟创建会话（第一次发消息时才创建）
+    const currentSessionId = await ensureSession();
+    if (!currentSessionId) {
+      setIsStreaming(false);
+      return;
+    }
+
+    window.electronAPI.aiChatSend({
+      sessionId: currentSessionId,
+      message: userMsg.content,
+      articleId: articleId ?? undefined,
+    });
+  }, [input, isStreaming, articleId, ensureSession]);
 
   // 预设分析按钮发送
-  const handlePresetSend = useCallback((prompt: string) => {
-    if (!sessionId || isStreaming) return;
+  const handlePresetSend = useCallback(async (prompt: string) => {
+    if (isStreaming) return;
 
     const userMsg: ChatMessage = {
       role: 'user',
@@ -545,15 +608,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setError(null);
+    setIsStreaming(true);
+
+    // 延迟创建会话（第一次发消息时才创建）
+    const currentSessionId = await ensureSession();
+    if (!currentSessionId) {
+      setIsStreaming(false);
+      return;
+    }
 
     window.electronAPI.aiChatSend({
-      sessionId,
+      sessionId: currentSessionId,
       message: prompt,
       articleId: articleId ?? undefined,
     });
-
-    setIsStreaming(true);
-  }, [sessionId, isStreaming, articleId]);
+  }, [isStreaming, articleId, ensureSession]);
 
   // 键盘事件：Enter 发送
   const handleKeyDown = useCallback(
@@ -566,20 +635,20 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     [handleSend],
   );
 
-  // 新建会话
-  const handleNewSession = useCallback(async () => {
-    try {
-      const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
-      setSessionId(session.id);
-      setMessages(session.messages);
-      setShowSessionList(false);
-      // 刷新列表
-      const list = await window.electronAPI.aiChatSessionList();
-      setSessions(list);
-    } catch {
-      setError(t('chat.error'));
-    }
-  }, [articleId, t]);
+  // 新建会话（仅重置状态，不立即创建数据库记录）
+  const handleNewSession = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setError(null);
+    setStreamingText('');
+    setToolCalls([]);
+    setIsStreaming(false);
+  }, []);
+
+  // 关闭会话列表
+  const handleCloseSessionList = useCallback(() => {
+    setShowSessionList(false);
+  }, []);
 
   // 切换会话
   const handleSelectSession = useCallback(async (id: string) => {
@@ -597,16 +666,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
 
   // 删除会话
   const handleDeleteSession = useCallback(async (id: string) => {
+    // 乐观更新：立即从列表中移除，提供即时视觉反馈
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    // 如果删除的是当前会话，重置聊天状态
+    if (id === sessionId) {
+      handleNewSession();
+    }
     try {
       await window.electronAPI.aiChatSessionDelete(id);
-      // 如果删除的是当前会话，新建一个
-      if (id === sessionId) {
-        await handleNewSession();
-      }
-      // 刷新列表
+      // 从数据库重新加载列表，确保一致性
       const list = await window.electronAPI.aiChatSessionList();
       setSessions(list);
     } catch {
+      // 删除失败时恢复列表
+      const list = await window.electronAPI.aiChatSessionList();
+      setSessions(list);
       setError(t('chat.error'));
     }
   }, [sessionId, handleNewSession, t]);
@@ -643,7 +717,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             <ChevronDown className="w-3 h-3" />
           </button>
           <button
-            onClick={handleNewSession}
+            onClick={() => { handleNewSession(); setShowSessionList(false); }}
             className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
             title={t('chat.newSession')}
           >
@@ -657,14 +731,20 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             onSelect={handleSelectSession}
             onNew={handleNewSession}
             onDelete={handleDeleteSession}
-            onClose={() => setShowSessionList(false)}
+            onClose={handleCloseSessionList}
           />
         )}
       </div>
 
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.length === 0 && !isStreaming && <EmptyState onSelectPreset={handlePresetSend} />}
+        {messages.length === 0 && !isStreaming && (
+          <EmptyState
+            onSelectPreset={handlePresetSend}
+            presets={promptPresets}
+            loading={loadingPromptPresets}
+          />
+        )}
         {messages.map((msg, i) => (
           <ChatBubble key={i} message={msg} />
         ))}
@@ -683,9 +763,13 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
       {/* 输入框 */}
       <div className="shrink-0 border-t border-white/5 p-3">
         {/* 对话中显示快捷标签 */}
-        {messages.length > 0 && (
+        {messages.length > 0 && promptPresets.length > 0 && (
           <div className="mb-2">
-            <AnalysisPills onSelectPreset={handlePresetSend} disabled={isStreaming || !sessionId} />
+            <PromptPills
+              presets={promptPresets}
+              onSelectPreset={handlePresetSend}
+              disabled={isStreaming}
+            />
           </div>
         )}
         <div className="flex gap-2">
@@ -696,12 +780,12 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('chat.placeholder')}
-            disabled={isStreaming || !sessionId}
+            disabled={isStreaming}
             className="flex-1 bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-gray-600 outline-none focus:border-blue-500/50 transition-colors disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={isStreaming || !input.trim() || !sessionId}
+            disabled={isStreaming || !input.trim()}
             className="shrink-0 px-3 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isStreaming ? (
