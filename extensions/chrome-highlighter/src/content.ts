@@ -4,11 +4,16 @@ import { createHighlight, deleteHighlight, getHighlightsByUrl, saveArticle, upda
 import { showNoteEditor } from './note-editor';
 import { showHighlightMenu } from './highlight-menu';
 import { toast } from './toast';
+import { initShortcuts, registerShortcut, showShortcutsHelp } from './shortcuts';
 import type { HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
 
 async function init() {
+  // 初始化快捷键系统
+  initShortcuts();
+  registerAllShortcuts();
+
   try {
     const result = await getHighlightsByUrl(window.location.href);
     if (result.articleId) {
@@ -254,5 +259,72 @@ chrome.runtime.onMessage.addListener((message) => {
     toast.info(`搜索功能开发中: "${searchText}"`);
   }
 });
+
+/**
+ * 注册所有快捷键
+ */
+function registerAllShortcuts(): void {
+  // 快速高亮快捷键
+  registerShortcut({
+    key: '1',
+    alt: true,
+    description: '黄色高亮',
+    category: '高亮操作',
+    action: () => handleHighlight('yellow'),
+  });
+
+  registerShortcut({
+    key: '2',
+    alt: true,
+    description: '蓝色高亮',
+    category: '高亮操作',
+    action: () => handleHighlight('blue'),
+  });
+
+  registerShortcut({
+    key: '3',
+    alt: true,
+    description: '绿色高亮',
+    category: '高亮操作',
+    action: () => handleHighlight('green'),
+  });
+
+  registerShortcut({
+    key: '4',
+    alt: true,
+    description: '红色高亮',
+    category: '高亮操作',
+    action: () => handleHighlight('red'),
+  });
+
+  // 添加笔记快捷键
+  registerShortcut({
+    key: 'n',
+    alt: true,
+    description: '添加笔记高亮',
+    category: '高亮操作',
+    action: handleHighlightWithNote,
+  });
+
+  // 保存文章快捷键
+  registerShortcut({
+    key: 's',
+    alt: true,
+    description: '保存文章到 Z-Reader',
+    category: '文章操作',
+    action: handleSaveArticle,
+  });
+
+  // 显示帮助快捷键
+  registerShortcut({
+    key: '?',
+    alt: true,
+    description: '显示快捷键帮助',
+    category: '帮助',
+    action: showShortcutsHelp,
+  });
+
+  console.log('[Z-Reader] 已注册 7 个快捷键');
+}
 
 init();

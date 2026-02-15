@@ -4,6 +4,7 @@
 @import './styles/note-editor.css';
 @import './styles/toast.css';
 @import './styles/highlight-menu.css';
+@import './styles/shortcuts.css';
 
 /* 高亮文本 */
 .zr-highlight {
