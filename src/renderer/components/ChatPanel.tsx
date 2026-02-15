@@ -367,7 +367,7 @@ function SessionDropdown({
     >
       {/* 新建会话 */}
       <button
-        onClick={onNew}
+        onClick={() => { onNew(); onClose(); }}
         className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-gray-400 hover:bg-white/5 hover:text-white transition-colors cursor-pointer border-b border-white/5"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -395,6 +395,7 @@ function SessionDropdown({
               </p>
             </div>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(s.id);
@@ -434,9 +435,11 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
   // 引用
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // 使用 ref 保存 toolCalls 最新值，避免 useEffect 依赖循环
+  // 使用 ref 保存最新值，避免 useEffect 依赖循环
   const toolCallsRef = useRef(toolCalls);
   toolCallsRef.current = toolCalls;
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
@@ -456,19 +459,19 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     });
   }, []);
 
-  // 初始化：按 articleId 创建或恢复会话
+  // 初始化：仅加载会话列表，不立即创建会话（延迟到第一次发消息时创建）
   useEffect(() => {
     if (apiConfigured === false) return;
     if (apiConfigured === null) return;
 
     const initSession = async () => {
       try {
-        const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
-        setSessionId(session.id);
-        setMessages(session.messages);
-        // 加载会话列表
+        // 仅加载会话列表，不创建新会话
         const list = await window.electronAPI.aiChatSessionList();
         setSessions(list);
+        // 重置当前会话状态
+        setSessionId(null);
+        setMessages([]);
       } catch {
         setError(t('chat.error'));
       }
@@ -507,14 +510,40 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
         setStreamingText('');
         setToolCalls([]);
         setIsStreaming(false);
+      } else if (chunk.type === 'title-generated') {
+        // AI 自动生成的会话标题，更新会话列表中对应条目
+        if (chunk.title) {
+          const currentId = sessionIdRef.current;
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === currentId ? { ...s, title: chunk.title! } : s,
+            ),
+          );
+        }
       }
     });
     return unsubscribe;
   }, [t]);
 
+  // 确保会话已创建（延迟创建），返回 sessionId
+  const ensureSession = useCallback(async (): Promise<string | null> => {
+    if (sessionId) return sessionId;
+    try {
+      const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
+      setSessionId(session.id);
+      // 刷新会话列表
+      const list = await window.electronAPI.aiChatSessionList();
+      setSessions(list);
+      return session.id;
+    } catch {
+      setError(t('chat.error'));
+      return null;
+    }
+  }, [sessionId, articleId, t]);
+
   // 发送消息
-  const handleSend = useCallback(() => {
-    if (!input.trim() || !sessionId || isStreaming) return;
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isStreaming) return;
 
     const userMsg: ChatMessage = {
       role: 'user',
@@ -523,20 +552,26 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setError(null);
-
-    window.electronAPI.aiChatSend({
-      sessionId,
-      message: input.trim(),
-      articleId: articleId ?? undefined,
-    });
-
     setInput('');
     setIsStreaming(true);
-  }, [input, sessionId, isStreaming, articleId]);
+
+    // 延迟创建会话（第一次发消息时才创建）
+    const currentSessionId = await ensureSession();
+    if (!currentSessionId) {
+      setIsStreaming(false);
+      return;
+    }
+
+    window.electronAPI.aiChatSend({
+      sessionId: currentSessionId,
+      message: userMsg.content,
+      articleId: articleId ?? undefined,
+    });
+  }, [input, isStreaming, articleId, ensureSession]);
 
   // 预设分析按钮发送
-  const handlePresetSend = useCallback((prompt: string) => {
-    if (!sessionId || isStreaming) return;
+  const handlePresetSend = useCallback(async (prompt: string) => {
+    if (isStreaming) return;
 
     const userMsg: ChatMessage = {
       role: 'user',
@@ -545,15 +580,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setError(null);
+    setIsStreaming(true);
+
+    // 延迟创建会话（第一次发消息时才创建）
+    const currentSessionId = await ensureSession();
+    if (!currentSessionId) {
+      setIsStreaming(false);
+      return;
+    }
 
     window.electronAPI.aiChatSend({
-      sessionId,
+      sessionId: currentSessionId,
       message: prompt,
       articleId: articleId ?? undefined,
     });
-
-    setIsStreaming(true);
-  }, [sessionId, isStreaming, articleId]);
+  }, [isStreaming, articleId, ensureSession]);
 
   // 键盘事件：Enter 发送
   const handleKeyDown = useCallback(
@@ -566,20 +607,20 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     [handleSend],
   );
 
-  // 新建会话
-  const handleNewSession = useCallback(async () => {
-    try {
-      const session = await window.electronAPI.aiChatSessionCreate(articleId ?? undefined);
-      setSessionId(session.id);
-      setMessages(session.messages);
-      setShowSessionList(false);
-      // 刷新列表
-      const list = await window.electronAPI.aiChatSessionList();
-      setSessions(list);
-    } catch {
-      setError(t('chat.error'));
-    }
-  }, [articleId, t]);
+  // 新建会话（仅重置状态，不立即创建数据库记录）
+  const handleNewSession = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setError(null);
+    setStreamingText('');
+    setToolCalls([]);
+    setIsStreaming(false);
+  }, []);
+
+  // 关闭会话列表
+  const handleCloseSessionList = useCallback(() => {
+    setShowSessionList(false);
+  }, []);
 
   // 切换会话
   const handleSelectSession = useCallback(async (id: string) => {
@@ -597,16 +638,21 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
 
   // 删除会话
   const handleDeleteSession = useCallback(async (id: string) => {
+    // 乐观更新：立即从列表中移除，提供即时视觉反馈
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    // 如果删除的是当前会话，重置聊天状态
+    if (id === sessionId) {
+      handleNewSession();
+    }
     try {
       await window.electronAPI.aiChatSessionDelete(id);
-      // 如果删除的是当前会话，新建一个
-      if (id === sessionId) {
-        await handleNewSession();
-      }
-      // 刷新列表
+      // 从数据库重新加载列表，确保一致性
       const list = await window.electronAPI.aiChatSessionList();
       setSessions(list);
     } catch {
+      // 删除失败时恢复列表
+      const list = await window.electronAPI.aiChatSessionList();
+      setSessions(list);
       setError(t('chat.error'));
     }
   }, [sessionId, handleNewSession, t]);
@@ -643,7 +689,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             <ChevronDown className="w-3 h-3" />
           </button>
           <button
-            onClick={handleNewSession}
+            onClick={() => { handleNewSession(); setShowSessionList(false); }}
             className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
             title={t('chat.newSession')}
           >
@@ -657,7 +703,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             onSelect={handleSelectSession}
             onNew={handleNewSession}
             onDelete={handleDeleteSession}
-            onClose={() => setShowSessionList(false)}
+            onClose={handleCloseSessionList}
           />
         )}
       </div>
@@ -685,7 +731,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
         {/* 对话中显示快捷标签 */}
         {messages.length > 0 && (
           <div className="mb-2">
-            <AnalysisPills onSelectPreset={handlePresetSend} disabled={isStreaming || !sessionId} />
+            <AnalysisPills onSelectPreset={handlePresetSend} disabled={isStreaming} />
           </div>
         )}
         <div className="flex gap-2">
@@ -696,12 +742,12 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('chat.placeholder')}
-            disabled={isStreaming || !sessionId}
+            disabled={isStreaming}
             className="flex-1 bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-[13px] text-white placeholder-gray-600 outline-none focus:border-blue-500/50 transition-colors disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={isStreaming || !input.trim() || !sessionId}
+            disabled={isStreaming || !input.trim()}
             className="shrink-0 px-3 py-2 rounded-lg bg-blue-600 text-white text-[13px] font-medium hover:bg-blue-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {isStreaming ? (

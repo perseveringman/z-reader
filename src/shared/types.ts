@@ -493,13 +493,15 @@ export interface ChatSession {
 
 /** 流式 Chunk */
 export interface ChatStreamChunk {
-  type: 'text-delta' | 'tool-call' | 'tool-result' | 'done' | 'error';
+  type: 'text-delta' | 'tool-call' | 'tool-result' | 'done' | 'error' | 'title-generated';
   textDelta?: string;
   toolCall?: { name: string; args: Record<string, unknown> };
   toolResult?: { name: string; result: string };
   error?: string;
   tokenCount?: number;
   fullText?: string;
+  /** 自动生成的会话标题（首次对话后生成） */
+  title?: string;
 }
 
 /** 发送消息输入 */
