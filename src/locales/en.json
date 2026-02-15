@@ -541,6 +541,18 @@
     "copied": "Copied",
     "error": "Error"
   },
+  "sync": {
+    "title": "iCloud Sync",
+    "icloudAvailable": "iCloud Drive available",
+    "icloudUnavailable": "iCloud Drive unavailable, please sign in to iCloud",
+    "lastSync": "Last synced",
+    "neverSynced": "Never synced",
+    "contentTitle": "Sync Content",
+    "books": "Book files (EPUB/PDF)",
+    "podcasts": "Podcast audio files",
+    "syncNow": "Sync Now",
+    "syncing": "Syncing..."
+  },
   "errors": {
     "networkError": "Network error",
     "serverError": "Server error",

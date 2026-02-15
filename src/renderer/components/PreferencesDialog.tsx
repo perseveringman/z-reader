@@ -14,11 +14,13 @@ import {
   EyeOff,
   Mic,
   Settings,
+  Cloud,
+  RefreshCw,
   type LucideIcon,
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { AIDebugPanel } from './AIDebugPanel';
-import type { AppSettings, AISettingsData } from '../../shared/types';
+import type { AppSettings, AISettingsData, SyncStatus, SyncDevice } from '../../shared/types';
 import { changeLanguage, supportedLanguages } from '../../i18n';
 import {
   PRIMARY_PREFERENCE_SECTIONS,
@@ -40,6 +42,7 @@ const PRIMARY_SECTION_LABELS: Record<PrimaryPreferenceSectionId, string> = {
   content: '内容源',
   asr: '语音识别',
   ai: 'AI',
+  sync: '同步',
 };
 
 const PRIMARY_SECTION_ICONS: Record<PrimaryPreferenceSectionId, LucideIcon> = {
@@ -47,6 +50,7 @@ const PRIMARY_SECTION_ICONS: Record<PrimaryPreferenceSectionId, LucideIcon> = {
   content: Podcast,
   asr: Mic,
   ai: Brain,
+  sync: Cloud,
 };
 
 const SECONDARY_SECTION_LABELS: Record<SecondaryPreferenceSectionId, string> = {
@@ -60,6 +64,7 @@ const SECONDARY_SECTION_LABELS: Record<SecondaryPreferenceSectionId, string> = {
   'asr-credentials-tencent': '腾讯云凭据',
   'ai-models': '模型与密钥',
   'ai-debug': '调试面板',
+  'sync-general': 'iCloud 同步',
 };
 
 export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
@@ -79,6 +84,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [aiDirty, setAiDirty] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const { showToast } = useToast();
 
@@ -94,11 +101,15 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       Promise.all([
         window.electronAPI.settingsGet(),
         window.electronAPI.aiSettingsGet().catch(() => null),
+        window.electronAPI.syncGetStatus().catch(() => null),
       ])
-        .then(([s, ai]) => {
+        .then(([s, ai, sync]) => {
           setSettings(s);
           if (ai) {
             setAiSettings(ai);
+          }
+          if (sync) {
+            setSyncStatus(sync);
           }
         })
         .catch((err) => console.error('Failed to load settings:', err))
@@ -622,6 +633,113 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     </section>
   );
 
+  const renderSyncSection = () => {
+    const icloudAvailable = syncStatus?.icloudAvailable ?? false;
+    const enabled = syncStatus?.enabled ?? false;
+
+    return (
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Cloud size={16} className="text-blue-400" />
+          <h3 className="text-sm font-medium text-white">iCloud 同步</h3>
+        </div>
+
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white">启用 iCloud 同步</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {icloudAvailable ? 'iCloud Drive 可用' : 'iCloud Drive 不可用，请登录 iCloud'}
+              </p>
+            </div>
+            <button
+              disabled={!icloudAvailable}
+              onClick={async () => {
+                try {
+                  if (!enabled) {
+                    const status = await window.electronAPI.syncEnable();
+                    setSyncStatus(status);
+                  } else {
+                    await window.electronAPI.syncDisable();
+                    setSyncStatus(prev => prev ? { ...prev, enabled: false } : null);
+                  }
+                } catch (err) {
+                  console.error('同步切换失败:', err);
+                }
+              }}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                !icloudAvailable ? 'bg-gray-700 cursor-not-allowed' :
+                enabled ? 'bg-blue-500' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                enabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          {enabled && (
+            <>
+              <div className="text-[11px] text-gray-500">
+                {syncStatus?.lastSyncAt
+                  ? `最近同步: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`
+                  : '尚未同步'}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">同步内容</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-white">电子书文件 (EPUB/PDF)</span>
+                  <button
+                    onClick={() => updateField('syncBooks', !(settings.syncBooks ?? false))}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      (settings.syncBooks ?? false) ? 'bg-blue-500' : 'bg-gray-600 hover:bg-gray-500'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      (settings.syncBooks ?? false) ? 'translate-x-5' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-white">播客音频文件</span>
+                  <button
+                    onClick={() => updateField('syncPodcasts', !(settings.syncPodcasts ?? false))}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      (settings.syncPodcasts ?? false) ? 'bg-blue-500' : 'bg-gray-600 hover:bg-gray-500'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      (settings.syncPodcasts ?? false) ? 'translate-x-5' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                disabled={syncing}
+                onClick={async () => {
+                  setSyncing(true);
+                  try {
+                    await window.electronAPI.syncNow();
+                    const status = await window.electronAPI.syncGetStatus();
+                    setSyncStatus(status);
+                  } finally {
+                    setSyncing(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                <span>{syncing ? '同步中...' : '立即同步'}</span>
+              </button>
+            </>
+          )}
+        </div>
+      </section>
+    );
+  };
+
   const renderActiveSection = () => {
     if (activeSecondary === 'language') return renderLanguageSection();
     if (activeSecondary === 'reading') return renderReadingSection();
@@ -632,6 +750,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     if (activeSecondary === 'asr-credentials-volcengine') return renderAsrVolcSection();
     if (activeSecondary === 'asr-credentials-tencent') return renderAsrTencentSection();
     if (activeSecondary === 'ai-models') return renderAiModelsSection();
+    if (activeSecondary === 'sync-general') return renderSyncSection();
     return <AIDebugPanel />;
   };
 

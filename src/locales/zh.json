@@ -541,6 +541,18 @@
     "copied": "已复制",
     "error": "错误"
   },
+  "sync": {
+    "title": "iCloud 同步",
+    "icloudAvailable": "iCloud Drive 可用",
+    "icloudUnavailable": "iCloud Drive 不可用，请登录 iCloud",
+    "lastSync": "最近同步",
+    "neverSynced": "尚未同步",
+    "contentTitle": "同步内容",
+    "books": "电子书文件 (EPUB/PDF)",
+    "podcasts": "播客音频文件",
+    "syncNow": "立即同步",
+    "syncing": "同步中..."
+  },
   "errors": {
     "networkError": "网络错误",
     "serverError": "服务器错误",

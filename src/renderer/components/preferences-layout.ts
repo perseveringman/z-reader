@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../shared/types';
 
-export type PrimaryPreferenceSectionId = 'general' | 'content' | 'asr' | 'ai';
+export type PrimaryPreferenceSectionId = 'general' | 'content' | 'asr' | 'ai' | 'sync';
 
 export type SecondaryPreferenceSectionId =
   | 'language'
@@ -12,7 +12,8 @@ export type SecondaryPreferenceSectionId =
   | 'asr-credentials-volcengine'
   | 'asr-credentials-tencent'
   | 'ai-models'
-  | 'ai-debug';
+  | 'ai-debug'
+  | 'sync-general';
 
 export interface PrimaryPreferenceSection {
   id: PrimaryPreferenceSectionId;
@@ -33,6 +34,7 @@ export const PRIMARY_PREFERENCE_SECTIONS: PrimaryPreferenceSection[] = [
   { id: 'content' },
   { id: 'asr' },
   { id: 'ai' },
+  { id: 'sync' },
 ];
 
 export function getSecondarySectionsForPrimary(
@@ -53,6 +55,10 @@ export function getSecondarySectionsForPrimary(
       { id: 'asr-provider' },
       { id: provider === 'tencent' ? 'asr-credentials-tencent' : 'asr-credentials-volcengine' },
     ];
+  }
+
+  if (primaryId === 'sync') {
+    return [{ id: 'sync-general' }];
   }
 
   return [{ id: 'ai-models' }, { id: 'ai-debug' }];
