@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
+import { isYouTubeUrl, extractYouTubeVideoId, fetchYouTubeVideoMeta } from '../services/youtube-service';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
 
@@ -178,9 +179,6 @@ export function registerArticleHandlers() {
     const now = new Date().toISOString();
     const id = randomUUID();
 
-    // 使用 parser-service 解析文章内容
-    const parsed = await parseArticleContent(input.url);
-
     let domain: string | null = null;
     try {
       domain = new URL(input.url).hostname;
@@ -188,28 +186,64 @@ export function registerArticleHandlers() {
       // invalid URL
     }
 
-    await db.insert(schema.articles).values({
-      id,
-      feedId: null,
-      guid: null,
-      url: input.url,
-      title: input.title || parsed?.title || null,
-      author: parsed?.author || null,
-      summary: parsed?.excerpt || null,
-      content: parsed?.content || null,
-      contentText: parsed?.contentText || null,
-      thumbnail: parsed?.leadImageUrl || null,
-      wordCount: parsed?.wordCount || 0,
-      readingTime: parsed?.readingTime || 0,
-      publishedAt: null,
-      savedAt: now,
-      readStatus: 'inbox',
-      source: 'library',
-      domain,
-      createdAt: now,
-      updatedAt: now,
-    });
-    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'insert', changedFields: { url: input.url, title: input.title || parsed?.title || null, source: 'library' } });
+    // YouTube 视频特殊处理：提取 videoId，通过 oEmbed 获取元数据
+    const videoId = isYouTubeUrl(input.url) ? extractYouTubeVideoId(input.url) : null;
+
+    if (videoId) {
+      const meta = await fetchYouTubeVideoMeta(videoId);
+
+      await db.insert(schema.articles).values({
+        id,
+        feedId: null,
+        guid: null,
+        url: input.url,
+        title: input.title || meta?.title || null,
+        author: meta?.author || null,
+        summary: null,
+        content: null,
+        contentText: null,
+        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        wordCount: 0,
+        readingTime: 0,
+        publishedAt: null,
+        savedAt: now,
+        readStatus: 'inbox',
+        source: 'library',
+        domain: 'youtube.com',
+        mediaType: 'video',
+        videoId,
+        duration: meta?.duration ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else {
+      // 非 YouTube URL：使用 parser-service 解析文章内容
+      const parsed = await parseArticleContent(input.url);
+
+      await db.insert(schema.articles).values({
+        id,
+        feedId: null,
+        guid: null,
+        url: input.url,
+        title: input.title || parsed?.title || null,
+        author: parsed?.author || null,
+        summary: parsed?.excerpt || null,
+        content: parsed?.content || null,
+        contentText: parsed?.contentText || null,
+        thumbnail: parsed?.leadImageUrl || null,
+        wordCount: parsed?.wordCount || 0,
+        readingTime: parsed?.readingTime || 0,
+        publishedAt: null,
+        savedAt: now,
+        readStatus: 'inbox',
+        source: 'library',
+        domain,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'insert', changedFields: { url: input.url, title: input.title || null, source: 'library' } });
 
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return result;
