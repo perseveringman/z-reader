@@ -772,17 +772,17 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           <h2 className="text-[13px] font-semibold text-white tracking-wide">Contents</h2>
           <div className="w-6" />
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto p-2">
           {tocItems.length > 0 ? (
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {tocItems.map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => {
                       document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
-                    className="text-[12px] text-gray-400 hover:text-white text-left truncate w-full transition-colors"
-                    style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
+                    className="text-[13px] text-gray-400 hover:text-white hover:bg-white/5 rounded-md px-3 py-1.5 text-left truncate w-full transition-colors cursor-pointer"
+                    style={{ paddingLeft: `${12 + (item.level - 1) * 12}px` }}
                   >
                     {item.text}
                   </button>
@@ -790,7 +790,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
               ))}
             </ul>
           ) : (
-            <p className="text-[12px] text-gray-500">
+            <p className="px-3 py-4 text-[13px] text-gray-500">
               {isLoading ? '加载中…' : '此文章没有章节标题'}
             </p>
           )}

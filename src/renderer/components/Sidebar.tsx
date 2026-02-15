@@ -65,7 +65,7 @@ function NavItem({ icon, label, active, collapsed, count, onClick }: NavItemProp
     <button
       onClick={onClick}
       className={`
-        relative flex items-center gap-3 w-full px-3 py-2 rounded-md text-[13px]
+        relative flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-[13px]
         transition-colors duration-150 cursor-pointer outline-none
         ${active
           ? 'text-white bg-white/[0.08]'
@@ -80,7 +80,7 @@ function NavItem({ icon, label, active, collapsed, count, onClick }: NavItemProp
       <span className="shrink-0">{icon}</span>
       {!collapsed && (
         <>
-          <span className="flex-1 text-left truncate">{label}</span>
+          <span className="flex-1 text-left truncate font-medium">{label}</span>
           {count !== undefined && (
             <span className="text-xs text-gray-500">{count}</span>
           )}
@@ -105,7 +105,7 @@ function SectionLabel({
   return (
     <button
       onClick={onToggle}
-      className="flex items-center gap-1.5 w-full px-3 pt-5 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-gray-500 hover:text-gray-400 transition-colors cursor-pointer outline-none"
+      className="flex items-center gap-1.5 w-full px-3 mt-4 mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-gray-400 transition-colors cursor-pointer outline-none"
     >
       {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       <span>{label}</span>
@@ -115,7 +115,7 @@ function SectionLabel({
 
 export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, onTasks, onNotifications, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const { t } = useTranslation();
-  const iconSize = 18;
+  const iconSize = 16;
   const [sections, setSections] = useState({
     library: true,
     feed: true,
@@ -275,7 +275,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                   onViewChange('tags');
                 }}
                 className={`
-                  relative flex items-center gap-2 w-full pl-6 pr-3 py-1.5 rounded-md text-[11px]
+                  relative flex items-center gap-2.5 w-full pl-9 pr-3 py-1.5 rounded-md text-[13px]
                   transition-colors duration-150 cursor-pointer outline-none
                   ${selectedTagId === tag.id
                     ? 'text-white bg-white/[0.08]'
@@ -338,7 +338,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                     onViewChange('feeds');
                   }}
                   className={`
-                    group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[11px]
+                    group relative flex items-center gap-2.5 w-full pl-9 pr-3 py-1.5 rounded-md text-[13px]
                     transition-colors duration-150 cursor-pointer outline-none
                     ${selectedFeedId === feed.id
                       ? 'text-white bg-white/[0.08]'
@@ -350,7 +350,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                   {selectedFeedId === feed.id && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-500" />
                   )}
-                  <Pin size={10} className="shrink-0 text-blue-400/60" />
                   <span className="shrink-0">{displayIcon}</span>
                   <span className="flex-1 text-left truncate">{feed.title || feed.url}</span>
                 </button>
@@ -385,7 +384,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               key={item.label}
               onClick={item.onClick}
               className={`
-                flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px]
+                flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px]
                 transition-colors duration-150 cursor-pointer outline-none
                 ${item.active
                   ? 'text-white bg-white/[0.08]'

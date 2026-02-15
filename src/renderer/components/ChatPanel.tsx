@@ -154,8 +154,10 @@ function EmptyState({ onSelectPreset }: { onSelectPreset: (prompt: string) => vo
   const presets = useAnalysisPresets();
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-2">
-      <MessageSquare className="w-8 h-8 text-gray-600 opacity-30 mb-3" />
-      <p className="text-sm text-gray-500 mb-4">{t('chat.empty')}</p>
+      <div className="flex items-center gap-2 mb-4">
+        <MessageSquare className="w-5 h-5 text-gray-600 opacity-30" />
+        <p className="text-sm text-gray-500">{t('chat.empty')}</p>
+      </div>
       <div className="grid grid-cols-2 gap-2 w-full">
         {presets.map((preset) => (
           <button
@@ -163,10 +165,12 @@ function EmptyState({ onSelectPreset }: { onSelectPreset: (prompt: string) => vo
             onClick={() => onSelectPreset(preset.prompt)}
             className="flex flex-col items-start gap-1.5 p-2.5 rounded-lg bg-[#1a1a1a] border border-white/5 hover:border-white/15 transition-colors cursor-pointer text-left group"
           >
-            <span className={preset.color}>{preset.icon}</span>
-            <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
-              {t(`chat.analysis.${preset.key}`)}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className={preset.color}>{preset.icon}</span>
+              <span className="text-[12px] font-medium text-gray-300 group-hover:text-white transition-colors">
+                {t(`chat.analysis.${preset.key}`)}
+              </span>
+            </div>
             <span className="text-[11px] text-gray-600 leading-tight">
               {t(`chat.analysis.${preset.key}Desc`)}
             </span>

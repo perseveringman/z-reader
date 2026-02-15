@@ -620,7 +620,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
           </div>
         ) : (
           <div className={`flex ${dialogLayout.bodyClass}`}>
-            <aside className={`${dialogLayout.sidebarClass} border-r border-white/10 bg-[#151515] p-3 space-y-1.5`}>
+            <aside className={`${dialogLayout.sidebarClass} border-r border-white/10 bg-[#151515] p-3 space-y-1`}>
               {PRIMARY_PREFERENCE_SECTIONS.map((section) => {
                 const Icon = PRIMARY_SECTION_ICONS[section.id];
                 const active = section.id === activePrimary;
@@ -628,13 +628,13 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                   <button
                     key={section.id}
                     onClick={() => onPrimaryChange(section.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors cursor-pointer ${
+                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
                       active
-                        ? 'bg-white/10 text-white border border-white/15'
+                        ? 'bg-white/10 text-white border border-white/15 font-medium'
                         : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent'
                     }`}
                   >
-                    <Icon size={15} />
+                    <Icon size={16} />
                     <span>{PRIMARY_SECTION_LABELS[section.id]}</span>
                   </button>
                 );
@@ -642,7 +642,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
             </aside>
 
             <section className="flex-1 min-w-0 flex flex-col">
-              <div className="px-5 pt-5 pb-3 border-b border-white/10">
+              <div className="px-5 pt-4 pb-2 border-b border-white/10">
                 <div className="flex items-center gap-2 flex-wrap">
                   {secondarySections.map((section) => {
                     const active = section.id === activeSecondary;
@@ -650,7 +650,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                       <button
                         key={section.id}
                         onClick={() => setActiveSecondary(section.id)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                           active
                             ? 'bg-blue-500/20 text-blue-300 border border-blue-400/40'
                             : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white hover:bg-white/10'

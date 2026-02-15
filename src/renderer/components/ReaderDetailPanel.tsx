@@ -139,7 +139,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
         className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 z-10 transition-colors"
       />
       {/* Tab 切换 */}
-      <div className="shrink-0 flex gap-2 px-4 pt-3 pb-2 border-b border-[#262626]">
+      <div className="shrink-0 flex gap-1.5 px-3 pt-3 pb-1 border-b border-[#262626]">
         {[
           { key: 'info' as DetailTab, label: 'Info' },
           { key: 'notebook' as DetailTab, label: 'Notebook', count: highlights.length },
@@ -149,16 +149,19 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`
-              px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1
+              px-3 py-1.5 text-[13px] font-medium rounded-t-md transition-colors cursor-pointer flex items-center gap-1.5 relative
               ${activeTab === tab.key
-                ? 'text-white bg-white/10'
-                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                ? 'text-white'
+                : 'text-gray-500 hover:text-gray-300'
               }
             `}
           >
             {tab.label}
             {tab.count != null && tab.count > 0 && (
-              <span className="text-[10px] text-gray-500">{tab.count}</span>
+              <span className="text-[11px] text-gray-500">{tab.count}</span>
+            )}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
             )}
           </button>
         ))}
@@ -177,13 +180,13 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
         ) : (
           <>
             {activeTab === 'info' && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-5">
                 {/* SUMMARY */}
                 <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                     Summary
                   </h3>
-                  <p className="text-[12px] leading-[1.6] text-gray-400">
+                  <p className="text-[13px] leading-[1.6] text-gray-400">
                     {article.summary || '暂无摘要'}
                   </p>
                 </div>
@@ -193,13 +196,13 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                   {metaRows.map((row) => (
                     <div
                       key={row.label}
-                      className="flex items-center py-2 border-b border-white/5 last:border-b-0"
+                      className="flex items-center py-2.5 border-b border-white/5 last:border-b-0"
                     >
-                      <span className="flex items-center gap-1.5 text-[11px] text-gray-500 w-[90px] shrink-0">
-                        {row.icon}
+                      <span className="flex items-center gap-2 text-[11px] text-gray-500 w-[100px] shrink-0 font-medium">
+                        <span className="text-gray-600">{row.icon}</span>
                         {row.label}
                       </span>
-                      <span className="text-[12px] text-white truncate">
+                      <span className="text-[13px] text-gray-300 truncate">
                         {row.value || '—'}
                       </span>
                     </div>
@@ -220,32 +223,32 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                         {highlights.length} {highlights.length === 1 ? 'highlight' : 'highlights'}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleExport('clipboard')}
-                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          className="p-1.5 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
                           title="复制到剪贴板"
                         >
-                          <Copy className="w-3 h-3" />
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleExport('file')}
-                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          className="p-1.5 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
                           title="保存为文件"
                         >
-                          <Download className="w-3 h-3" />
+                          <Download className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => openShareCard(highlights)}
-                          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                          className="p-1.5 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"
                           title="生成分享卡片"
                         >
-                          <ImageIcon className="w-3 h-3" />
+                          <ImageIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -259,8 +262,8 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                           className="w-[3px] shrink-0"
                           style={{ backgroundColor: HIGHLIGHT_COLOR_MAP[hl.color] ?? HIGHLIGHT_COLOR_MAP.yellow }}
                         />
-                        <div className="flex-1 p-2.5 min-w-0">
-                          <p className="text-[12px] leading-[1.5] text-gray-300 italic">
+                        <div className="flex-1 p-3 min-w-0">
+                          <p className="text-[13px] leading-[1.5] text-gray-300 italic">
                             &ldquo;{hl.text}&rdquo;
                           </p>
                           {editingNoteId === hl.id ? (
@@ -276,7 +279,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                                 }
                                 if (e.key === 'Escape') setEditingNoteId(null);
                               }}
-                              className="mt-1 w-full text-[11px] text-gray-300 bg-white/5 border border-white/10 rounded px-2 py-1 resize-none outline-none focus:border-blue-500/50"
+                              className="mt-2 w-full text-[12px] text-gray-300 bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 resize-none outline-none focus:border-blue-500/50"
                               rows={2}
                               placeholder="添加笔记…"
                             />
@@ -286,28 +289,28 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                                 setEditingNoteId(hl.id);
                                 setEditingNoteText(hl.note || '');
                               }}
-                              className="mt-1 block text-left text-[11px] text-gray-400 hover:text-gray-300 transition-colors w-full"
+                              className="mt-1.5 block text-left text-[12px] text-gray-500 hover:text-gray-400 transition-colors w-full"
                             >
                               {hl.note || '添加笔记…'}
                             </button>
                           )}
-                          <span className="mt-1.5 block text-[10px] text-gray-600">
+                          <span className="mt-2 block text-[10px] text-gray-600">
                             {formatRelativeTime(hl.createdAt)}
                           </span>
                         </div>
-                        <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                           <button
                             onClick={(e) => { e.stopPropagation(); openShareCard([hl], 'single'); }}
-                            className="p-1 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-blue-400"
+                            className="p-1.5 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-blue-400"
                             title="生成分享卡片"
                           >
-                            <Share2 className="w-3 h-3" />
+                            <Share2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDeleteHighlight(hl.id); }}
-                            className="p-1 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-red-400"
+                            className="p-1.5 rounded hover:bg-white/10 cursor-pointer text-gray-500 hover:text-red-400"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

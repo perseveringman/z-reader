@@ -318,22 +318,25 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       )}
       <div className="flex flex-col h-full" style={{ minWidth: panelWidth }}>
       {/* Tab 切换 */}
-      <div className="shrink-0 flex gap-1 px-4 pt-3 border-b border-white/5">
+      <div className="shrink-0 flex gap-1.5 px-3 pt-3 pb-1 border-b border-[#262626]">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`
-              px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer
+              px-3 py-1.5 text-[13px] font-medium rounded-t-md transition-colors cursor-pointer flex items-center gap-1.5 relative
               ${activeTab === tab.key
-                ? 'text-white border-b-2 border-blue-500'
+                ? 'text-white'
                 : 'text-gray-500 hover:text-gray-300'
               }
             `}
           >
             {tab.label}
             {tab.key === 'notebook' && (
-              <span className="ml-1 min-w-[1em] text-center text-[10px] text-gray-500 tabular-nums inline-block">{highlights.length}</span>
+              <span className="ml-1 min-w-[1em] text-center text-[11px] text-gray-500 tabular-nums inline-block">{highlights.length}</span>
+            )}
+            {activeTab === tab.key && (
+              <span className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
             )}
           </button>
         ))}
@@ -356,13 +359,13 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
         ) : (
           <>
             {activeTab === 'info' && (
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col gap-5">
                 <div className="flex-1">
                   {/* SUMMARY */}
-                  <h3 className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                     Summary
                   </h3>
-                  <p className="mt-2 text-[13px] leading-[1.6] text-gray-400">
+                  <p className="text-[13px] leading-[1.6] text-gray-400">
                     {article.summary || t('detailPanel.noHighlights')}
                   </p>
 
@@ -373,11 +376,11 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                         key={row.label}
                         className="flex items-center py-2.5 border-b border-white/5 last:border-b-0"
                       >
-                        <span className="flex items-center gap-1.5 text-[12px] text-gray-500 w-[120px] shrink-0">
-                          {row.icon}
+                        <span className="flex items-center gap-2 text-[11px] text-gray-500 w-[110px] shrink-0 font-medium">
+                          <span className="text-gray-600">{row.icon}</span>
                           {row.label}
                         </span>
-                        <span className="text-[13px] text-white truncate">
+                        <span className="text-[13px] text-gray-300 truncate">
                           {row.value || '—'}
                         </span>
                       </div>
@@ -386,9 +389,9 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
 
                   {/* Tags */}
                   <div className="mt-6">
-                    <div className="flex items-center gap-1.5 mb-2">
+                    <div className="flex items-center gap-2 mb-2">
                       <Tag className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Tags</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tags</span>
                     </div>
                     <TagPicker articleId={article.id} />
                   </div>

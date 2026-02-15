@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, and, sql } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
 import { parseArticleContent } from './parser-service';
+import { estimateReadingTimeMinutes, estimateWordCount } from './text-stats';
 
 const parser = new Parser({
   timeout: 15000,
@@ -172,8 +173,8 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
       const summary = item.contentSnippet
         ? truncate(item.contentSnippet, 500)
         : truncate(contentText, 500);
-      const wordCount = contentText.split(/\s+/).filter(Boolean).length;
-      const readingTime = Math.max(1, Math.round(wordCount / 200));
+      const wordCount = estimateWordCount(contentText);
+      const readingTime = estimateReadingTimeMinutes(contentText);
 
       // Podcast-specific fields
       const enclosure = item.enclosure;
@@ -232,7 +233,7 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
 
       // 正文为空或过短时，自动拉取全文（跳过 podcast/video）
       if (mediaType === 'article' && articleUrl) {
-        const textLen = contentText.split(/\s+/).filter(Boolean).length;
+        const textLen = estimateWordCount(contentText);
         if (!rawContent || textLen < 100) {
           try {
             const fullContent = await parseArticleContent(articleUrl);

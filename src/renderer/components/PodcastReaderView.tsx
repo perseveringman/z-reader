@@ -544,10 +544,15 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
           return next;
         });
       }
+
+      if (e.key === ']') {
+        e.preventDefault();
+        toggleDetail();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose]);
+  }, [handleClose, toggleDetail]);
 
   const annotatedAboutContent = useMemo(
     () => article?.content ? annotatePodcastTimestampLines(article.content) : null,
@@ -594,28 +599,28 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
         <h2 className="text-[13px] font-semibold text-white tracking-wide">时间轴</h2>
         <div className="w-6" />
       </div>
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-2">
         {aboutOutlineItems.length > 0 ? (
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {aboutOutlineItems.map((item, index) => (
               <li key={item.id}>
                 <button
                   type="button"
                   onClick={() => handleAboutOutlineClick(item)}
-                  className={`w-full text-left rounded-md px-2.5 py-2 transition-colors cursor-pointer ${
+                  className={`w-full text-left rounded-md px-3 py-2 transition-colors cursor-pointer ${
                     index === activeOutlineIndex
                       ? 'bg-blue-500/15 border border-blue-500/35'
                       : 'border border-transparent hover:bg-white/5'
                   }`}
                 >
-                  <div className="text-[10px] font-mono text-blue-300 tabular-nums">{item.label}</div>
-                  <div className="text-[12px] leading-5 text-gray-300 line-clamp-2 mt-0.5">{item.title}</div>
+                  <div className="text-[11px] font-mono text-blue-300 tabular-nums">{item.label}</div>
+                  <div className="text-[13px] leading-5 text-gray-300 line-clamp-2 mt-0.5">{item.title}</div>
                 </button>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="px-2 py-3 text-[12px] text-gray-500">暂无时间戳</div>
+          <div className="px-3 py-4 text-[13px] text-gray-500">暂无时间戳</div>
         )}
       </div>
     </div>
@@ -654,90 +659,95 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const scrollToSegmentInt = scrollToSegment != null ? Math.floor(scrollToSegment) : null;
 
   return (
-    <div className="flex flex-col h-full bg-[#0f0f0f]">
-      {/* Top toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-[#262626] shrink-0">
-        <button
-          onClick={handleClose}
-          className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-          title="返回"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className="text-sm font-medium text-gray-200 truncate flex-1">
-          {article.title}
-        </h1>
-        <button
-          onClick={toggleDetail}
-          className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-          title={detailCollapsed ? '显示详情面板' : '隐藏详情面板'}
-        >
-          {detailCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
-        </button>
-      </div>
+    <div className="flex h-full bg-[#0f0f0f]">
+      {/* Left: Timeline sidebar */}
+      {timelineSidebar}
 
-      {/* Main content */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left: player + content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Audio player */}
-          <div className="shrink-0 px-6 pt-4">
-            <AudioPlayer
-              ref={audioPlayerRef}
-              audioUrl={audioUrl}
-              title={article.title ?? undefined}
-              showName={feedTitle ?? undefined}
-              artworkUrl={article.thumbnail ?? undefined}
-              initialTime={initialTime}
-              onTimeUpdate={handleTimeUpdate}
-              onDuration={handleDuration}
-              onEnded={handleEnded}
-              onDownload={handleDownload}
-              downloaded={downloaded}
-            />
+      {/* Center: toolbar + player + content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top toolbar */}
+        <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626]">
+          <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
+            {(outlineCollapsed || aboutOutlineItems.length === 0) && (
+              <button
+                onClick={handleClose}
+                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white shrink-0"
+                title="返回列表"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setOutlineCollapsed((prev) => {
+                const next = !prev;
+                localStorage.setItem('podcast-reader-outline-collapsed', String(next));
+                return next;
+              })}
+              className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white shrink-0"
+              title={outlineCollapsed ? '展开时间轴（[）' : '收起时间轴（[）'}
+            >
+              {outlineCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
+            {feedTitle && (
+              <>
+                <span className="text-gray-500 truncate">{feedTitle}</span>
+                <span className="text-gray-600">&gt;</span>
+              </>
+            )}
+            <span className="text-gray-400 truncate">{article.title ?? '加载中…'}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleDetail}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+              title={detailCollapsed ? '展开详情（]）' : '收起详情（]）'}
+            >
+              {detailCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
 
-          <div className="flex-1 min-h-0 flex mt-3">
-            {timelineSidebar}
+        {/* Audio player */}
+        <div className="shrink-0 px-6 pt-4">
+          <AudioPlayer
+            ref={audioPlayerRef}
+            audioUrl={audioUrl}
+            title={article.title ?? undefined}
+            showName={feedTitle ?? undefined}
+            artworkUrl={article.thumbnail ?? undefined}
+            initialTime={initialTime}
+            onTimeUpdate={handleTimeUpdate}
+            onDuration={handleDuration}
+            onEnded={handleEnded}
+            onDownload={handleDownload}
+            downloaded={downloaded}
+          />
+        </div>
 
-            <div className="flex-1 min-h-0 flex flex-col">
-              {/* Content tabs */}
-              <div className="shrink-0 flex items-center justify-between border-b border-white/5 px-6">
-                <div className="flex">
-                  {[
-                    { key: 'about' as const, label: '简介', icon: <FileText size={14} /> },
-                    { key: 'summary' as const, label: '摘要', icon: <Sparkles size={14} /> },
-                    { key: 'transcript' as const, label: '转写', icon: <Mic size={14} /> },
-                  ].map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setContentTab(tab.key)}
-                      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
-                        contentTab === tab.key
-                          ? 'border-blue-500 text-white'
-                          : 'border-transparent text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      {tab.icon}
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {aboutOutlineItems.length > 0 && (
-                  <button
-                    onClick={() => setOutlineCollapsed((prev) => {
-                      const next = !prev;
-                      localStorage.setItem('podcast-reader-outline-collapsed', String(next));
-                      return next;
-                    })}
-                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                    title={outlineCollapsed ? '展开时间轴（[）' : '收起时间轴（[）'}
-                  >
-                    {outlineCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-                  </button>
-                )}
-              </div>
+        <div className="flex-1 min-h-0 flex flex-col mt-3">
+          {/* Content tabs */}
+          <div className="shrink-0 flex items-center border-b border-white/5 px-6">
+            <div className="flex">
+              {[
+                { key: 'about' as const, label: '简介', icon: <FileText size={14} /> },
+                { key: 'summary' as const, label: '摘要', icon: <Sparkles size={14} /> },
+                { key: 'transcript' as const, label: '转写', icon: <Mic size={14} /> },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setContentTab(tab.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+                    contentTab === tab.key
+                      ? 'border-blue-500 text-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
               {/* Tab content */}
               {contentTab === 'about' && (
@@ -773,12 +783,6 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
                       </>
                     )}
                   </div>
-
-                  {article.summary && (
-                    <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                      {article.summary}
-                    </p>
-                  )}
 
                   {/* Full content (show notes) */}
                   {article.content && (
@@ -1075,19 +1079,17 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
                   )}
                 </div>
               )}
-            </div>
-          </div>
         </div>
-
-        {/* Right: detail panel */}
-        <DetailPanel
-          articleId={articleId}
-          collapsed={detailCollapsed}
-          externalHighlights={highlights}
-          onExternalDeleteHighlight={handleDeleteHighlight}
-          onHighlightClick={handleHighlightClick}
-        />
       </div>
+
+      {/* Right: detail panel */}
+      <DetailPanel
+        articleId={articleId}
+        collapsed={detailCollapsed}
+        externalHighlights={highlights}
+        onExternalDeleteHighlight={handleDeleteHighlight}
+        onHighlightClick={handleHighlightClick}
+      />
     </div>
   );
 }

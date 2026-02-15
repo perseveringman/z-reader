@@ -1,4 +1,5 @@
 import Parser from '@postlight/parser';
+import { estimateReadingTimeMinutes, estimateWordCount } from './text-stats';
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
@@ -72,8 +73,8 @@ export async function parseArticleContent(url: string): Promise<ParseResult | nu
 
     const content = result.content ? normalizeImageUrls(result.content, url) : null;
     const contentText = content ? stripHtml(content) : null;
-    const wordCount = contentText ? contentText.split(/\s+/).filter(Boolean).length : 0;
-    const readingTime = Math.max(1, Math.round(wordCount / 200));
+    const wordCount = estimateWordCount(contentText);
+    const readingTime = estimateReadingTimeMinutes(contentText);
 
     return {
       title: result.title ?? null,
