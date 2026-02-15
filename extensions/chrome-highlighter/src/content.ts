@@ -221,6 +221,38 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'ARTICLE_SAVED') {
     currentArticleId = message.payload.id;
   }
+
+  // 处理右键菜单触发的高亮
+  if (message.type === 'HIGHLIGHT_SELECTION') {
+    const color = (message.payload.color || 'yellow') as HighlightColor;
+    handleHighlight(color);
+  }
+
+  // 处理右键菜单触发的笔记高亮
+  if (message.type === 'HIGHLIGHT_WITH_NOTE') {
+    handleHighlightWithNote();
+  }
+
+  // 显示 Toast 通知
+  if (message.type === 'SHOW_TOAST') {
+    const { message: msg, type } = message.payload;
+    if (type === 'success') {
+      toast.success(msg);
+    } else if (type === 'error') {
+      toast.error(msg);
+    } else if (type === 'warning') {
+      toast.warning(msg);
+    } else {
+      toast.info(msg);
+    }
+  }
+
+  // 在 Z-Reader 中搜索
+  if (message.type === 'SEARCH_IN_ZREADER') {
+    const searchText = message.payload.text;
+    // TODO: 实现在 Z-Reader 中搜索的功能
+    toast.info(`搜索功能开发中: "${searchText}"`);
+  }
 });
 
 init();
