@@ -7,6 +7,7 @@ import { toast } from './toast';
 import { initShortcuts, registerShortcut, showShortcutsHelp } from './shortcuts';
 import { initStatsPanel, updateHighlightList, toggleStatsPanel } from './stats-panel';
 import { initSettings, showSettingsPanel, getPreferences } from './settings-panel';
+import { initOfflineSupport, saveHighlightOffline, addPendingOperation } from './offline';
 import type { HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
@@ -14,6 +15,9 @@ let currentArticleId: string | null = null;
 async function init() {
   // 初始化设置系统（必须首先初始化）
   initSettings();
+  
+  // 初始化离线支持
+  initOfflineSupport();
   
   // 初始化快捷键系统
   initShortcuts();
