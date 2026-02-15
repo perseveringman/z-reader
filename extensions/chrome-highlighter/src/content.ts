@@ -5,6 +5,7 @@ import { showNoteEditor } from './note-editor';
 import { showHighlightMenu } from './highlight-menu';
 import { toast } from './toast';
 import { initShortcuts, registerShortcut, showShortcutsHelp } from './shortcuts';
+import { initStatsPanel, updateHighlightList, toggleStatsPanel } from './stats-panel';
 import type { HighlightColor } from './types';
 
 let currentArticleId: string | null = null;
@@ -14,6 +15,9 @@ async function init() {
   initShortcuts();
   registerAllShortcuts();
 
+  // 初始化统计面板
+  initStatsPanel();
+
   try {
     const result = await getHighlightsByUrl(window.location.href);
     if (result.articleId) {
@@ -21,6 +25,8 @@ async function init() {
       for (const h of result.highlights) {
         restoreHighlight(h.id, h.text ?? '', (h.color as HighlightColor) ?? 'yellow');
       }
+      // 恢复高亮后更新统计
+      updateHighlightList();
     }
   } catch {
     // Z-Reader 未启动，静默忽略
@@ -89,6 +95,7 @@ async function handleHighlight(color: HighlightColor) {
     });
     result.updateId(highlight.id);
     toast.success('高亮已创建');
+    updateHighlightList(); // 更新统计
   } catch (error) {
     console.error('[Z-Reader] 创建高亮失败:', error);
     toast.error('创建高亮失败');
@@ -131,6 +138,7 @@ async function handleHighlightWithNote() {
         });
         result.updateId(highlight.id);
         toast.success('笔记高亮已创建');
+        updateHighlightList(); // 更新统计
       } catch (error) {
         console.error('[Z-Reader] 创建带笔记高亮失败:', error);
         toast.error('创建笔记高亮失败');
@@ -163,6 +171,7 @@ document.addEventListener('zr-highlight-click', (e) => {
       deleteHighlight(detail.id)
         .then(() => {
           toast.success('高亮已删除');
+          updateHighlightList(); // 更新统计
         })
         .catch((error) => {
           console.error('[Z-Reader] 删除高亮失败:', error);
@@ -315,6 +324,15 @@ function registerAllShortcuts(): void {
     action: handleSaveArticle,
   });
 
+  // 切换统计面板
+  registerShortcut({
+    key: 'h',
+    alt: true,
+    description: '切换高亮统计面板',
+    category: '面板操作',
+    action: toggleStatsPanel,
+  });
+
   // 显示帮助快捷键
   registerShortcut({
     key: '?',
@@ -324,7 +342,7 @@ function registerAllShortcuts(): void {
     action: showShortcutsHelp,
   });
 
-  console.log('[Z-Reader] 已注册 7 个快捷键');
+  console.log('[Z-Reader] 已注册 8 个快捷键');
 }
 
 init();
