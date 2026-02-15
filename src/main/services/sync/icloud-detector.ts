@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const SYNC_CONTAINER = 'iCloud~com~z-reader';
+// 使用 iCloud Drive 公共目录（com~apple~CloudDocs）下的 Z-Reader 子目录
+// 注：iCloud~ 容器需要 Apple 开发者签名，Electron 应用使用公共 iCloud Drive 目录
+const SYNC_FOLDER = 'Z-Reader';
 
 export interface ICloudStatus {
   available: boolean;
@@ -15,7 +17,7 @@ export function getDefaultICloudBasePath(): string {
 
 export function getSyncDirectoryPath(icloudBasePath?: string): string {
   const base = icloudBasePath || getDefaultICloudBasePath();
-  return path.join(base, SYNC_CONTAINER);
+  return path.join(base, 'com~apple~CloudDocs', SYNC_FOLDER);
 }
 
 export function checkICloudAvailability(mobileDocumentsPath?: string): ICloudStatus {
