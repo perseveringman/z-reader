@@ -5,6 +5,7 @@ import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
 import { isYouTubeUrl, extractYouTubeVideoId, fetchYouTubeVideoMeta } from '../services/youtube-service';
+import { isPodcastEpisodeUrl, fetchPodcastEpisodeMeta } from '../services/podcast-resolver';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
 
@@ -213,6 +214,47 @@ export function registerArticleHandlers() {
         mediaType: 'video',
         videoId,
         duration: meta?.duration ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (isPodcastEpisodeUrl(input.url)) {
+      // 播客单集特殊处理：从页面 HTML 提取播客元数据 + 解析正文
+      const [meta, parsed] = await Promise.all([
+        fetchPodcastEpisodeMeta(input.url),
+        parseArticleContent(input.url),
+      ]);
+
+      // 优先使用 meta.content（JSON-LD 完整描述，含时间轴等），Postlight 可能丢失 JS 渲染内容
+      const hasMetaContent = !!meta?.content;
+      const contentHtml = hasMetaContent
+        ? meta.content!.split('\n').map(line => `<p>${line}</p>`).join('')
+        : parsed?.content || null;
+      const contentText = hasMetaContent
+        ? meta.content!
+        : parsed?.contentText || null;
+
+      await db.insert(schema.articles).values({
+        id,
+        feedId: null,
+        guid: null,
+        url: input.url,
+        title: input.title || meta?.title || parsed?.title || null,
+        author: meta?.author || meta?.showName || parsed?.author || null,
+        summary: meta?.summary || parsed?.excerpt || null,
+        content: contentHtml,
+        contentText,
+        thumbnail: meta?.thumbnail || parsed?.leadImageUrl || null,
+        wordCount: parsed?.wordCount || 0,
+        readingTime: 0,
+        publishedAt: meta?.publishedAt || null,
+        savedAt: now,
+        readStatus: 'inbox',
+        source: 'library',
+        domain,
+        mediaType: 'podcast',
+        audioUrl: meta?.audioUrl || null,
+        audioDuration: meta?.duration || null,
+        duration: meta?.duration || null,
         createdAt: now,
         updatedAt: now,
       });
