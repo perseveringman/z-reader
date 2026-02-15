@@ -7,6 +7,7 @@ import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type { BookListQuery, UpdateBookInput } from '../../shared/types';
 import { extractEpubMetadata, extractPdfMetadata } from '../services/epub-metadata';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerBookHandlers() {
   const {
@@ -135,6 +136,7 @@ export function registerBookHandlers() {
         updatedAt: now,
         deletedFlg: 0,
       });
+      getGlobalTracker()?.trackChange({ table: 'books', recordId: id, operation: 'insert', changedFields: { title, author, fileType: isEpub ? 'epub' : 'pdf' } });
 
       const [book] = await db.select().from(schema.books).where(eq(schema.books.id, id));
       importedBooks.push(book);
@@ -148,6 +150,7 @@ export function registerBookHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.books).set({ deletedFlg: 1, updatedAt: now }).where(eq(schema.books.id, id));
+    getGlobalTracker()?.trackChange({ table: 'books', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
   });
 
   // 更新书籍信息
@@ -163,6 +166,7 @@ export function registerBookHandlers() {
     if (input.author !== undefined) updates.author = input.author;
 
     await db.update(schema.books).set(updates).where(eq(schema.books.id, input.id));
+    getGlobalTracker()?.trackChange({ table: 'books', recordId: input.id, operation: 'update', changedFields: updates });
     const [result] = await db.select().from(schema.books).where(eq(schema.books.id, input.id));
     return result;
   });

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type { CreateHighlightInput, CreateBookHighlightInput, UpdateHighlightInput } from '../../shared/types';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerHighlightHandlers() {
   const { HIGHLIGHT_LIST, HIGHLIGHT_CREATE, HIGHLIGHT_DELETE, HIGHLIGHT_UPDATE } = IPC_CHANNELS;
@@ -40,6 +41,7 @@ export function registerHighlightHandlers() {
       updatedAt: now,
       deletedFlg: 0,
     });
+    getGlobalTracker()?.trackChange({ table: 'highlights', recordId: id, operation: 'insert', changedFields: { articleId: input.articleId, text: input.text, color: input.color ?? 'yellow' } });
 
     const [result] = await db
       .select()
@@ -56,6 +58,7 @@ export function registerHighlightHandlers() {
       .update(schema.highlights)
       .set({ deletedFlg: 1, updatedAt: now })
       .where(eq(schema.highlights.id, id));
+    getGlobalTracker()?.trackChange({ table: 'highlights', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
   });
 
   // Book 高亮列表
@@ -107,6 +110,7 @@ export function registerHighlightHandlers() {
       updatedAt: now,
       deletedFlg: 0,
     });
+    getGlobalTracker()?.trackChange({ table: 'highlights', recordId: id, operation: 'insert', changedFields: { bookId: input.bookId, text: input.text, color: input.color ?? 'yellow' } });
 
     const [result] = await db
       .select()
@@ -137,6 +141,7 @@ export function registerHighlightHandlers() {
       updatedAt: now,
       deletedFlg: 0,
     });
+    getGlobalTracker()?.trackChange({ table: 'highlights', recordId: id, operation: 'insert', changedFields: { bookId: input.bookId, text: input.text, color: input.color ?? 'yellow' } });
 
     const [result] = await db
       .select()
@@ -154,6 +159,7 @@ export function registerHighlightHandlers() {
     if (input.note !== undefined) updates.note = input.note;
     if (input.color !== undefined) updates.color = input.color;
     await db.update(schema.highlights).set(updates).where(eq(schema.highlights.id, input.id));
+    getGlobalTracker()?.trackChange({ table: 'highlights', recordId: input.id, operation: 'update', changedFields: updates });
     const [result] = await db.select().from(schema.highlights).where(eq(schema.highlights.id, input.id));
     return result;
   });

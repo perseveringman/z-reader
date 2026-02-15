@@ -5,6 +5,7 @@ import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { fetchTranscript, getVideoStreamUrl } from '../services/youtube-service';
 import { openLoginWindow, clearAuth, isLoggedIn } from '../services/youtube-auth';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerTranscriptHandlers() {
   // 查询缓存字幕
@@ -52,6 +53,7 @@ export function registerTranscriptHandlers() {
       language: result.language,
       createdAt: now,
     });
+    getGlobalTracker()?.trackChange({ table: 'transcripts', recordId: id, operation: 'insert', changedFields: { articleId, language: result.language } });
 
     return {
       id,
@@ -79,6 +81,7 @@ export function registerTranscriptHandlers() {
     await db.update(schema.transcripts)
       .set({ speakerMap: JSON.stringify(speakerMap) })
       .where(eq(schema.transcripts.articleId, articleId));
+    getGlobalTracker()?.trackChange({ table: 'transcripts', recordId: row.id, operation: 'update', changedFields: { speakerMap: JSON.stringify(speakerMap) } });
   });
 
   // 获取 YouTube 视频流直链 URL

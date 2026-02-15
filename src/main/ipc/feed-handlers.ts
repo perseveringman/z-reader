@@ -8,6 +8,7 @@ import { fetchFeed, fetchAllFeeds, importOpml } from '../services/rss-service';
 import { isYouTubeUrl, resolveYouTubeChannelFeed } from '../services/youtube-service';
 import { resolvePodcastUrl } from '../services/podcast-resolver';
 import type { CreateFeedInput, UpdateFeedInput } from '../../shared/types';
+import { getGlobalTracker } from './sync-handlers';
 
 /** Check if a URL is from a known podcast platform. */
 function isPodcastPlatformUrl(url: string): boolean {
@@ -67,6 +68,7 @@ export function registerFeedHandlers() {
       updatedAt: now,
     };
     await db.insert(schema.feeds).values(values);
+    getGlobalTracker()?.trackChange({ table: 'feeds', recordId: id, operation: 'insert', changedFields: values });
 
     // 等待 fetchFeed 完成，确保 RSS 解析的 title 已写入数据库
     await fetchFeed(id).catch(console.error);
@@ -89,6 +91,7 @@ export function registerFeedHandlers() {
     if (input.fetchInterval !== undefined) updates.fetchInterval = input.fetchInterval;
 
     await db.update(schema.feeds).set(updates).where(eq(schema.feeds.id, input.id));
+    getGlobalTracker()?.trackChange({ table: 'feeds', recordId: input.id, operation: 'update', changedFields: updates });
     const result = await db.select().from(schema.feeds).where(eq(schema.feeds.id, input.id));
     return result[0];
   });
@@ -97,6 +100,7 @@ export function registerFeedHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.feeds).set({ deletedFlg: 1, updatedAt: now }).where(eq(schema.feeds.id, id));
+    getGlobalTracker()?.trackChange({ table: 'feeds', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
   });
 
   ipcMain.handle(FEED_FETCH, async (_event, id: string) => {
@@ -126,6 +130,7 @@ export function registerFeedHandlers() {
     if (!feed) throw new Error('Feed not found');
     const newPinned = feed.pinned ? 0 : 1;
     await db.update(schema.feeds).set({ pinned: newPinned, updatedAt: now }).where(eq(schema.feeds.id, id));
+    getGlobalTracker()?.trackChange({ table: 'feeds', recordId: id, operation: 'update', changedFields: { pinned: newPinned } });
     const [updated] = await db.select().from(schema.feeds).where(eq(schema.feeds.id, id));
     return updated;
   });

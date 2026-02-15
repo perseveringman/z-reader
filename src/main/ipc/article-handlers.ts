@@ -5,6 +5,7 @@ import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerArticleHandlers() {
   const { ARTICLE_LIST, ARTICLE_GET, ARTICLE_UPDATE, ARTICLE_DELETE, ARTICLE_PARSE_CONTENT, ARTICLE_SEARCH, ARTICLE_RESTORE, ARTICLE_PERMANENT_DELETE, ARTICLE_LIST_DELETED, ARTICLE_BATCH_UPDATE, ARTICLE_BATCH_DELETE, ARTICLE_SAVE_URL, ARTICLE_SAVE_TO_LIBRARY } = IPC_CHANNELS;
@@ -63,6 +64,7 @@ export function registerArticleHandlers() {
     if (input.source !== undefined) updates.source = input.source;
 
     await db.update(schema.articles).set(updates).where(eq(schema.articles.id, input.id));
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: input.id, operation: 'update', changedFields: updates });
     const result = await db.select().from(schema.articles).where(eq(schema.articles.id, input.id));
     return result[0];
   });
@@ -71,6 +73,7 @@ export function registerArticleHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.articles).set({ deletedFlg: 1, updatedAt: now }).where(eq(schema.articles.id, id));
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
   });
 
   ipcMain.handle(ARTICLE_PARSE_CONTENT, async (_event, id: string) => {
@@ -126,6 +129,7 @@ export function registerArticleHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.articles).set({ deletedFlg: 0, updatedAt: now }).where(eq(schema.articles.id, id));
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'update', changedFields: { deletedFlg: 0 } });
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return result;
   });
@@ -153,6 +157,9 @@ export function registerArticleHandlers() {
     if (input.readProgress !== undefined) updates.readProgress = input.readProgress;
     if (input.isShortlisted !== undefined) updates.isShortlisted = input.isShortlisted ? 1 : 0;
     await db.update(schema.articles).set(updates).where(inArray(schema.articles.id, ids));
+    for (const id of ids) {
+      getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'update', changedFields: updates });
+    }
   });
 
   // 批量删除文章（软删除）
@@ -199,6 +206,7 @@ export function registerArticleHandlers() {
       createdAt: now,
       updatedAt: now,
     });
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'insert', changedFields: { url: input.url, title: input.title || parsed?.title || null, source: 'library' } });
 
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return result;
@@ -213,6 +221,7 @@ export function registerArticleHandlers() {
       readStatus: 'inbox',
       updatedAt: now,
     }).where(eq(schema.articles.id, id));
+    getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'update', changedFields: { source: 'library', readStatus: 'inbox' } });
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
     return result;
   });

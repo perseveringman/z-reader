@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
+import { getGlobalTracker } from './sync-handlers';
 
 export function registerTagHandlers() {
   const { TAG_LIST, TAG_CREATE, TAG_DELETE, ARTICLE_TAG_ADD, ARTICLE_TAG_REMOVE, ARTICLE_LIST_BY_TAG, ARTICLE_TAGS_FOR_ARTICLE } = IPC_CHANNELS;
@@ -37,6 +38,7 @@ export function registerTagHandlers() {
       updatedAt: now,
       deletedFlg: 0,
     });
+    getGlobalTracker()?.trackChange({ table: 'tags', recordId: id, operation: 'insert', changedFields: { name, parentId: parentId ?? null } });
 
     const [result] = await db.select().from(schema.tags).where(eq(schema.tags.id, id));
     return result;
@@ -47,6 +49,7 @@ export function registerTagHandlers() {
     const db = getDatabase();
     const now = new Date().toISOString();
     await db.update(schema.tags).set({ deletedFlg: 1, updatedAt: now }).where(eq(schema.tags.id, id));
+    getGlobalTracker()?.trackChange({ table: 'tags', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
     // 同时删除关联
     await db.delete(schema.articleTags).where(eq(schema.articleTags.tagId, id));
   });
@@ -69,6 +72,7 @@ export function registerTagHandlers() {
         tagId,
         createdAt: now,
       });
+      getGlobalTracker()?.trackChange({ table: 'article_tags', recordId: `${articleId}:${tagId}`, operation: 'insert', changedFields: { articleId, tagId } });
     }
   });
 
@@ -80,6 +84,7 @@ export function registerTagHandlers() {
         eq(schema.articleTags.articleId, articleId),
         eq(schema.articleTags.tagId, tagId),
       ));
+    getGlobalTracker()?.trackChange({ table: 'article_tags', recordId: `${articleId}:${tagId}`, operation: 'delete', changedFields: {} });
   });
 
   // 按标签获取文章列表
