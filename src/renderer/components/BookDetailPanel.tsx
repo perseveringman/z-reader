@@ -14,7 +14,7 @@ export function BookDetailPanel({ bookId, collapsed, onOpenReader, onRefresh }: 
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(false);
   const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
-    defaultWidth: 600,
+    defaultWidth: 360,
     minWidth: 280,
     maxWidth: 600,
     storageKey: 'bookDetailPanelWidth',

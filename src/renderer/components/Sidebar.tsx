@@ -11,7 +11,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
-  User,
+
   ChevronRight,
   ChevronDown,
   Plus,
@@ -119,7 +119,6 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
   const [sections, setSections] = useState({
     library: true,
     feed: true,
-    pinned: true,
   });
   const [feedCategories, setFeedCategories] = useState<Record<string, Feed[]>>({});
   const [tags, setTags] = useState<TagType[]>([]);
@@ -195,6 +194,13 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
             <Plus size={16} />
           </button>
           <button
+            onClick={onSearch}
+            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            title={t('sidebar.search')}
+          >
+            <Search size={16} />
+          </button>
+          <button
             onClick={onToggleCollapse}
             className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
           >
@@ -243,6 +249,13 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               onClick={() => onViewChange('library-podcasts')}
             />
             <NavItem
+              icon={<Star size={iconSize} />}
+              label={t('sidebar.shortlist')}
+              active={activeView === 'shortlist'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('shortlist')}
+            />
+            <NavItem
               icon={<Tag size={iconSize} />}
               label={t('sidebar.tags')}
               active={activeView === 'tags' && !selectedTagId}
@@ -262,7 +275,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                   onViewChange('tags');
                 }}
                 className={`
-                  relative flex items-center gap-2 w-full pl-6 pr-3 py-1.5 rounded-md text-[12px]
+                  relative flex items-center gap-2 w-full pl-6 pr-3 py-1.5 rounded-md text-[11px]
                   transition-colors duration-150 cursor-pointer outline-none
                   ${selectedTagId === tag.id
                     ? 'text-white bg-white/[0.08]'
@@ -325,7 +338,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                     onViewChange('feeds');
                   }}
                   className={`
-                    group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[12px]
+                    group relative flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-[11px]
                     transition-colors duration-150 cursor-pointer outline-none
                     ${selectedFeedId === feed.id
                       ? 'text-white bg-white/[0.08]'
@@ -355,76 +368,37 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
           </>
         )}
 
-        {/* ===== Pinned Section ===== */}
-        <SectionLabel
-          label={t('sidebar.pinned')}
-          collapsed={collapsed}
-          expanded={sections.pinned}
-          onToggle={() => toggleSection('pinned')}
-        />
-        {(collapsed || sections.pinned) && (
-          <>
-            <NavItem
-              icon={<Star size={iconSize} />}
-              label={t('sidebar.shortlist')}
-              active={activeView === 'shortlist'}
-              collapsed={collapsed}
-              onClick={() => onViewChange('shortlist')}
-            />
-          </>
-        )}
       </nav>
 
-      {/* 底部操作区 */}
-      <div className="px-2 py-2 border-t border-white/5 space-y-0.5">
-        <NavItem
-          icon={<Trash2 size={iconSize} />}
-          label={t('sidebar.trash')}
-          active={activeView === 'trash'}
-          collapsed={collapsed}
-          onClick={() => onViewChange('trash')}
-        />
-        <NavItem
-          icon={<Search size={iconSize} />}
-          label={t('sidebar.search')}
-          collapsed={collapsed}
-          onClick={onSearch}
-        />
-        <NavItem
-          icon={<Keyboard size={iconSize} />}
-          label={t('sidebar.shortcuts')}
-          collapsed={collapsed}
-          onClick={onShortcutsHelp}
-        />
-        <NavItem
-          icon={<Download size={iconSize} />}
-          label={t('sidebar.downloads')}
-          collapsed={collapsed}
-          onClick={onDownloads}
-        />
-        <NavItem
-          icon={<CheckSquare size={iconSize} />}
-          label="任务"
-          collapsed={collapsed}
-          onClick={onTasks}
-        />
-        <NavItem
-          icon={<Bell size={iconSize} />}
-          label="通知"
-          collapsed={collapsed}
-          onClick={onNotifications}
-        />
-        <NavItem
-          icon={<Settings size={iconSize} />}
-          label={t('sidebar.preferences')}
-          collapsed={collapsed}
-          onClick={onPreferences}
-        />
-        <NavItem
-          icon={<User size={iconSize} />}
-          label={t('sidebar.profile')}
-          collapsed={collapsed}
-        />
+      {/* 底部操作区 - 双列布局 */}
+      <div className="px-2 py-2 border-t border-white/5">
+        <div className="grid grid-cols-2 gap-0.5">
+          {[
+            { icon: <Trash2 size={iconSize} />, label: t('sidebar.trash'), onClick: () => onViewChange('trash'), active: activeView === 'trash' },
+            { icon: <Keyboard size={iconSize} />, label: t('sidebar.shortcuts'), onClick: onShortcutsHelp },
+            { icon: <Download size={iconSize} />, label: t('sidebar.downloads'), onClick: onDownloads },
+            { icon: <CheckSquare size={iconSize} />, label: '任务', onClick: onTasks },
+            { icon: <Bell size={iconSize} />, label: '通知', onClick: onNotifications },
+            { icon: <Settings size={iconSize} />, label: t('sidebar.preferences'), onClick: onPreferences },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={item.onClick}
+              className={`
+                flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px]
+                transition-colors duration-150 cursor-pointer outline-none
+                ${item.active
+                  ? 'text-white bg-white/[0.08]'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                }
+              `}
+              title={item.label}
+            >
+              <span className="shrink-0">{item.icon}</span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </button>
+          ))}
+        </div>
       </div>
       </div>
     </aside>

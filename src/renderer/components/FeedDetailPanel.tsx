@@ -40,7 +40,7 @@ export function FeedDetailPanel({
   const [recentArticles, setRecentArticles] = useState<Article[]>([]);
   const [fetching, setFetching] = useState(false);
   const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
-    defaultWidth: 600,
+    defaultWidth: 360,
     minWidth: 280,
     maxWidth: 600,
     storageKey: 'feedDetailPanelWidth',

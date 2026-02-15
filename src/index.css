@@ -243,6 +243,94 @@
   margin-top: 0.5rem;
 }
 
+.podcast-show-notes [data-podcast-ts] {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.06) 100%);
+  padding: 8px 10px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  list-style: none;
+}
+
+.podcast-show-notes [data-podcast-ts]::before {
+  content: attr(data-podcast-ts-label);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #bfdbfe;
+  background: rgba(30, 58, 138, 0.6);
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.podcast-show-notes [data-podcast-ts]:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.24) 0%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+.podcast-text-timestamp-line {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.06) 100%);
+  padding: 8px 10px;
+  margin: 0 0 6px 0;
+  text-align: inherit;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.podcast-text-timestamp-line:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.24) 0%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+.podcast-text-timestamp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #bfdbfe;
+  background: rgba(30, 58, 138, 0.6);
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.podcast-text-timestamp-content {
+  color: #d1d5db;
+}
+
+.podcast-timestamp-focus-flash {
+  animation: podcast-timestamp-flash 1.2s ease;
+}
+
+@keyframes podcast-timestamp-flash {
+  0%, 100% { box-shadow: none; }
+  20% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45) inset; }
+  60% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25) inset; }
+}
+
 /* ==================== 注释层 (Annotation Layer) ==================== */
 
 .annotation-layer {

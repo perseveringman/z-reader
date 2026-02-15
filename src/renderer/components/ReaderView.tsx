@@ -801,6 +801,15 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       <div className="relative flex-1 flex flex-col overflow-hidden">
         <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-[#262626]">
           <div className="flex items-center gap-1.5 text-[12px] min-w-0 truncate">
+            {tocCollapsed && (
+              <button
+                onClick={onClose}
+                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white shrink-0"
+                title="返回列表"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => setTocCollapsed((prev) => {
                 const next = !prev;

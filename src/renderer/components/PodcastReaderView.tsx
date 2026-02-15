@@ -1,12 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  ArrowLeft, Loader2, PanelRightClose, PanelRightOpen,
+  ArrowLeft, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   FileText, Sparkles, Mic, Settings, Download, RefreshCw, XCircle, Cloud,
 } from 'lucide-react';
 import type { Article, Highlight, HighlightTagsMap, TranscriptSegment, AppSettings, AppTask } from '../../shared/types';
 import { AudioPlayer, type AudioPlayerRef } from './AudioPlayer';
 import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
+import {
+  annotatePodcastTimestampLines,
+  extractPodcastTimestampOutlineFromAnnotatedHtml,
+  parsePodcastContentTextLines,
+  type PodcastTimestampOutlineItem,
+} from '../utils/podcast-timestamps';
 
 interface PodcastReaderViewProps {
   articleId: string;
@@ -40,6 +46,9 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const [detailCollapsed, setDetailCollapsed] = useState(() =>
     localStorage.getItem('podcast-reader-detail-collapsed') === 'true'
   );
+  const [outlineCollapsed, setOutlineCollapsed] = useState(() =>
+    localStorage.getItem('podcast-reader-outline-collapsed') === 'true'
+  );
   const [downloaded, setDownloaded] = useState(false);
   const [contentTab, setContentTab] = useState<'about' | 'summary' | 'transcript'>('about');
 
@@ -63,6 +72,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const scrollTriggerRef = useRef(0);
 
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
+  const aboutContentRef = useRef<HTMLDivElement>(null);
   const progressSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durationRef = useRef<number>(0);
   const segmentsLengthRef = useRef(0);
@@ -384,6 +394,38 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     audioPlayerRef.current?.seekTo(startTime);
   }, []);
 
+  const handleAboutTimestampClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    // Respect native link interactions in show notes.
+    if (target.closest('a')) return;
+
+    const clickable = target.closest<HTMLElement>('[data-podcast-ts]');
+    if (!clickable) return;
+
+    const seconds = Number(clickable.getAttribute('data-podcast-ts'));
+    if (!Number.isFinite(seconds)) return;
+    audioPlayerRef.current?.seekTo(seconds);
+  }, []);
+
+  const scrollAboutTimestampIntoView = useCallback((targetId: string): boolean => {
+    const container = aboutContentRef.current;
+    if (!container) return false;
+    const target = container.querySelector<HTMLElement>(`[data-podcast-ts-id="${targetId}"]`);
+    if (!target) return false;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.add('podcast-timestamp-focus-flash');
+    window.setTimeout(() => target.classList.remove('podcast-timestamp-focus-flash'), 1200);
+    return true;
+  }, []);
+
+  const handleAboutOutlineClick = useCallback((item: PodcastTimestampOutlineItem) => {
+    audioPlayerRef.current?.seekTo(item.seconds);
+    if (contentTab !== 'about') return;
+    scrollAboutTimestampIntoView(item.id);
+  }, [contentTab, scrollAboutTimestampIntoView]);
+
   const handleCreateHighlight = useCallback(async (data: {
     text: string;
     paragraphIndex: number;
@@ -479,14 +521,98 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   // ESC to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )) {
+        return;
+      }
+
       if (e.key === 'Escape') {
         e.preventDefault();
         handleClose();
+        return;
+      }
+
+      if (e.key === '[') {
+        e.preventDefault();
+        setOutlineCollapsed((prev) => {
+          const next = !prev;
+          localStorage.setItem('podcast-reader-outline-collapsed', String(next));
+          return next;
+        });
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleClose]);
+
+  const annotatedAboutContent = useMemo(
+    () => article?.content ? annotatePodcastTimestampLines(article.content) : null,
+    [article?.content],
+  );
+  const aboutTextLines = useMemo(
+    () => parsePodcastContentTextLines(article?.contentText),
+    [article?.contentText],
+  );
+  const aboutOutlineItems = useMemo(() => {
+    if (annotatedAboutContent) {
+      return extractPodcastTimestampOutlineFromAnnotatedHtml(annotatedAboutContent);
+    }
+
+    const items: PodcastTimestampOutlineItem[] = [];
+    aboutTextLines.forEach((line, index) => {
+      if (line.seconds == null) return;
+      items.push({
+        id: `podcast-text-ts-${index}`,
+        seconds: line.seconds,
+        label: line.timestampLabel ?? '',
+        title: line.content || line.text || line.timestampLabel || `片段 ${items.length + 1}`,
+      });
+    });
+    return items;
+  }, [annotatedAboutContent, aboutTextLines]);
+  const activeOutlineIndex = useMemo(() => {
+    for (let i = aboutOutlineItems.length - 1; i >= 0; i--) {
+      if (currentTime >= aboutOutlineItems[i].seconds) return i;
+    }
+    return -1;
+  }, [aboutOutlineItems, currentTime]);
+
+  const timelineSidebar = (
+    <div className={`shrink-0 flex flex-col border-r border-[#262626] bg-[#131313] transition-all duration-200 overflow-hidden ${outlineCollapsed || aboutOutlineItems.length === 0 ? 'w-0 border-r-0' : 'w-[230px]'}`}>
+      <div className="shrink-0 h-10 px-4 border-b border-white/5 flex items-center justify-between">
+        <h3 className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">时间轴</h3>
+        <span className="text-[10px] text-gray-500">{aboutOutlineItems.length}</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2">
+        {aboutOutlineItems.length > 0 ? (
+          <ul className="space-y-1">
+            {aboutOutlineItems.map((item, index) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => handleAboutOutlineClick(item)}
+                  className={`w-full text-left rounded-md px-2.5 py-2 transition-colors cursor-pointer ${
+                    index === activeOutlineIndex
+                      ? 'bg-blue-500/15 border border-blue-500/35'
+                      : 'border border-transparent hover:bg-white/5'
+                  }`}
+                >
+                  <div className="text-[10px] font-mono text-blue-300 tabular-nums">{item.label}</div>
+                  <div className="text-[12px] leading-5 text-gray-300 line-clamp-2 mt-0.5">{item.title}</div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="px-2 py-3 text-[12px] text-gray-500">暂无时间戳</div>
+        )}
+      </div>
+    </div>
+  );
 
   if (loading || !article) {
     return (
@@ -564,340 +690,386 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
             />
           </div>
 
-          {/* Content tabs */}
-          <div className="shrink-0 flex border-b border-white/5 px-6 mt-3">
-            {[
-              { key: 'about' as const, label: '简介', icon: <FileText size={14} /> },
-              { key: 'summary' as const, label: '摘要', icon: <Sparkles size={14} /> },
-              { key: 'transcript' as const, label: '转写', icon: <Mic size={14} /> },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setContentTab(tab.key)}
-                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
-                  contentTab === tab.key
-                    ? 'border-blue-500 text-white'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <div className="flex-1 min-h-0 flex mt-3">
+            {timelineSidebar}
 
-          {/* Tab content */}
-          {contentTab === 'about' && (
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
-              {/* Episode metadata */}
-              <div className="flex items-center gap-3 mb-4">
-                {feedTitle && (
-                  <span className="text-xs text-gray-500">{feedTitle}</span>
-                )}
-                {article.publishedAt && (
-                  <>
-                    {feedTitle && <span className="text-xs text-gray-600">·</span>}
-                    <span className="text-xs text-gray-500">
-                      {new Date(article.publishedAt).toLocaleDateString()}
-                    </span>
-                  </>
-                )}
-                {article.episodeNumber != null && (
-                  <>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-500">
-                      {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
-                      E{article.episodeNumber}
-                    </span>
-                  </>
-                )}
-                {article.audioDuration != null && (
-                  <>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-500">
-                      {formatDuration(article.audioDuration)}
-                    </span>
-                  </>
+            <div className="flex-1 min-h-0 flex flex-col">
+              {/* Content tabs */}
+              <div className="shrink-0 flex items-center justify-between border-b border-white/5 px-6">
+                <div className="flex">
+                  {[
+                    { key: 'about' as const, label: '简介', icon: <FileText size={14} /> },
+                    { key: 'summary' as const, label: '摘要', icon: <Sparkles size={14} /> },
+                    { key: 'transcript' as const, label: '转写', icon: <Mic size={14} /> },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setContentTab(tab.key)}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+                        contentTab === tab.key
+                          ? 'border-blue-500 text-white'
+                          : 'border-transparent text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {aboutOutlineItems.length > 0 && (
+                  <button
+                    onClick={() => setOutlineCollapsed((prev) => {
+                      const next = !prev;
+                      localStorage.setItem('podcast-reader-outline-collapsed', String(next));
+                      return next;
+                    })}
+                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    title={outlineCollapsed ? '展开时间轴（[）' : '收起时间轴（[）'}
+                  >
+                    {outlineCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                  </button>
                 )}
               </div>
 
-              {/* Summary */}
-              {article.summary && (
-                <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                  {article.summary}
-                </p>
-              )}
-
-              {/* Full content (show notes) */}
-              {article.content && (
-                <div
-                  className="prose prose-invert prose-sm max-w-none text-gray-300
-                    prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                    prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
-                  dangerouslySetInnerHTML={{ __html: article.content }}
-                />
-              )}
-
-              {/* Fallback: plaintext content */}
-              {!article.content && article.contentText && (
-                <div className="text-sm text-gray-400 whitespace-pre-wrap leading-relaxed">
-                  {article.contentText}
-                </div>
-              )}
-            </div>
-          )}
-
-          {contentTab === 'summary' && (
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
-              {summarizing ? (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                  <Loader2 size={32} className="mb-3 animate-spin text-teal-400" />
-                  <p className="text-sm">正在生成摘要...</p>
-                  <p className="text-xs mt-1 text-gray-600">基于转写全文分析中</p>
-                </div>
-              ) : article.summary ? (
-                <div>
-                  <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-                    {article.summary}
+              {/* Tab content */}
+              {contentTab === 'about' && (
+                <div ref={aboutContentRef} className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
+                  {/* Episode metadata */}
+                  <div className="flex items-center gap-3 mb-4">
+                    {feedTitle && (
+                      <span className="text-xs text-gray-500">{feedTitle}</span>
+                    )}
+                    {article.publishedAt && (
+                      <>
+                        {feedTitle && <span className="text-xs text-gray-600">·</span>}
+                        <span className="text-xs text-gray-500">
+                          {new Date(article.publishedAt).toLocaleDateString()}
+                        </span>
+                      </>
+                    )}
+                    {article.episodeNumber != null && (
+                      <>
+                        <span className="text-xs text-gray-600">·</span>
+                        <span className="text-xs text-gray-500">
+                          {article.seasonNumber != null ? `S${article.seasonNumber} ` : ''}
+                          E{article.episodeNumber}
+                        </span>
+                      </>
+                    )}
+                    {article.audioDuration != null && (
+                      <>
+                        <span className="text-xs text-gray-600">·</span>
+                        <span className="text-xs text-gray-500">
+                          {formatDuration(article.audioDuration)}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={handleGenerateSummary}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-white/5 hover:bg-white/10 rounded-md transition-colors cursor-pointer"
-                    >
-                      <RefreshCw size={12} />
-                      重新生成
-                    </button>
-                  </div>
-                </div>
-              ) : segments.length > 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                  <Sparkles size={32} className="mb-3 opacity-40" />
-                  <p className="text-sm mb-4">已有转写内容，可生成 AI 摘要</p>
-                  <button
-                    onClick={handleGenerateSummary}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Sparkles size={14} />
-                    基于转写内容生成摘要
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                  <Mic size={32} className="mb-3 opacity-40" />
-                  <p className="text-sm">请先完成转写后再生成摘要</p>
-                  <p className="text-xs mt-1 text-gray-600">切换到"转写"标签开始转写</p>
-                </div>
-              )}
-            </div>
-          )}
 
-          {contentTab === 'transcript' && (
-            <div className="flex-1 min-h-0 flex flex-col">
-              {/* 转写进行中的进度条 + 控制栏 */}
-              {transcriptState === 'transcribing' && (
-                <div className="shrink-0 px-6 pt-3 pb-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin text-teal-400" />
-                      <span className="text-xs text-gray-400">
-                        {asrProgress.totalChunks > 1
-                          ? `分块 ${asrProgress.chunkIndex + 1}/${asrProgress.totalChunks} · `
-                          : ''}
-                        {Math.round(asrProgress.overallProgress * 100)}% 完成
-                      </span>
-                    </div>
-                    <button
-                      onClick={handleCancelTranscribe}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
-                    >
-                      <XCircle size={12} />
-                      取消
-                    </button>
-                  </div>
-                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                  {article.summary && (
+                    <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                      {article.summary}
+                    </p>
+                  )}
+
+                  {/* Full content (show notes) */}
+                  {article.content && (
                     <div
-                      className="h-full bg-teal-500 rounded-full transition-all duration-300"
-                      style={{ width: `${asrProgress.overallProgress * 100}%` }}
+                      className="podcast-show-notes prose prose-invert prose-sm max-w-none text-gray-300
+                        prose-headings:text-gray-200 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                        prose-strong:text-gray-200 prose-code:text-gray-300 prose-code:bg-white/5 prose-code:rounded prose-code:px-1"
+                      onClick={handleAboutTimestampClick}
+                      dangerouslySetInnerHTML={{ __html: annotatedAboutContent ?? '' }}
                     />
-                  </div>
-                </div>
-              )}
-
-              {/* 已完成的重新转写按钮 */}
-              {transcriptState === 'complete' && (
-                <div className="shrink-0 px-6 pt-3 pb-1 flex justify-end">
-                  <button
-                    onClick={handleRetranscribe}
-                    className="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
-                  >
-                    <RefreshCw size={11} />
-                    重新转写
-                  </button>
-                </div>
-              )}
-
-              {/* 错误提示 */}
-              {asrError && (
-                <div className="shrink-0 mx-6 mt-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-md">
-                  <p className="text-xs text-red-400">{asrError}</p>
-                </div>
-              )}
-
-              {/* 转写内容区 */}
-              {(transcriptState === 'complete' || (transcriptState === 'transcribing' && segments.length > 0)) ? (
-                <div className="flex-1 min-h-0">
-                  <TranscriptView
-                    segments={segments}
-                    currentTime={currentTime}
-                    onSegmentClick={handleSegmentClick}
-                    highlights={highlights}
-                    onCreateHighlight={handleCreateHighlight}
-                    onDeleteHighlight={handleDeleteHighlight}
-                    onUpdateHighlight={handleUpdateHighlight}
-                    highlightTagsMap={highlightTagsMap}
-                    scrollToSegment={scrollToSegmentInt}
-                    speakerMap={speakerMap}
-                    onSpeakerRename={async (speakerId, name) => {
-                      await window.electronAPI.transcriptUpdateSpeaker(articleId, speakerId, name);
-                      setSpeakerMap((prev) => {
-                        const next = { ...prev };
-                        if (name.trim()) {
-                          next[String(speakerId)] = name.trim();
-                        } else {
-                          delete next[String(speakerId)];
-                        }
-                        return next;
-                      });
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex-1 min-h-0 flex items-center justify-center">
-                  {transcriptState === 'loading' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500">
-                      <Loader2 size={24} className="animate-spin" />
-                      <p className="text-sm">加载中...</p>
-                    </div>
                   )}
 
-                  {transcriptState === 'not-configured' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
-                      <Settings size={32} className="opacity-40" />
-                      <p className="text-sm">需要配置语音识别服务</p>
-                      <p className="text-xs text-gray-600">
-                        请在设置中选择语音识别服务（火山引擎或腾讯云）并配置凭据
-                      </p>
-                    </div>
-                  )}
-
-                  {transcriptState === 'not-downloaded' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
-                      <Download size={32} className="opacity-40" />
-                      <p className="text-sm">请先下载音频</p>
-                      <p className="text-xs text-gray-600 mb-2">
-                        后台转写将自动下载音频并在后台完成
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleStartBackgroundTranscribe}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
-                        >
-                          <Cloud size={14} />
-                          后台转写
-                        </button>
-                        <button
-                          onClick={handleDownload}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
-                        >
-                          <Download size={14} />
-                          下载音频
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {transcriptState === 'downloading' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
-                      <Loader2 size={32} className="animate-spin text-teal-400" />
-                      <p className="text-sm">正在下载音频...</p>
-                      <p className="text-xs text-gray-600">
-                        下载完成后可使用实时转写
-                      </p>
-                    </div>
-                  )}
-
-                  {transcriptState === 'ready' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
-                      <Mic size={32} className="opacity-40" />
-                      <p className="text-sm">音频转写为文字</p>
-                      {article.audioDuration != null && (
-                        <p className="text-xs text-gray-600">
-                          音频时长 {formatDuration(article.audioDuration)}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        <button
-                          onClick={handleStartBackgroundTranscribe}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
-                        >
-                          <Cloud size={14} />
-                          后台转写
-                        </button>
-                        {downloaded && (
-                          <button
-                            onClick={handleStartTranscribe}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
+                  {/* Fallback: plaintext content */}
+                  {!article.content && aboutTextLines.length > 0 && (
+                    <div className="text-sm text-gray-400 leading-relaxed">
+                      {aboutTextLines.map((line, index) => (
+                        line.seconds == null ? (
+                          <div
+                            key={`${index}-${line.text.slice(0, 24)}`}
+                            className="whitespace-pre-wrap"
                           >
-                            <Mic size={14} />
-                            实时转写
+                            {line.text || '\u00A0'}
+                          </div>
+                        ) : (
+                          <button
+                            key={`${index}-${line.text.slice(0, 24)}`}
+                            type="button"
+                            data-podcast-ts-id={`podcast-text-ts-${index}`}
+                            onClick={() => {
+                              if (line.seconds != null) audioPlayerRef.current?.seekTo(line.seconds);
+                            }}
+                            className="podcast-text-timestamp-line w-full text-left"
+                          >
+                            <span className="podcast-text-timestamp-badge">{line.timestampLabel ?? ''}</span>
+                            <span className="podcast-text-timestamp-content whitespace-pre-wrap">
+                              {line.content || line.text}
+                            </span>
                           </button>
-                        )}
+                        )
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {contentTab === 'summary' && (
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 pt-4">
+                  {summarizing ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                      <Loader2 size={32} className="mb-3 animate-spin text-teal-400" />
+                      <p className="text-sm">正在生成摘要...</p>
+                      <p className="text-xs mt-1 text-gray-600">基于转写全文分析中</p>
+                    </div>
+                  ) : article.summary ? (
+                    <div>
+                      <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                        {article.summary}
                       </div>
-                      <p className="text-[11px] text-gray-600 mt-1">
-                        {downloaded
-                          ? '后台转写速度更快，实时转写可边转边看'
-                          : '后台转写将自动下载音频，可离开页面等待完成'}
-                      </p>
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={handleGenerateSummary}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-white/5 hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                        >
+                          <RefreshCw size={12} />
+                          重新生成
+                        </button>
+                      </div>
+                    </div>
+                  ) : segments.length > 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                      <Sparkles size={32} className="mb-3 opacity-40" />
+                      <p className="text-sm mb-4">已有转写内容，可生成 AI 摘要</p>
+                      <button
+                        onClick={handleGenerateSummary}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Sparkles size={14} />
+                        基于转写内容生成摘要
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                      <Mic size={32} className="mb-3 opacity-40" />
+                      <p className="text-sm">请先完成转写后再生成摘要</p>
+                      <p className="text-xs mt-1 text-gray-600">切换到"转写"标签开始转写</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {contentTab === 'transcript' && (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  {/* 转写进行中的进度条 + 控制栏 */}
+                  {transcriptState === 'transcribing' && (
+                    <div className="shrink-0 px-6 pt-3 pb-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={14} className="animate-spin text-teal-400" />
+                          <span className="text-xs text-gray-400">
+                            {asrProgress.totalChunks > 1
+                              ? `分块 ${asrProgress.chunkIndex + 1}/${asrProgress.totalChunks} · `
+                              : ''}
+                            {Math.round(asrProgress.overallProgress * 100)}% 完成
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleCancelTranscribe}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <XCircle size={12} />
+                          取消
+                        </button>
+                      </div>
+                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                          style={{ width: `${asrProgress.overallProgress * 100}%` }}
+                        />
+                      </div>
                     </div>
                   )}
 
-                  {transcriptState === 'background-running' && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
-                      <Cloud size={32} className="text-teal-400 opacity-70" />
-                      <p className="text-sm text-gray-300">后台转写进行中</p>
-                      {backgroundTask && (
-                        <>
-                          {backgroundTask.progress > 0 && (
-                            <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-teal-500 rounded-full transition-all duration-500"
-                                style={{ width: `${Math.round(backgroundTask.progress * 100)}%` }}
-                              />
-                            </div>
-                          )}
-                          <p className="text-xs text-gray-500">
-                            {backgroundTask.detail || '等待处理...'}
-                          </p>
-                        </>
+                  {/* 已完成的重新转写按钮 */}
+                  {transcriptState === 'complete' && (
+                    <div className="shrink-0 px-6 pt-3 pb-1 flex justify-end">
+                      <button
+                        onClick={handleRetranscribe}
+                        className="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw size={11} />
+                        重新转写
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 错误提示 */}
+                  {asrError && (
+                    <div className="shrink-0 mx-6 mt-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-md">
+                      <p className="text-xs text-red-400">{asrError}</p>
+                    </div>
+                  )}
+
+                  {/* 转写内容区 */}
+                  {(transcriptState === 'complete' || (transcriptState === 'transcribing' && segments.length > 0)) ? (
+                    <div className="flex-1 min-h-0">
+                      <TranscriptView
+                        segments={segments}
+                        currentTime={currentTime}
+                        onSegmentClick={handleSegmentClick}
+                        highlights={highlights}
+                        onCreateHighlight={handleCreateHighlight}
+                        onDeleteHighlight={handleDeleteHighlight}
+                        onUpdateHighlight={handleUpdateHighlight}
+                        highlightTagsMap={highlightTagsMap}
+                        scrollToSegment={scrollToSegmentInt}
+                        speakerMap={speakerMap}
+                        onSpeakerRename={async (speakerId, name) => {
+                          await window.electronAPI.transcriptUpdateSpeaker(articleId, speakerId, name);
+                          setSpeakerMap((prev) => {
+                            const next = { ...prev };
+                            if (name.trim()) {
+                              next[String(speakerId)] = name.trim();
+                            } else {
+                              delete next[String(speakerId)];
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 flex items-center justify-center">
+                      {transcriptState === 'loading' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500">
+                          <Loader2 size={24} className="animate-spin" />
+                          <p className="text-sm">加载中...</p>
+                        </div>
                       )}
-                      <p className="text-[11px] text-gray-600 mt-1">
-                        可离开此页面，完成后将收到通知
-                      </p>
-                    </div>
-                  )}
 
-                  {transcriptState === 'transcribing' && segments.length === 0 && (
-                    <div className="flex flex-col items-center gap-3 text-gray-500">
-                      <Loader2 size={24} className="animate-spin text-teal-400" />
-                      <p className="text-sm">正在处理音频...</p>
-                      <p className="text-xs text-gray-600">转写结果将实时显示</p>
+                      {transcriptState === 'not-configured' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                          <Settings size={32} className="opacity-40" />
+                          <p className="text-sm">需要配置语音识别服务</p>
+                          <p className="text-xs text-gray-600">
+                            请在设置中选择语音识别服务（火山引擎或腾讯云）并配置凭据
+                          </p>
+                        </div>
+                      )}
+
+                      {transcriptState === 'not-downloaded' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                          <Download size={32} className="opacity-40" />
+                          <p className="text-sm">请先下载音频</p>
+                          <p className="text-xs text-gray-600 mb-2">
+                            后台转写将自动下载音频并在后台完成
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleStartBackgroundTranscribe}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
+                            >
+                              <Cloud size={14} />
+                              后台转写
+                            </button>
+                            <button
+                              onClick={handleDownload}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
+                            >
+                              <Download size={14} />
+                              下载音频
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {transcriptState === 'downloading' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                          <Loader2 size={32} className="animate-spin text-teal-400" />
+                          <p className="text-sm">正在下载音频...</p>
+                          <p className="text-xs text-gray-600">
+                            下载完成后可使用实时转写
+                          </p>
+                        </div>
+                      )}
+
+                      {transcriptState === 'ready' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                          <Mic size={32} className="opacity-40" />
+                          <p className="text-sm">音频转写为文字</p>
+                          {article.audioDuration != null && (
+                            <p className="text-xs text-gray-600">
+                              音频时长 {formatDuration(article.audioDuration)}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              onClick={handleStartBackgroundTranscribe}
+                              className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors cursor-pointer"
+                            >
+                              <Cloud size={14} />
+                              后台转写
+                            </button>
+                            {downloaded && (
+                              <button
+                                onClick={handleStartTranscribe}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-300 text-sm rounded-md transition-colors cursor-pointer"
+                              >
+                                <Mic size={14} />
+                                实时转写
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-600 mt-1">
+                            {downloaded
+                              ? '后台转写速度更快，实时转写可边转边看'
+                              : '后台转写将自动下载音频，可离开页面等待完成'}
+                          </p>
+                        </div>
+                      )}
+
+                      {transcriptState === 'background-running' && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500 max-w-xs text-center">
+                          <Cloud size={32} className="text-teal-400 opacity-70" />
+                          <p className="text-sm text-gray-300">后台转写进行中</p>
+                          {backgroundTask && (
+                            <>
+                              {backgroundTask.progress > 0 && (
+                                <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.round(backgroundTask.progress * 100)}%` }}
+                                  />
+                                </div>
+                              )}
+                              <p className="text-xs text-gray-500">
+                                {backgroundTask.detail || '等待处理...'}
+                              </p>
+                            </>
+                          )}
+                          <p className="text-[11px] text-gray-600 mt-1">
+                            可离开此页面，完成后将收到通知
+                          </p>
+                        </div>
+                      )}
+
+                      {transcriptState === 'transcribing' && segments.length === 0 && (
+                        <div className="flex flex-col items-center gap-3 text-gray-500">
+                          <Loader2 size={24} className="animate-spin text-teal-400" />
+                          <p className="text-sm">正在处理音频...</p>
+                          <p className="text-xs text-gray-600">转写结果将实时显示</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right: detail panel */}

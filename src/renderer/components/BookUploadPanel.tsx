@@ -39,7 +39,7 @@ export function BookUploadPanel({ onImported, collapsed }: BookUploadPanelProps)
   }, [handleImport]);
 
   const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
-    defaultWidth: 600,
+    defaultWidth: 360,
     minWidth: 280,
     maxWidth: 600,
     storageKey: 'bookUploadPanelWidth',
