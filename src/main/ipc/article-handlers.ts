@@ -1,12 +1,13 @@
 import { ipcMain, dialog, app } from 'electron';
 import { eq, and, desc, asc, inArray, or, like } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { parseArticleContent } from '../services/parser-service';
+import { extractPdfMetadata } from '../services/epub-metadata';
 import { isYouTubeUrl, extractYouTubeVideoId, fetchYouTubeVideoMeta } from '../services/youtube-service';
 import { isPodcastEpisodeUrl, fetchPodcastEpisodeMeta } from '../services/podcast-resolver';
 import {
@@ -18,6 +19,42 @@ import {
 } from '../services/local-media-import';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
+
+function isArxivPdfUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.hostname === 'arxiv.org' && parsed.pathname.startsWith('/pdf/');
+  } catch {
+    return false;
+  }
+}
+
+function isRemotePdfUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.pathname.toLowerCase().endsWith('.pdf') || isArxivPdfUrl(rawUrl);
+  } catch {
+    return false;
+  }
+}
+
+function inferPdfTitleFromUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    if (!pathname) return null;
+    const tail = pathname.split('/').pop();
+    if (!tail) return null;
+    const decoded = decodeURIComponent(tail).replace(/\.pdf$/i, '');
+    if (!decoded) return null;
+    if (isArxivPdfUrl(rawUrl)) {
+      return `arXiv: ${decoded}`;
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
 
 export function registerArticleHandlers() {
   const {
@@ -211,6 +248,69 @@ export function registerArticleHandlers() {
       domain = new URL(input.url).hostname;
     } catch {
       // invalid URL
+    }
+
+    if (isRemotePdfUrl(input.url)) {
+      const booksDir = join(app.getPath('userData'), 'books');
+      await mkdir(booksDir, { recursive: true });
+
+      const response = await fetch(input.url);
+      if (!response.ok) {
+        throw new Error(`PDF download failed: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().includes('pdf') && !isArxivPdfUrl(input.url)) {
+        throw new Error('URL does not point to a PDF file');
+      }
+
+      const pdfBuffer = Buffer.from(await response.arrayBuffer());
+      if (pdfBuffer.byteLength === 0) {
+        throw new Error('Downloaded PDF is empty');
+      }
+
+      const bookId = randomUUID();
+      const filePath = join(booksDir, `${bookId}.pdf`);
+      await writeFile(filePath, pdfBuffer);
+
+      const fileStat = await stat(filePath);
+      const pdfMeta = await extractPdfMetadata(filePath);
+      const title = input.title?.trim() || pdfMeta.title || inferPdfTitleFromUrl(input.url);
+
+      await db.insert(schema.books).values({
+        id: bookId,
+        title: title || null,
+        author: pdfMeta.author || null,
+        cover: null,
+        filePath,
+        fileType: 'pdf',
+        fileSize: fileStat.size,
+        language: pdfMeta.language || null,
+        publisher: pdfMeta.publisher || null,
+        description: pdfMeta.description || null,
+        readStatus: 'inbox',
+        readProgress: 0,
+        totalLocations: null,
+        currentLocation: null,
+        isShortlisted: 0,
+        createdAt: now,
+        updatedAt: now,
+        deletedFlg: 0,
+      });
+
+      getGlobalTracker()?.trackChange({
+        table: 'books',
+        recordId: bookId,
+        operation: 'insert',
+        changedFields: {
+          title: title || null,
+          author: pdfMeta.author || null,
+          fileType: 'pdf',
+        },
+      });
+
+      const [savedBook] = await db.select().from(schema.books).where(eq(schema.books.id, bookId));
+      return savedBook;
     }
 
     // YouTube 视频特殊处理：提取 videoId，通过 oEmbed 获取元数据
