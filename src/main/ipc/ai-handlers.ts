@@ -834,7 +834,7 @@ ${sourceText.slice(0, 24000)}`,
         aiDb,
       });
 
-      // 获取文章上下文（如有）
+      // 获取文章上下文（如有），video/podcast 优先使用转写文本
       let articleContext: string | null = null;
       if (input.articleId) {
         const db = getDatabase();
@@ -844,7 +844,20 @@ ${sourceText.slice(0, 24000)}`,
           .where(eq(articles.id, input.articleId))
           .get();
         if (article) {
-          articleContext = article.contentText || article.summary || null;
+          if (article.mediaType === 'video' || article.mediaType === 'podcast') {
+            const transcript = await db
+              .select()
+              .from(transcripts)
+              .where(eq(transcripts.articleId, input.articleId))
+              .get();
+            const transcriptText = parseTranscriptText(transcript?.segments);
+            if (transcriptText) {
+              articleContext = transcriptText;
+            }
+          }
+          if (!articleContext) {
+            articleContext = article.contentText || article.summary || null;
+          }
         }
       }
 
