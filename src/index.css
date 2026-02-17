@@ -694,3 +694,21 @@
   pointer-events: none;
   user-select: none;
 }
+
+/* ==================== MindMap Dark Theme ==================== */
+.mindmap-dark svg {
+  --markmap-text-color: #e5e7eb;
+  --markmap-highlight-color: #f8fafc;
+}
+
+.mindmap-dark .markmap text {
+  fill: #e5e7eb !important;
+}
+
+.mindmap-dark .markmap-link {
+  stroke: rgba(148, 163, 184, 0.6) !important;
+}
+
+.mindmap-dark .markmap-node circle {
+  fill: rgba(56, 189, 248, 0.85) !important;
+}

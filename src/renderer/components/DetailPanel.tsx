@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, Globe, User, Calendar, FileText, MessageSquare, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Hash, Loader2 } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, Trash2, Highlighter, Tag, Download, Copy, Sparkles, Languages, Tags, Hash, Loader2, Network } from 'lucide-react';
 import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
 import { ChatPanel } from './ChatPanel';
+import { MindMapPanel } from './MindMapPanel';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 
-type DetailTab = 'info' | 'notebook' | 'chat';
+type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat';
 
 interface DetailPanelProps {
   articleId: string | null;
@@ -78,6 +79,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const TABS: { key: DetailTab; label: string }[] = [
     { key: 'info', label: t('feedDetail.info') },
     { key: 'notebook', label: t('detailPanel.highlights') },
+    { key: 'mindmap', label: t('ai.mindmap') },
     { key: 'chat', label: t('chat.title') },
   ];
   const [article, setArticle] = useState<Article | null>(null);
@@ -104,6 +106,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const [aiTopicsLoading, setAiTopicsLoading] = useState(false);
   const [aiTopicsResult, setAiTopicsResult] = useState<{ topics: string[] } | null>(null);
   const [aiTopicsError, setAiTopicsError] = useState<string | null>(null);
+  const [mindmapGenerateSignal, setMindmapGenerateSignal] = useState(0);
 
   // 使用外部高亮或内部高亮
   const useExternal = externalHighlights != null;
@@ -346,7 +349,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       </div>
 
       {/* 内容区域 */}
-      <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'chat' ? '' : 'overflow-y-auto p-4'}`}>
+      <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'chat' || activeTab === 'mindmap' ? '' : 'overflow-y-auto p-4'}`}>
         {!articleId ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             {t('detailPanel.noSelection')}
@@ -551,6 +554,20 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                         )}
                       </div>
 
+                      {/* AI 思维导图 */}
+                      <div className="rounded-lg bg-[#1a1a1a] border border-white/5 p-3">
+                        <button
+                          onClick={() => {
+                            setActiveTab('mindmap');
+                            setMindmapGenerateSignal((prev) => prev + 1);
+                          }}
+                          className="flex items-center gap-2 text-[13px] text-gray-300 hover:text-white transition-colors cursor-pointer w-full"
+                        >
+                          <Network className="w-4 h-4 text-cyan-400" />
+                          <span>{t('ai.generateMindmap')}</span>
+                        </button>
+                      </div>
+
                     </div>
                   </div>
                 </div>
@@ -676,6 +693,13 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
               <div className="flex-1 flex flex-col min-h-0">
                 <ChatPanel articleId={articleId} />
               </div>
+            )}
+
+            {activeTab === 'mindmap' && (
+              <MindMapPanel
+                articleId={article.id}
+                generateSignal={mindmapGenerateSignal}
+              />
             )}
           </>
         )}

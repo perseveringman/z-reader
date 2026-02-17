@@ -3,9 +3,10 @@ import { Clock, Globe, User, Calendar, FileText, Trash2, Highlighter, Download, 
 import type { Article, Highlight, CardType } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
 import { ChatPanel } from './ChatPanel';
+import { MindMapPanel } from './MindMapPanel';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 
-type DetailTab = 'info' | 'notebook' | 'chat';
+type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat';
 
 interface ReaderDetailPanelProps {
   articleId: string;
@@ -152,6 +153,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
         {[
           { key: 'info' as DetailTab, label: 'Info' },
           { key: 'notebook' as DetailTab, label: 'Notebook', count: highlights.length },
+          { key: 'mindmap' as DetailTab, label: 'MindMap' },
           { key: 'chat' as DetailTab, label: 'Chat' },
         ].map((tab) => (
           <button
@@ -177,7 +179,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
       </div>
 
       {/* 内容区域 */}
-      <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'chat' ? '' : 'overflow-y-auto p-4'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'chat' || activeTab === 'mindmap' ? '' : 'overflow-y-auto p-4'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             加载中…
@@ -333,6 +335,10 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
               <div className="flex-1 flex flex-col min-h-0">
                 <ChatPanel articleId={articleId} />
               </div>
+            )}
+
+            {activeTab === 'mindmap' && (
+              <MindMapPanel articleId={articleId} />
             )}
           </>
         )}

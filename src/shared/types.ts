@@ -569,6 +569,25 @@ export interface AIExtractTopicsResult {
   tokenCount: number;
 }
 
+export type AIMindmapSourceType = 'article' | 'transcript' | 'summary';
+
+export interface AIMindmapGenerateInput {
+  articleId: string;
+}
+
+export interface AIMindmapRecord {
+  articleId: string;
+  title: string | null;
+  sourceType: AIMindmapSourceType;
+  sourceHash: string;
+  promptVersion: string;
+  model: string;
+  mindmapMarkdown: string;
+  tokenCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ==================== ASR (语音识别) 类型 ====================
 export interface AsrProgressEvent {
   articleId: string;
@@ -771,6 +790,10 @@ export interface ElectronAPI {
 
   // AI 主题提取
   aiExtractTopics: (input: AIExtractTopicsInput) => Promise<AIExtractTopicsResult>;
+
+  // AI 思维导图
+  aiMindmapGenerate: (input: AIMindmapGenerateInput) => Promise<AIMindmapRecord>;
+  aiMindmapGet: (articleId: string) => Promise<AIMindmapRecord | null>;
 
   // AI 任务日志详情
   aiTaskLogDetail: (logId: string) => Promise<AITaskLogDetail | null>;

@@ -522,6 +522,8 @@
     "aiActions": "AI 操作",
     "extractTopics": "提取主题",
     "topics": "主题关键词",
+    "mindmap": "思维导图",
+    "generateMindmap": "生成思维导图",
     "debugPanel": "AI 调试面板",
     "callHistory": "调用历史",
     "traceDetails": "执行追踪",
