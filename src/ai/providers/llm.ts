@@ -21,7 +21,8 @@ export function createLLMProvider(config: AIProviderConfig) {
     /** 根据任务类型获取模型 */
     getModel(task: 'fast' | 'smart' | 'cheap') {
       const modelId = config.models[task] || DEFAULT_AI_CONFIG.models[task];
-      return provider(modelId);
+      // 使用 chat() 走 Chat Completions API，避免 OpenRouter 不兼容 Responses API
+      return provider.chat(modelId);
     },
     provider,
   };

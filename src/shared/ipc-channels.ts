@@ -124,6 +124,8 @@ export const IPC_CHANNELS = {
   AI_SUMMARIZE: 'ai:summarize',
   AI_TRANSLATE: 'ai:translate',
   AI_AUTO_TAG: 'ai:autoTag',
+  AI_MINDMAP_GENERATE: 'ai:mindmap:generate',
+  AI_MINDMAP_GET: 'ai:mindmap:get',
   AI_TASK_LOGS: 'ai:taskLogs',
 
   // AI Chat

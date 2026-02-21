@@ -161,6 +161,21 @@ export const aiSettings = sqliteTable('ai_settings', {
   updatedAt: text('updated_at').notNull(),
 });
 
+/** AI 思维导图缓存 */
+export const aiMindmaps = sqliteTable('ai_mindmaps', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').notNull().references(() => articles.id),
+  title: text('title'),
+  sourceType: text('source_type').notNull(), // article | transcript | summary
+  sourceHash: text('source_hash').notNull(),
+  promptVersion: text('prompt_version').notNull(),
+  model: text('model').notNull(),
+  mindmapMarkdown: text('mindmap_markdown').notNull(),
+  tokenCount: integer('token_count').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 /** AI 快捷提示词 */
 export const aiPromptPresets = sqliteTable('ai_prompt_presets', {
   id: text('id').primaryKey(),

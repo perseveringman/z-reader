@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Loader2, Link, FolderUp } from 'lucide-react';
 import { useToast } from './Toast';
+import type { Article, Book } from '../../shared/types';
 
 interface AddUrlDialogProps {
   open: boolean;
   onClose: () => void;
-  onArticleSaved?: () => void;
+  onArticleSaved?: (saved?: Article | Book) => void;
 }
 
 export function formatLocalImportToastMessage(importedCount: number): string {
@@ -49,13 +50,14 @@ export function AddUrlDialog({ open, onClose, onArticleSaved }: AddUrlDialogProp
 
     setLoading(true);
     try {
-      await window.electronAPI.articleSaveUrl({
+      const saved = await window.electronAPI.articleSaveUrl({
         url: url.trim(),
         title: title.trim() || undefined,
       });
-      showToast('Saved to Library');
+      const savedAsBook = typeof saved === 'object' && saved !== null && 'fileType' in saved;
+      showToast(savedAsBook ? 'Saved to Books' : 'Saved to Library');
       onClose();
-      onArticleSaved?.();
+      onArticleSaved?.(saved);
     } catch (error) {
       console.error('Failed to save URL:', error);
       showToast('Failed to save URL. Please check the URL and try again.');
@@ -219,7 +221,7 @@ export function AddUrlDialog({ open, onClose, onArticleSaved }: AddUrlDialogProp
         <div className="px-6 pb-6 pt-0">
           {tab === 'url' ? (
             <p className="text-xs text-gray-500">
-              The article content will be automatically parsed from the URL.
+              Article URLs are parsed automatically. PDF URLs (for example arXiv /pdf links) are imported into Books.
               You can also use <kbd className="px-1 py-0.5 bg-white/10 rounded text-gray-400">Cmd+Shift+S</kbd> to open this dialog.
             </p>
           ) : (

@@ -23,7 +23,7 @@ import { PreferencesDialog } from './components/PreferencesDialog';
 import { DiscoverPage } from './components/discover/DiscoverPage';
 import { TaskDrawer } from './components/TaskDrawer';
 import { NotificationDrawer } from './components/NotificationDrawer';
-import type { Feed, ArticleSource, MediaType } from '../shared/types';
+import type { Feed, ArticleSource, MediaType, Article, Book } from '../shared/types';
 import { changeLanguage } from '../i18n';
 import { findAnchorExternalUrl } from './utils/external-links';
 
@@ -197,6 +197,35 @@ function AppContent() {
 
   const handleRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const handleUrlSaved = useCallback((saved?: Article | Book) => {
+    setRefreshTrigger((prev) => prev + 1);
+    if (!saved) return;
+
+    if ('fileType' in saved) {
+      setSelectedArticleId(null);
+      setSelectedFeedId(null);
+      setSelectedTagId(null);
+      setActiveView('books');
+      setSelectedBookId(saved.id);
+      return;
+    }
+
+    setSelectedBookId(null);
+    setSelectedArticleId(saved.id);
+    setSelectedFeedId(null);
+    setSelectedTagId(null);
+
+    if (saved.mediaType === 'video') {
+      setActiveView('library-videos');
+      return;
+    }
+    if (saved.mediaType === 'podcast') {
+      setActiveView('library-podcasts');
+      return;
+    }
+    setActiveView('library-articles');
   }, []);
 
   const handleOpenReader = useCallback(async (articleId: string) => {
@@ -418,7 +447,7 @@ function AppContent() {
         <AddUrlDialog
           open={addUrlDialogOpen}
           onClose={() => setAddUrlDialogOpen(false)}
-          onArticleSaved={handleRefresh}
+          onArticleSaved={handleUrlSaved}
         />
 
         <SearchPanel

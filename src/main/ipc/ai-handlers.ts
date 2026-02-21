@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron';
+import { createHash } from 'node:crypto';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { getDatabase, getSqlite } from '../db';
-import { articles } from '../db/schema';
+import { articles, transcripts } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { AIDatabase } from '../../ai/providers/db';
 import { createLLMProvider } from '../../ai/providers/llm';
@@ -11,6 +12,8 @@ import { createToolContext } from '../ai/tool-context-factory';
 import type { AIProviderConfig } from '../../ai/providers/config';
 import type {
   AICreatePromptPresetInput,
+  AIMindmapGenerateInput,
+  AIMindmapRecord,
   AIPromptPreset,
   AIPromptPresetListQuery,
   AIPromptPresetTarget,
@@ -25,7 +28,7 @@ import type {
   ChatSendInput,
   ChatSession,
 } from '../../shared/types';
-import type { TaskLogRow, ChatSessionRow, PromptPresetRow, CreatePromptPresetInput, UpdatePromptPresetInput } from '../../ai/providers/db';
+import type { TaskLogRow, ChatSessionRow, PromptPresetRow, CreatePromptPresetInput, UpdatePromptPresetInput, MindmapRow } from '../../ai/providers/db';
 
 /** 获取 AI 数据库实例 */
 function getAIDatabase(): AIDatabase {
@@ -73,6 +76,21 @@ function mapChatSessionRow(row: ChatSessionRow): ChatSession {
     title: row.title,
     articleId: row.article_id,
     messages: JSON.parse(row.messages_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMindmapRow(row: MindmapRow): AIMindmapRecord {
+  return {
+    articleId: row.article_id,
+    title: row.title,
+    sourceType: row.source_type as AIMindmapRecord['sourceType'],
+    sourceHash: row.source_hash,
+    promptVersion: row.prompt_version,
+    model: row.model,
+    mindmapMarkdown: row.mindmap_markdown,
+    tokenCount: row.token_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -262,6 +280,53 @@ function mapPromptPresetRow(row: PromptPresetRow): AIPromptPreset {
 
 function ensureBuiltinPromptPresets(aiDb: AIDatabase): void {
   aiDb.upsertBuiltinPromptPresets(DEFAULT_CHAT_PROMPT_PRESETS);
+}
+
+const MINDMAP_PROMPT_VERSION = 'mindmap-v1';
+
+function parseTranscriptText(segmentsJson: string | null | undefined): string {
+  if (!segmentsJson) return '';
+  try {
+    const segments = JSON.parse(segmentsJson) as Array<{ text?: unknown }>;
+    if (!Array.isArray(segments)) return '';
+    return segments
+      .map((segment) => (typeof segment?.text === 'string' ? segment.text.trim() : ''))
+      .filter((text) => text.length > 0)
+      .join('\n');
+  } catch {
+    return '';
+  }
+}
+
+function pickMindmapSource(input: {
+  mediaType: string | null | undefined;
+  contentText: string | null | undefined;
+  content: string | null | undefined;
+  summary: string | null | undefined;
+  transcriptSegments: string | null | undefined;
+}): { sourceType: AIMindmapRecord['sourceType']; sourceText: string } {
+  const transcriptText = parseTranscriptText(input.transcriptSegments);
+  const articleBody = input.contentText || input.content || '';
+  const summary = input.summary || '';
+
+  if ((input.mediaType === 'video' || input.mediaType === 'podcast') && transcriptText) {
+    return { sourceType: 'transcript', sourceText: transcriptText };
+  }
+  if (articleBody) {
+    return { sourceType: 'article', sourceText: articleBody };
+  }
+  if (summary) {
+    return { sourceType: 'summary', sourceText: summary };
+  }
+  if (transcriptText) {
+    return { sourceType: 'transcript', sourceText: transcriptText };
+  }
+
+  return { sourceType: 'article', sourceText: '' };
+}
+
+function hashMindmapSource(sourceText: string): string {
+  return createHash('sha256').update(sourceText).digest('hex');
 }
 
 export function registerAIHandlers() {
@@ -629,6 +694,115 @@ ${transcriptText}`;
     return { tags: result.object.tags, tokenCount };
   });
 
+  // 获取文章思维导图（只保留最新一版）
+  ipcMain.handle(IPC_CHANNELS.AI_MINDMAP_GET, async (_event, articleId: string) => {
+    const aiDb = getAIDatabase();
+    aiDb.initTables();
+    if (!articleId) throw new Error('文章 ID 不能为空');
+    const row = aiDb.getMindmapByArticleId(articleId);
+    return row ? mapMindmapRow(row) : null;
+  });
+
+  // 生成文章思维导图（Markdown for Markmap）
+  ipcMain.handle(IPC_CHANNELS.AI_MINDMAP_GENERATE, async (_event, input: AIMindmapGenerateInput) => {
+    const aiDb = getAIDatabase();
+    aiDb.initTables();
+    const inputJson = JSON.stringify(input);
+
+    try {
+      const config = loadAIConfig(aiDb);
+      if (!config.apiKey) throw new Error('请先配置 AI API Key');
+      if (!input.articleId) throw new Error('文章 ID 不能为空');
+
+      const db = getDatabase();
+      const article = await db.select().from(articles).where(eq(articles.id, input.articleId)).get();
+      if (!article) throw new Error('文章不存在');
+
+      const transcript = await db
+        .select()
+        .from(transcripts)
+        .where(eq(transcripts.articleId, input.articleId))
+        .get();
+
+      const { sourceType, sourceText } = pickMindmapSource({
+        mediaType: article.mediaType,
+        contentText: article.contentText,
+        content: article.content,
+        summary: article.summary,
+        transcriptSegments: transcript?.segments,
+      });
+
+      if (!sourceText.trim()) {
+        throw new Error('正文/转写/摘要均为空，无法生成思维导图');
+      }
+
+      const llm = createLLMProvider(config);
+      const { generateObject } = await import('ai');
+      const { z } = await import('zod');
+
+      const result = await generateObject({
+        model: llm.getModel('smart'),
+        schema: z.object({
+          mindmapMarkdown: z
+            .string()
+            .describe('可直接用于 Markmap 的 Markdown，必须是标题+层级列表'),
+        }),
+        prompt: `你是思维导图助手。请将以下内容整理为适合 Markmap 渲染的 Markdown 思维导图。
+
+要求：
+1. 输出只能是 Markdown，不要解释、不要代码围栏。
+2. 第一行必须是一级标题（# 标题），作为导图中心节点。
+3. 使用二级及以下标题或列表表示层级结构，建议总深度不超过 4 层。
+4. 每个节点用简短短语表达，避免长句（建议 6-18 字）。
+5. 优先按“主题 -> 关键观点 -> 证据/例子 -> 行动建议”组织。
+6. 不要杜撰不存在的信息。
+
+标题：${article.title || '未命名内容'}
+内容类型：${sourceType}
+
+原文：
+${sourceText.slice(0, 24000)}`,
+      });
+
+      const markdown = result.object.mindmapMarkdown.trim();
+      if (!markdown) throw new Error('模型返回空导图');
+
+      const tokenCount = result.usage?.totalTokens ?? 0;
+      const row = aiDb.upsertMindmap({
+        articleId: input.articleId,
+        title: article.title,
+        sourceType,
+        sourceHash: hashMindmapSource(sourceText),
+        promptVersion: MINDMAP_PROMPT_VERSION,
+        model: config.models.smart,
+        mindmapMarkdown: markdown,
+        tokenCount,
+      });
+
+      aiDb.insertTaskLog({
+        taskType: 'mindmap',
+        status: 'completed',
+        inputJson,
+        outputJson: JSON.stringify({ articleId: input.articleId, tokenCount }),
+        tokenCount,
+        costUsd: 0,
+      });
+
+      return mapMindmapRow(row);
+    } catch (error) {
+      aiDb.insertTaskLog({
+        taskType: 'mindmap',
+        status: 'failed',
+        inputJson,
+        outputJson: null,
+        tokenCount: 0,
+        costUsd: 0,
+        errorText: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
+
   // 任务日志查询
   ipcMain.handle(IPC_CHANNELS.AI_TASK_LOGS, async (_event, limit?: number) => {
     const aiDb = getAIDatabase();
@@ -660,7 +834,7 @@ ${transcriptText}`;
         aiDb,
       });
 
-      // 获取文章上下文（如有）
+      // 获取文章上下文（如有），video/podcast 优先使用转写文本
       let articleContext: string | null = null;
       if (input.articleId) {
         const db = getDatabase();
@@ -670,7 +844,20 @@ ${transcriptText}`;
           .where(eq(articles.id, input.articleId))
           .get();
         if (article) {
-          articleContext = article.contentText || article.summary || null;
+          if (article.mediaType === 'video' || article.mediaType === 'podcast') {
+            const transcript = await db
+              .select()
+              .from(transcripts)
+              .where(eq(transcripts.articleId, input.articleId))
+              .get();
+            const transcriptText = parseTranscriptText(transcript?.segments);
+            if (transcriptText) {
+              articleContext = transcriptText;
+            }
+          }
+          if (!articleContext) {
+            articleContext = article.contentText || article.summary || null;
+          }
         }
       }
 

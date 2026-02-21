@@ -74,6 +74,31 @@ export interface UpdatePromptPresetInput {
   isBuiltin?: boolean;
 }
 
+export interface MindmapRow {
+  id: string;
+  article_id: string;
+  title: string | null;
+  source_type: string;
+  source_hash: string;
+  prompt_version: string;
+  model: string;
+  mindmap_markdown: string;
+  token_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpsertMindmapInput {
+  articleId: string;
+  title: string | null;
+  sourceType: string;
+  sourceHash: string;
+  promptVersion: string;
+  model: string;
+  mindmapMarkdown: string;
+  tokenCount: number;
+}
+
 /**
  * AI 模块数据库操作层
  * 负责 ai_settings、ai_task_logs、ai_chat_sessions、ai_prompt_presets 四张表的 CRUD
@@ -89,6 +114,23 @@ export class AIDatabase {
         value_json TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS ai_mindmaps (
+        id TEXT PRIMARY KEY,
+        article_id TEXT NOT NULL,
+        title TEXT,
+        source_type TEXT NOT NULL,
+        source_hash TEXT NOT NULL,
+        prompt_version TEXT NOT NULL,
+        model TEXT NOT NULL,
+        mindmap_markdown TEXT NOT NULL,
+        token_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_mindmaps_article_id ON ai_mindmaps(article_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_mindmaps_source_hash ON ai_mindmaps(source_hash);
 
       CREATE TABLE IF NOT EXISTS ai_task_logs (
         id TEXT PRIMARY KEY,
@@ -161,6 +203,64 @@ export class AIDatabase {
       VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
     `).run(key, JSON.stringify(value), now);
+  }
+
+  /** 获取文章最新思维导图 */
+  getMindmapByArticleId(articleId: string): MindmapRow | null {
+    const row = this.sqlite.prepare(
+      'SELECT * FROM ai_mindmaps WHERE article_id = ? LIMIT 1'
+    ).get(articleId) as MindmapRow | undefined;
+    return row ?? null;
+  }
+
+  /** 按 article_id 覆盖写入思维导图（仅保留最新一版） */
+  upsertMindmap(input: UpsertMindmapInput): MindmapRow {
+    const now = new Date().toISOString();
+    const existing = this.getMindmapByArticleId(input.articleId);
+    const id = existing?.id ?? crypto.randomUUID();
+    const createdAt = existing?.created_at ?? now;
+
+    this.sqlite.prepare(`
+      INSERT INTO ai_mindmaps (
+        id, article_id, title, source_type, source_hash, prompt_version, model, mindmap_markdown, token_count, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(article_id) DO UPDATE SET
+        title = excluded.title,
+        source_type = excluded.source_type,
+        source_hash = excluded.source_hash,
+        prompt_version = excluded.prompt_version,
+        model = excluded.model,
+        mindmap_markdown = excluded.mindmap_markdown,
+        token_count = excluded.token_count,
+        updated_at = excluded.updated_at
+    `).run(
+      id,
+      input.articleId,
+      input.title,
+      input.sourceType,
+      input.sourceHash,
+      input.promptVersion,
+      input.model,
+      input.mindmapMarkdown,
+      input.tokenCount,
+      createdAt,
+      now,
+    );
+
+    return {
+      id,
+      article_id: input.articleId,
+      title: input.title,
+      source_type: input.sourceType,
+      source_hash: input.sourceHash,
+      prompt_version: input.promptVersion,
+      model: input.model,
+      mindmap_markdown: input.mindmapMarkdown,
+      token_count: input.tokenCount,
+      created_at: createdAt,
+      updated_at: now,
+    };
   }
 
   /** 插入任务日志 */

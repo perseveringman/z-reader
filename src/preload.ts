@@ -129,6 +129,8 @@ const electronAPI: ElectronAPI = {
   aiSummarize: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_SUMMARIZE, input),
   aiTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_TRANSLATE, input),
   aiAutoTag: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_AUTO_TAG, input),
+  aiMindmapGenerate: (input) => ipcRenderer.invoke(IPC_CHANNELS.AI_MINDMAP_GENERATE, input),
+  aiMindmapGet: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.AI_MINDMAP_GET, articleId),
   aiTaskLogs: (limit) => ipcRenderer.invoke(IPC_CHANNELS.AI_TASK_LOGS, limit),
 
   // AI Chat 流式通信

@@ -522,6 +522,8 @@
     "aiActions": "AI Actions",
     "extractTopics": "Extract Topics",
     "topics": "Topics",
+    "mindmap": "MindMap",
+    "generateMindmap": "Generate MindMap",
     "debugPanel": "AI Debug Panel",
     "callHistory": "Call History",
     "traceDetails": "Execution Trace",

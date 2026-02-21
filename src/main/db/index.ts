@@ -304,6 +304,23 @@ function initTables(sqlite: Database.Database) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ai_mindmaps (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id),
+      title TEXT,
+      source_type TEXT NOT NULL,
+      source_hash TEXT NOT NULL,
+      prompt_version TEXT NOT NULL,
+      model TEXT NOT NULL,
+      mindmap_markdown TEXT NOT NULL,
+      token_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_mindmaps_article_id ON ai_mindmaps(article_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_mindmaps_source_hash ON ai_mindmaps(source_hash);
+
     CREATE TABLE IF NOT EXISTS ai_task_logs (
       id TEXT PRIMARY KEY,
       task_type TEXT NOT NULL,
