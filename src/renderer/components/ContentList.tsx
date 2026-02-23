@@ -30,10 +30,6 @@ type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all' | 'short
 
 const PAGE_SIZE = 100;
 
-const SORT_OPTIONS: { key: SortBy; label: string }[] = [
-  { key: 'saved_at', label: 'Date saved' },
-  { key: 'published_at', label: 'Date published' },
-];
 
 export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType }: ContentListProps) {
   const { t } = useTranslation();
@@ -192,8 +188,8 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     archive: t('contentList.archiveArticle'),
     later: t('contentList.addToShortlist'),
     inbox: t('contentList.markAsRead'),
-    seen: t('detailPanel.seen') || 'Marked as seen',
-    unseen: t('detailPanel.unseen') || 'Marked as unseen',
+    seen: t('detailPanel.seen'),
+    unseen: t('detailPanel.unseen'),
   };
 
   const handleStatusChange = async (id: string, status: ReadStatusType) => {
@@ -202,13 +198,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       const prevStatus = article?.readStatus ?? 'inbox';
       await window.electronAPI.articleUpdate({ id, readStatus: status });
       await fetchArticles();
-      showToast(STATUS_TOAST[status] ?? `Moved to ${status}`, 'success');
+      showToast(STATUS_TOAST[status] ?? t('contentList.movedToTrash'), 'success');
       undoStack.push({
         description: `Revert to ${prevStatus}`,
         undo: async () => {
           await window.electronAPI.articleUpdate({ id, readStatus: prevStatus });
           await fetchArticles();
-          showToast('Undone', 'info');
+          showToast(t('contentList.undone'), 'info');
         },
       });
     } catch (err) {
@@ -222,7 +218,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       const current = article?.isShortlisted === 1;
       await window.electronAPI.articleUpdate({ id, isShortlisted: !current });
       await fetchArticles();
-      showToast(current ? 'Removed from Shortlist' : 'Added to Shortlist', 'success');
+      showToast(current ? t('contentList.removedFromShortlist') : t('contentList.addedToShortlist'), 'success');
     } catch (err) {
       console.error('Failed to toggle shortlist:', err);
     }
@@ -232,7 +228,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articleSaveToLibrary(id);
       await fetchArticles(); // Article disappears from feed view
-      showToast('Saved to Library', 'success');
+      showToast(t('contentList.savedToLibrary'), 'success');
     } catch (err) {
       console.error('Failed to save to library:', err);
     }
@@ -250,13 +246,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleDelete(id);
       await fetchArticles();
       if (nextId) onSelectArticle(nextId);
-      showToast('Moved to Trash', 'success');
+      showToast(t('contentList.movedToTrash'), 'success');
       undoStack.push({
         description: 'Undo delete',
         undo: async () => {
           await window.electronAPI.articleRestore(id);
           await fetchArticles();
-          showToast('Restored', 'info');
+          showToast(t('contentList.restored'), 'info');
         },
       });
     } catch (err) {
@@ -268,7 +264,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articleRestore(id);
       await fetchArticles();
-      showToast('Restored', 'success');
+      showToast(t('contentList.restored'), 'success');
     } catch (err) {
       console.error('Failed to restore article:', err);
     }
@@ -278,7 +274,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     try {
       await window.electronAPI.articlePermanentDelete(id);
       await fetchArticles();
-      showToast('Permanently deleted', 'success');
+      showToast(t('contentList.permanentlyDeleted'), 'success');
     } catch (err) {
       console.error('Failed to permanently delete article:', err);
     }
@@ -357,7 +353,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchUpdate(Array.from(selectedIds), { readStatus: 'archive' });
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`Archived ${selectedIds.size} articles`, 'success');
+      showToast(t('contentList.archivedCount', { count: selectedIds.size }), 'success');
     } catch (err) {
       console.error('Batch archive failed:', err);
     }
@@ -369,7 +365,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchUpdate(Array.from(selectedIds), { readStatus: 'later' });
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`Saved ${selectedIds.size} for later`, 'success');
+      showToast(t('contentList.savedForLaterCount', { count: selectedIds.size }), 'success');
     } catch (err) {
       console.error('Batch later failed:', err);
     }
@@ -382,7 +378,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
       await window.electronAPI.articleBatchDelete(ids);
       setSelectedIds(new Set());
       await fetchArticles();
-      showToast(`Deleted ${ids.length} articles`, 'success');
+      showToast(t('contentList.deletedCount', { count: ids.length }), 'success');
       undoStack.push({
         description: `Undo batch delete ${ids.length}`,
         undo: async () => {
@@ -390,7 +386,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             await window.electronAPI.articleRestore(id);
           }
           await fetchArticles();
-          showToast('Restored', 'info');
+          showToast(t('contentList.restored'), 'info');
         },
       });
     } catch (err) {
@@ -415,21 +411,21 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
     if (isTrash) {
       return [
-        { label: 'Restore', icon: Inbox, onClick: () => handleRestore(article.id) },
+        { label: t('contentList.restore'), icon: Inbox, onClick: () => handleRestore(article.id) },
         { separator: true },
-        { label: 'Delete permanently', icon: Trash2, onClick: () => handlePermanentDelete(article.id), danger: true },
+        { label: t('contentList.deletePermanently'), icon: Trash2, onClick: () => handlePermanentDelete(article.id), danger: true },
       ];
     }
 
     const items: ContextMenuEntry[] = [
-      { label: 'Open in Reader', icon: BookOpen, onClick: () => onOpenReader(article.id) },
+      { label: t('contentList.openInReader'), icon: BookOpen, onClick: () => onOpenReader(article.id) },
       { separator: true },
     ];
 
     // "Save to Library" for feed articles
     if (isFeedView || article.source === 'feed') {
       items.push({
-        label: 'Save to Library',
+        label: t('contentList.saveToLibrary'),
         icon: BookmarkPlus,
         onClick: () => handleSaveToLibrary(article.id),
       });
@@ -439,31 +435,31 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     // Library status actions
     if (isLibraryView || article.source === 'library') {
       if (article.readStatus !== 'inbox') {
-        items.push({ label: 'Move to Inbox', icon: Inbox, onClick: () => handleStatusChange(article.id, 'inbox') });
+        items.push({ label: t('contentList.moveToInbox'), icon: Inbox, onClick: () => handleStatusChange(article.id, 'inbox') });
       }
       if (article.readStatus !== 'later') {
-        items.push({ label: 'Read later', icon: Clock, onClick: () => handleStatusChange(article.id, 'later') });
+        items.push({ label: t('contentList.readLater'), icon: Clock, onClick: () => handleStatusChange(article.id, 'later') });
       }
       if (article.readStatus !== 'archive') {
-        items.push({ label: 'Archive', icon: Archive, onClick: () => handleStatusChange(article.id, 'archive') });
+        items.push({ label: t('contentList.archive'), icon: Archive, onClick: () => handleStatusChange(article.id, 'archive') });
       }
     }
 
     const isShortlistedNow = article.isShortlisted === 1;
     items.push({
-      label: isShortlistedNow ? 'Remove from Shortlist' : 'Add to Shortlist',
+      label: isShortlistedNow ? t('contentList.removeFromShortlist') : t('contentList.addToShortlist'),
       icon: Star,
       onClick: () => handleToggleShortlist(article.id),
     });
 
     items.push({ separator: true });
-    items.push({ label: 'Delete', icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
+    items.push({ label: t('contentList.deleteArticle'), icon: Trash2, onClick: () => handleDelete(article.id), danger: true });
 
     if (article.url) {
       const browserUrl = article.url;
       items.push({ separator: true });
       items.push({
-        label: 'Open in browser',
+        label: t('contentList.openInBrowser'),
         icon: ExternalLink,
         onClick: () => void window.electronAPI.externalOpenUrl(browserUrl),
       });
@@ -476,7 +472,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     setSortBy((prev) => (prev === 'saved_at' ? 'published_at' : 'saved_at'));
   };
 
-  const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sortBy)?.label ?? '';
+  const currentSortLabel = sortBy === 'saved_at' ? t('contentList.sortByDateSaved') : t('contentList.sortByDatePublished');
   const listRef = useRef<HTMLDivElement>(null);
 
   // 滚动到底部时加载更多
@@ -494,12 +490,12 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
 
   // Title
   const getTitle = () => {
-    if (isTrash) return 'Trash';
-    if (isShortlisted) return 'Shortlist';
-    if (tagId) return 'Tag';
-    if (isLibraryView) return 'Library';
-    if (isFeedView) return 'Feed';
-    return 'Articles';
+    if (isTrash) return t('contentList.trash');
+    if (isShortlisted) return t('contentList.shortlist');
+    if (tagId) return t('contentList.tag');
+    if (isLibraryView) return t('contentList.library');
+    if (isFeedView) return t('contentList.feed');
+    return t('sidebar.articles');
   };
 
   // Empty state message
@@ -677,21 +673,21 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
             <button
               onClick={cycleSortBy}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-[#666] hover:text-[#999] hover:bg-white/5 transition-colors cursor-pointer"
-              title={`Sort by: ${currentSortLabel}`}
+              title={currentSortLabel}
             >
               <span>{currentSortLabel}</span>
             </button>
             <button
               onClick={toggleSortOrder}
               className="p-1 rounded text-[#666] hover:text-[#999] hover:bg-white/5 transition-colors cursor-pointer"
-              title={sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+              title={sortOrder === 'desc' ? t('contentList.newestFirst') : t('contentList.oldestFirst')}
             >
               {sortOrder === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
             </button>
             <button
               onClick={toggleViewMode}
               className="p-1 rounded text-[#666] hover:text-[#999] hover:bg-white/5 transition-colors cursor-pointer"
-              title={viewMode === 'default' ? 'Compact view' : 'Default view'}
+              title={viewMode === 'default' ? t('contentList.compactView') : t('contentList.defaultView')}
             >
               {viewMode === 'default' ? <List size={12} /> : <LayoutGrid size={12} />}
             </button>
@@ -726,13 +722,13 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-4 py-2 bg-blue-500/10 border-b border-blue-500/20">
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-blue-400 font-medium">
-                {selectedIds.size} selected
+                {t('contentList.nSelected', { count: selectedIds.size })}
               </span>
               <button
                 onClick={handleSelectAll}
                 className="text-[11px] text-blue-400/70 hover:text-blue-400 transition-colors cursor-pointer"
               >
-                Select all
+                {t('contentList.selectAll')}
               </button>
             </div>
             <div className="flex items-center gap-1">
@@ -741,14 +737,14 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
                   <button
                     onClick={handleBatchArchive}
                     className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                    title="Archive"
+                    title={t('contentList.archive')}
                   >
                     <Archive size={14} />
                   </button>
                   <button
                     onClick={handleBatchLater}
                     className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                    title="Read later"
+                    title={t('contentList.readLater')}
                   >
                     <Clock size={14} />
                   </button>
@@ -757,14 +753,14 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
               <button
                 onClick={handleBatchDelete}
                 className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
-                title="Delete"
+                title={t('contentList.deleteArticle')}
               >
                 <Trash2 size={14} />
               </button>
               <button
                 onClick={handleClearSelection}
                 className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                title="Clear selection"
+                title={t('contentList.clearSelection')}
               >
                 <X size={14} />
               </button>
@@ -773,7 +769,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         )}
         {loading && articles.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <span className="text-[13px] text-[#555]">Loading...</span>
+            <span className="text-[13px] text-[#555]">{t('common.loading')}</span>
           </div>
         ) : articles.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -807,15 +803,17 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
         )}
         {loadingMore && (
           <div className="flex items-center justify-center py-3">
-            <span className="text-[12px] text-[#555]">加载更多...</span>
+            <span className="text-[12px] text-[#555]">{t('contentList.loadingMore')}</span>
           </div>
         )}
       </div>
 
       <div className="shrink-0 px-4 py-1.5 border-t border-[#262626] text-[11px] text-[#555]">
-        {articles.length} {articles.length === 1
-          ? (mediaType === 'video' ? 'video' : mediaType === 'podcast' ? 'podcast' : 'article')
-          : (mediaType === 'video' ? 'videos' : mediaType === 'podcast' ? 'podcasts' : 'articles')}
+        {mediaType === 'video'
+          ? t('contentList.videoCount', { count: articles.length })
+          : mediaType === 'podcast'
+          ? t('contentList.podcastCount', { count: articles.length })
+          : t('contentList.articleCount', { count: articles.length })}
       </div>
 
       {/* 右键上下文菜单 */}
