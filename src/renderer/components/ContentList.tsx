@@ -667,7 +667,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   }, [selectedArticleId]);
 
   return (
-    <div className={`flex flex-col min-w-[300px] border-r border-[#262626] bg-[#141414] h-full flex-1`}>
+    <div className={`flex flex-col min-w-0 border-r border-[#262626] bg-[#141414] h-full flex-1`}>
       <div className="shrink-0">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold text-white tracking-wide">
