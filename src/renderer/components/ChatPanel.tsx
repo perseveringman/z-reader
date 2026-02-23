@@ -197,7 +197,7 @@ function PromptPills({
   disabled: boolean;
 }) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+    <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
       {presets.map((preset) => (
         <button
           key={preset.id}

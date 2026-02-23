@@ -16,6 +16,7 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/*.node',
     },
+    icon: path.resolve(__dirname, 'assets/icons/icon'),
   },
   rebuildConfig: {},
   makers: [
