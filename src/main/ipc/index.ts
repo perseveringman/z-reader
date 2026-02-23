@@ -18,6 +18,7 @@ import { registerAppTaskHandlers } from './app-task-handlers';
 import { registerNotificationHandlers } from './notification-handlers';
 import { registerExternalHandlers } from './external-handlers';
 import { registerSyncHandlers } from './sync-handlers';
+import { registerWechatHandlers } from './wechat-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -40,4 +41,5 @@ export function registerAllIpcHandlers() {
   registerNotificationHandlers();
   registerExternalHandlers();
   registerSyncHandlers();
+  registerWechatHandlers();
 }

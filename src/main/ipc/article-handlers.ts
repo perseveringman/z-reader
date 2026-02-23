@@ -94,6 +94,9 @@ export function registerArticleHandlers() {
     if (query.mediaType) {
       conditions.push(eq(schema.articles.mediaType, query.mediaType));
     }
+    if (query.feedType) {
+      conditions.push(eq(schema.feeds.feedType, query.feedType));
+    }
 
     const sortField = query.sortBy === 'published_at' ? schema.articles.publishedAt : schema.articles.savedAt;
     const sortFn = query.sortOrder === 'asc' ? asc : desc;

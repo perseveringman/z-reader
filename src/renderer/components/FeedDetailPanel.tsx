@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Feed, FeedArticleCount, Article } from '../../shared/types';
 import { useResizablePanel } from '../hooks/useResizablePanel';
+import { WechatOperationPanel } from './WechatOperationPanel';
 
 interface FeedDetailPanelProps {
   feedId: string | null;
@@ -273,6 +274,17 @@ export function FeedDetailPanel({
           Unsubscribe
         </button>
       </div>
+
+      {/* Wechat Operation Panel - 仅微信类型 Feed 显示 */}
+      {feed.wechatBiz && (
+        <div className="px-5 py-4 border-b border-[#1e1e1e]">
+          <WechatOperationPanel
+            feedId={feed.id}
+            feedTitle={feed.title || feed.url}
+            onRefresh={loadFeedData}
+          />
+        </div>
+      )}
 
       {/* Recent Articles */}
       <div className="px-5 py-4">

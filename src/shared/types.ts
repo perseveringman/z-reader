@@ -13,6 +13,10 @@ export interface Feed {
   feedType: string;
   createdAt: string;
   updatedAt: string;
+  // 微信公众号特有字段
+  wechatBiz?: string | null;
+  wechatTokenUrl?: string | null;
+  wechatTokenExpiry?: string | null;
 }
 
 export interface FeedArticleCount {
@@ -25,6 +29,8 @@ export interface CreateFeedInput {
   url: string;
   title?: string;
   category?: string;
+  feedType?: string;
+  wechatBiz?: string;
 }
 
 export interface UpdateFeedInput {
@@ -95,6 +101,7 @@ export interface ArticleListQuery {
   limit?: number;
   offset?: number;
   mediaType?: MediaType;
+  feedType?: string;
 }
 
 export interface ArticleSearchQuery {
@@ -826,6 +833,18 @@ export interface ElectronAPI {
   syncDisable: () => Promise<void>;
   syncNow: () => Promise<{ pushed: number }>;
   syncGetDevices: () => Promise<SyncDevice[]>;
+
+  // WeChat (微信公众号)
+  wechatParseArticleUrl: (url: string) => Promise<WechatParseResult>;
+  wechatSetToken: (feedId: string, tokenUrl: string) => Promise<WechatTokenStatus>;
+  wechatGetTokenStatus: (feedId: string) => Promise<WechatTokenStatus>;
+  wechatFetchArticleList: (input: WechatFetchListInput) => Promise<void>;
+  wechatDownloadContent: (input: WechatDownloadContentInput) => Promise<void>;
+  wechatFetchStats: (input: WechatFetchStatsInput) => Promise<void>;
+  wechatGetStats: (articleId: string) => Promise<WechatStats | null>;
+  wechatGetComments: (articleId: string) => Promise<WechatComment[]>;
+  wechatCancelTask: (feedId: string) => Promise<void>;
+  wechatOnProgress: (callback: (event: WechatProgressEvent) => void) => () => void;
 }
 
 // ── Sync ──
@@ -842,4 +861,74 @@ export interface SyncDevice {
   name: string;
   platform: string;
   lastSeen?: string;
+}
+
+// ==================== 微信公众号相关类型 ====================
+
+export interface WechatTokenParams {
+  biz: string;
+  uin: string;
+  key: string;
+  passTicket: string;
+}
+
+export interface WechatTokenStatus {
+  hasToken: boolean;
+  biz: string | null;
+  expiry: string | null;
+  isExpired: boolean;
+}
+
+export interface WechatParseResult {
+  nickname: string;
+  biz: string;
+  homeUrl: string;
+  articleTitle: string;
+}
+
+export interface WechatFetchListInput {
+  feedId: string;
+  pagesStart: number;
+  pagesEnd: number;
+}
+
+export interface WechatDownloadContentInput {
+  feedId: string;
+  articleIds?: string[]; // 指定文章，不传则下载所有未下载的
+}
+
+export interface WechatFetchStatsInput {
+  feedId: string;
+  articleIds?: string[]; // 指定文章，不传则获取所有未获取的
+}
+
+export interface WechatStats {
+  id: string;
+  articleId: string;
+  readCount: number | null;
+  likeCount: number | null;
+  shareCount: number | null;
+  wowCount: number | null;
+  fetchedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WechatComment {
+  id: string;
+  articleId: string;
+  content: string | null;
+  likeCount: number | null;
+  nickname: string | null;
+  createdAt: string;
+}
+
+export interface WechatProgressEvent {
+  feedId: string;
+  taskType: 'fetch-list' | 'download-content' | 'fetch-stats';
+  current: number;
+  total: number;
+  currentTitle: string;
+  status: 'running' | 'pausing' | 'completed' | 'error' | 'cancelled';
+  error?: string;
 }

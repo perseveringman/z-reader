@@ -24,6 +24,7 @@ interface ContentListProps {
   source?: ArticleSource;
   initialTab?: string;
   mediaType?: MediaType;
+  feedType?: string;
 }
 
 type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all' | 'shortRead' | 'longRead';
@@ -35,7 +36,7 @@ const SORT_OPTIONS: { key: SortBy; label: string }[] = [
   { key: 'published_at', label: 'Date published' },
 ];
 
-export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType }: ContentListProps) {
+export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType, feedType }: ContentListProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     if (initialTab) return initialTab as TabKey;
@@ -131,9 +132,10 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     }
 
     if (isShortlisted) query.isShortlisted = true;
+    if (feedType) query.feedType = feedType;
 
     return query;
-  }, [sortBy, sortOrder, source, isShortlisted, mediaType, activeTab, isFeedView, isLibraryView, feedId]);
+  }, [sortBy, sortOrder, source, isShortlisted, mediaType, activeTab, isFeedView, isLibraryView, feedId, feedType]);
 
   const applyReadingFilter = useCallback((list: Article[]) => {
     if (activeTab === 'shortRead') return list.filter((a) => a.readingTime != null && a.readingTime <= readingThreshold);
@@ -497,6 +499,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     if (isTrash) return 'Trash';
     if (isShortlisted) return 'Shortlist';
     if (tagId) return 'Tag';
+    if (feedType === 'wechat') return '\u5fae\u4fe1\u516c\u4f17\u53f7';
     if (isLibraryView) return 'Library';
     if (isFeedView) return 'Feed';
     return 'Articles';
@@ -506,6 +509,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const getEmptyMessage = () => {
     if (isTrash) return t('contentList.emptyTrash');
     if (isShortlisted) return t('contentList.emptyShortlist');
+    if (feedType === 'wechat') return '\u8fd8\u6ca1\u6709\u5fae\u4fe1\u6587\u7ae0\uff0c\u8bf7\u5148\u6dfb\u52a0\u516c\u4f17\u53f7\u5e76\u62c9\u53d6\u6587\u7ae0\u5217\u8868';
     if (isFeedView) return activeTab === 'unseen' ? t('contentList.noArticles') : t('contentList.noArticles');
     if (activeView === 'tags' && !tagId) return t('contentList.emptyTag');
     if (activeView === 'tags' && tagId) return t('contentList.emptyTag');

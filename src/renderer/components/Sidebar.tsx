@@ -28,6 +28,7 @@ import {
   Compass,
   CheckSquare,
   Bell,
+  MessageSquare,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -321,9 +322,22 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
                 onFeedSelect(null);
               }}
             />
+            <NavItem
+              icon={<MessageSquare size={iconSize} className="text-green-500" />}
+              label="微信公众号"
+              active={activeView === 'wechat'}
+              collapsed={collapsed}
+              onClick={() => {
+                onViewChange('wechat');
+                onFeedSelect(null);
+              }}
+            />
             {/* Pinned feeds */}
             {!collapsed && Object.values(feedCategories).flat().filter(f => f.pinned).map((feed) => {
-              const displayIcon = feed.favicon ? (
+              const isWechat = !!feed.wechatBiz;
+              const displayIcon = isWechat ? (
+                <MessageSquare size={14} className="text-green-500" />
+              ) : feed.favicon ? (
                 <img src={feed.favicon} alt="" className="w-4 h-4 rounded" />
               ) : (
                 <div className="w-4 h-4 rounded bg-gray-700 flex items-center justify-center text-[10px] text-gray-400">

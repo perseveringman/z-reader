@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -212,6 +212,22 @@ const electronAPI: ElectronAPI = {
   syncDisable: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_DISABLE),
   syncNow: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_NOW),
   syncGetDevices: () => ipcRenderer.invoke(IPC_CHANNELS.SYNC_GET_DEVICES),
+
+  // WeChat (微信公众号)
+  wechatParseArticleUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_PARSE_ARTICLE_URL, url),
+  wechatSetToken: (feedId, tokenUrl) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_SET_TOKEN, feedId, tokenUrl),
+  wechatGetTokenStatus: (feedId) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_GET_TOKEN_STATUS, feedId),
+  wechatFetchArticleList: (input) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_FETCH_ARTICLE_LIST, input),
+  wechatDownloadContent: (input) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_DOWNLOAD_CONTENT, input),
+  wechatFetchStats: (input) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_FETCH_STATS, input),
+  wechatGetStats: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_GET_STATS, articleId),
+  wechatGetComments: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_GET_COMMENTS, articleId),
+  wechatCancelTask: (feedId) => ipcRenderer.invoke(IPC_CHANNELS.WECHAT_CANCEL_TASK, feedId),
+  wechatOnProgress: (callback: (event: WechatProgressEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, data: WechatProgressEvent) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.WECHAT_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.WECHAT_PROGRESS, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
