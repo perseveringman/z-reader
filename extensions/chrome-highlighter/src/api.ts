@@ -17,6 +17,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function openApp(): Promise<void> {
+  await request<unknown>('/open');
+}
+
 export async function checkConnection(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL}/status`, { method: 'GET' });

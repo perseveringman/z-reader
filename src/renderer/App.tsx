@@ -295,7 +295,7 @@ function AppContent() {
         {/* macOS title bar drag region */}
         <div className="h-[38px] shrink-0 drag-region flex items-center" />
         {!readerMode && !bookReaderMode ? (
-          <div className="flex flex-1 min-h-0">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             <Sidebar
               collapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}

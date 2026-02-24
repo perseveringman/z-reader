@@ -285,19 +285,19 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
   const effectiveDuration = article?.audioDuration || article?.duration;
   const readingTimeValue = (isVideo || isPodcast) && effectiveDuration
     ? formatDuration(effectiveDuration)
-    : article?.readingTime ? `${article.readingTime} min` : null;
+    : article?.readingTime ? `${article.readingTime} ${t('detailPanel.minutes')}` : null;
 
   const metaRows: MetaRow[] = article
     ? [
-        { label: 'Published', value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
-        ...(!isVideo ? [{ label: 'Author', value: article.author, icon: <User className="w-3.5 h-3.5" /> }] : []),
-        { label: 'Domain', value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
-        { label: isVideo || isPodcast ? 'Duration' : 'Reading Time', value: readingTimeValue, icon: <Clock className="w-3.5 h-3.5" /> },
+        { label: t('detailPanel.publishedAt'), value: formatDate(article.publishedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
+        ...(!isVideo ? [{ label: t('detailPanel.author'), value: article.author, icon: <User className="w-3.5 h-3.5" /> }] : []),
+        { label: t('detailPanel.domain'), value: article.domain, icon: <Globe className="w-3.5 h-3.5" /> },
+        { label: isVideo || isPodcast ? t('detailPanel.duration') : t('detailPanel.readingTime'), value: readingTimeValue, icon: <Clock className="w-3.5 h-3.5" /> },
         ...(isVideo
-          ? [{ label: 'Progress', value: `${Math.round(article.readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> }]
+          ? [{ label: t('books.progress'), value: `${Math.round(article.readProgress * 100)}%`, icon: <FileText className="w-3.5 h-3.5" /> }]
           : []),
-        ...(!isVideo && !isPodcast ? [{ label: 'Word Count', value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> }] : []),
-        { label: 'Saved', value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
+        ...(!isVideo && !isPodcast ? [{ label: t('detailPanel.wordCount'), value: article.wordCount?.toLocaleString() ?? null, icon: <FileText className="w-3.5 h-3.5" /> }] : []),
+        { label: t('detailPanel.savedAt'), value: formatDate(article.savedAt), icon: <Calendar className="w-3.5 h-3.5" /> },
       ]
     : [];
 
@@ -370,7 +370,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                 <div className="flex-1">
                   {/* SUMMARY */}
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
-                    Summary
+                    {t('detailPanel.summary')}
                   </h3>
                   <p className="text-[13px] leading-[1.6] text-gray-400">
                     {article.summary || t('detailPanel.noHighlights')}
@@ -398,7 +398,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                   <div className="mt-6">
                     <div className="flex items-center gap-2 mb-2">
                       <Tag className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tags</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{t('detailPanel.tags')}</span>
                     </div>
                     <TagPicker articleId={article.id} />
                   </div>
