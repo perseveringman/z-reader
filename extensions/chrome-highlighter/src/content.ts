@@ -76,9 +76,14 @@ document.addEventListener('mouseup', () => {
 async function ensureArticleSaved(): Promise<boolean> {
   if (currentArticleId) return true;
   try {
+    // 高亮时直接保存网页内容，避免刷新后高亮丢失
+    const content = document.documentElement.outerHTML;
+    const contentText = document.body.innerText;
     const article = await saveArticle({
       url: window.location.href,
       title: document.title,
+      content,
+      contentText,
     });
     currentArticleId = article.id;
     return true;
@@ -291,6 +296,11 @@ chrome.runtime.onMessage.addListener((message) => {
   // 处理右键菜单触发的笔记高亮
   if (message.type === 'HIGHLIGHT_WITH_NOTE') {
     handleHighlightWithNote();
+  }
+
+  // 处理右键菜单触发的保存（带网页内容）
+  if (message.type === 'SAVE_ARTICLE_WITH_CONTENT') {
+    handleSaveArticle();
   }
 
   // 显示 Toast 通知

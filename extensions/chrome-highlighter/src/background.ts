@@ -71,29 +71,9 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.id || !tab.url) return;
 
-  // 保存页面到 Z-Reader
+  // 保存页面到 Z-Reader（通过 content script 获取页面内容）
   if (info.menuItemId === 'save-to-zreader') {
-    try {
-      const article = await saveArticle({
-        url: tab.url,
-        title: tab.title,
-      });
-      chrome.tabs.sendMessage(tab.id, {
-        type: 'ARTICLE_SAVED',
-        payload: article,
-      });
-      // 显示成功通知
-      chrome.tabs.sendMessage(tab.id, {
-        type: 'SHOW_TOAST',
-        payload: { message: '文章已保存到 Z-Reader', type: 'success' },
-      });
-    } catch (error) {
-      console.error('保存文章失败:', error);
-      chrome.tabs.sendMessage(tab.id, {
-        type: 'SHOW_TOAST',
-        payload: { message: '保存文章失败', type: 'error' },
-      });
-    }
+    chrome.tabs.sendMessage(tab.id, { type: 'SAVE_ARTICLE_WITH_CONTENT' });
   }
 
   // 颜色高亮

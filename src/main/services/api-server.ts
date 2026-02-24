@@ -88,6 +88,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return await handleCreateArticle(req, res);
     }
 
+    if (method === 'GET' && pathname === '/api/highlights') {
+      return await handleGetHighlightsByUrl(url, res);
+    }
+
     if (method === 'POST' && pathname === '/api/highlights') {
       return await handleCreateHighlight(req, res);
     }
