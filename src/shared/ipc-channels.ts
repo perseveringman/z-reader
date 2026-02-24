@@ -168,4 +168,16 @@ export const IPC_CHANNELS = {
   SYNC_DISABLE: 'sync:disable',
   SYNC_NOW: 'sync:now',
   SYNC_GET_DEVICES: 'sync:getDevices',
+
+  // WeChat (微信公众号)
+  WECHAT_PARSE_ARTICLE_URL: 'wechat:parseArticleUrl',
+  WECHAT_SET_TOKEN: 'wechat:setToken',
+  WECHAT_GET_TOKEN_STATUS: 'wechat:getTokenStatus',
+  WECHAT_FETCH_ARTICLE_LIST: 'wechat:fetchArticleList',
+  WECHAT_DOWNLOAD_CONTENT: 'wechat:downloadContent',
+  WECHAT_FETCH_STATS: 'wechat:fetchStats',
+  WECHAT_GET_STATS: 'wechat:getStats',
+  WECHAT_GET_COMMENTS: 'wechat:getComments',
+  WECHAT_CANCEL_TASK: 'wechat:cancelTask',
+  WECHAT_PROGRESS: 'wechat:progress',
 } as const;

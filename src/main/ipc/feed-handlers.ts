@@ -56,6 +56,8 @@ export function registerFeedHandlers() {
       feedUrl = resolved.feedUrl;
       feedType = 'podcast';
       if (!resolvedTitle && resolved.title) resolvedTitle = resolved.title;
+    } else if (input.feedType === 'wechat') {
+      feedType = 'wechat';
     }
 
     const values = {
@@ -64,14 +66,17 @@ export function registerFeedHandlers() {
       title: resolvedTitle,
       category: input.category ?? null,
       feedType,
+      wechatBiz: input.wechatBiz ?? null,
       createdAt: now,
       updatedAt: now,
     };
     await db.insert(schema.feeds).values(values);
     getGlobalTracker()?.trackChange({ table: 'feeds', recordId: id, operation: 'insert', changedFields: values });
 
-    // 等待 fetchFeed 完成，确保 RSS 解析的 title 已写入数据库
-    await fetchFeed(id).catch(console.error);
+    // 等待 fetchFeed 完成，确保 RSS 解析的 title 已写入数据库（微信类型跳过）
+    if (feedType !== 'wechat') {
+      await fetchFeed(id).catch(console.error);
+    }
 
     const result = await db.select().from(schema.feeds).where(eq(schema.feeds.id, id));
     return result[0];

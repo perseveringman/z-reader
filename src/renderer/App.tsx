@@ -57,7 +57,7 @@ function AppContent() {
   // Derive source and sub-view from activeView
   const contentSource: ArticleSource | undefined =
     activeView.startsWith('library-') ? 'library'
-    : activeView.startsWith('feed-') || activeView === 'feeds' ? 'feed'
+    : activeView.startsWith('feed-') || activeView === 'feeds' || activeView === 'wechat' ? 'feed'
     : undefined;
 
   const initialTab =
@@ -315,7 +315,7 @@ function AppContent() {
               selectedFeedId={selectedFeedId}
               onFeedSelect={(feedId) => {
                 setSelectedFeedId(feedId);
-                setActiveView('feeds');
+                if (feedId) setActiveView('feeds');
               }}
               refreshTrigger={refreshTrigger}
               selectedTagId={selectedTagId}
@@ -394,6 +394,7 @@ function AppContent() {
                   source={contentSource}
                   initialTab={initialTab}
                   mediaType={contentMediaType}
+                  feedType={activeView === 'wechat' ? 'wechat' : undefined}
                 />
                 <DetailPanel articleId={selectedArticleId} collapsed={detailPanelCollapsed} />
               </>

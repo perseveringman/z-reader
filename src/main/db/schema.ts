@@ -18,6 +18,9 @@ export const feeds = sqliteTable('feeds', {
   deletedFlg: integer('deleted_flg').default(0),
   pinned: integer('pinned').default(0),
   feedType: text('feed_type').default('rss'),
+  wechatBiz: text('wechat_biz'),
+  wechatTokenUrl: text('wechat_token_url'),
+  wechatTokenExpiry: text('wechat_token_expiry'),
 });
 
 // ==================== articles 表 ====================
@@ -213,6 +216,31 @@ export const notifications = sqliteTable('notifications', {
   body: text('body'),
   articleId: text('article_id'),
   read: integer('read').default(0),
+  createdAt: text('created_at').notNull(),
+});
+
+// ==================== 微信公众号相关表 ====================
+
+/** 微信文章行为数据 */
+export const wechatStats = sqliteTable('wechat_stats', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').references(() => articles.id),
+  readCount: integer('read_count'),
+  likeCount: integer('like_count'),
+  shareCount: integer('share_count'),
+  wowCount: integer('wow_count'),
+  fetchedAt: text('fetched_at'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+/** 微信文章评论 */
+export const wechatComments = sqliteTable('wechat_comments', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').references(() => articles.id),
+  content: text('content'),
+  likeCount: integer('like_count'),
+  nickname: text('nickname'),
   createdAt: text('created_at').notNull(),
 });
 

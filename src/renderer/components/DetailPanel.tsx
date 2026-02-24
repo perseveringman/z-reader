@@ -6,6 +6,7 @@ import { TagPicker } from './TagPicker';
 import { ChatPanel } from './ChatPanel';
 import { MindMapPanel } from './MindMapPanel';
 import { useResizablePanel } from '../hooks/useResizablePanel';
+import { WechatStatsSection } from './WechatStatsSection';
 
 type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat';
 
@@ -401,6 +402,13 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
                     </div>
                     <TagPicker articleId={article.id} />
                   </div>
+
+                  {/* 微信行为数据 */}
+                  {article.url && article.url.includes('mp.weixin.qq.com') && (
+                    <div className="mt-6">
+                      <WechatStatsSection articleId={article.id} />
+                    </div>
+                  )}
 
                   {/* AI 操作区域 */}
                   <div className="mt-6">

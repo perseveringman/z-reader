@@ -398,6 +398,46 @@ function initTables(sqlite: Database.Database) {
   `);
 
 
+  // Migration: feeds 表新增微信公众号相关字段
+  try {
+    sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_biz TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_token_url TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_token_expiry TEXT`);
+  } catch { /* Column already exists */ }
+
+  // Migration: wechat_stats 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS wechat_stats (
+      id TEXT PRIMARY KEY,
+      article_id TEXT REFERENCES articles(id),
+      read_count INTEGER,
+      like_count INTEGER,
+      share_count INTEGER,
+      wow_count INTEGER,
+      fetched_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wechat_stats_article_id ON wechat_stats(article_id);
+  `);
+
+  // Migration: wechat_comments 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS wechat_comments (
+      id TEXT PRIMARY KEY,
+      article_id TEXT REFERENCES articles(id),
+      content TEXT,
+      like_count INTEGER,
+      nickname TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wechat_comments_article_id ON wechat_comments(article_id);
+  `);
+
   // Migration: sync 同步表
   initSyncTables(sqlite);
 }

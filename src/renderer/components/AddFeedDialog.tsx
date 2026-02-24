@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2, Plus, FileUp, Rss, Podcast, Mail, Copy, Check } from 'lucide-react';
+import { X, Loader2, Plus, FileUp, Rss, Podcast, Mail, Copy, Check, MessageSquare } from 'lucide-react';
 import { useToast } from './Toast';
 import { PodcastSearchPanel } from './PodcastSearchPanel';
 
-type DialogTab = 'rss' | 'podcast' | 'newsletter';
+type DialogTab = 'rss' | 'podcast' | 'newsletter' | 'wechat';
 
 interface AddFeedDialogProps {
   open: boolean;
@@ -22,6 +22,17 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
   const inputRef = useRef<HTMLInputElement>(null);
   const newsletterInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
+  // 微信状态
+  const [wechatUrl, setWechatUrl] = useState('');
+  const [wechatParsed, setWechatParsed] = useState<{
+    nickname: string;
+    biz: string;
+    homeUrl: string;
+    articleTitle: string;
+  } | null>(null);
+  const [wechatCategory, setWechatCategory] = useState('');
+  const wechatInputRef = useRef<HTMLInputElement>(null);
 
   // Newsletter 状态
   const [newsletterName, setNewsletterName] = useState('');
@@ -42,11 +53,16 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
       setNewsletterCategory('');
       setNewsletterResult(null);
       setCopied(false);
+      setWechatUrl('');
+      setWechatParsed(null);
+      setWechatCategory('');
       // 聚焦输入框
       if (activeTab === 'rss') {
         setTimeout(() => inputRef.current?.focus(), 100);
       } else if (activeTab === 'newsletter') {
         setTimeout(() => newsletterInputRef.current?.focus(), 100);
+      } else if (activeTab === 'wechat') {
+        setTimeout(() => wechatInputRef.current?.focus(), 100);
       }
     }
   }, [open, activeTab]);
@@ -134,6 +150,49 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
     }
   };
 
+  // 微信：解析 URL
+  const handleWechatParse = async () => {
+    if (!wechatUrl.trim()) return;
+    setLoading(true);
+    setWechatParsed(null);
+    try {
+      const result = await window.electronAPI.wechatParseArticleUrl(wechatUrl.trim());
+      if (!result) {
+        showToast('无法识别微信公众号信息，请检查 URL');
+        return;
+      }
+      setWechatParsed(result);
+    } catch (error) {
+      console.error('解析微信文章 URL 失败:', error);
+      showToast('无法识别微信公众号信息，请检查 URL');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 微信：添加为 Feed
+  const handleWechatAdd = async () => {
+    if (!wechatParsed) return;
+    setLoading(true);
+    try {
+      await window.electronAPI.feedAdd({
+        url: wechatParsed.homeUrl,
+        title: wechatParsed.nickname,
+        category: wechatCategory.trim() || '微信公众号',
+        feedType: 'wechat',
+        wechatBiz: wechatParsed.biz,
+      });
+      showToast(`已添加公众号「${wechatParsed.nickname}」`);
+      onClose();
+      onFeedAdded?.();
+    } catch (error) {
+      console.error('添加微信公众号失败:', error);
+      showToast('添加失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCopyEmail = async () => {
     if (!newsletterResult) return;
     try {
@@ -193,6 +252,17 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
           >
             <Podcast size={16} />
             播客
+          </button>
+          <button
+            onClick={() => setActiveTab('wechat')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'wechat'
+                ? 'border-blue-500 text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <MessageSquare size={16} />
+            微信
           </button>
           <button
             onClick={() => setActiveTab('newsletter')}
@@ -302,6 +372,89 @@ export function AddFeedDialog({ open, onClose, onFeedAdded }: AddFeedDialogProps
           /* 播客搜索 Tab */
           <div className="p-6">
             <PodcastSearchPanel onSubscribed={handlePodcastSubscribed} />
+          </div>
+        ) : activeTab === 'wechat' ? (
+          /* 微信公众号 Tab */
+          <div className="p-6 space-y-4">
+            <div>
+              <label htmlFor="wechat-url" className="block text-sm font-medium text-gray-300 mb-1.5">
+                微信文章链接 <span className="text-red-400">*</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  ref={wechatInputRef}
+                  id="wechat-url"
+                  type="text"
+                  value={wechatUrl}
+                  onChange={(e) => setWechatUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleWechatParse(); } }}
+                  placeholder="粘贴任意微信公众号文章链接"
+                  className="flex-1 px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={handleWechatParse}
+                  disabled={loading || !wechatUrl.trim()}
+                  className="shrink-0 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors cursor-pointer"
+                >
+                  {loading && !wechatParsed ? '解析中...' : '解析'}
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                提示: 粘贴任意该公众号的文章链接，会自动识别公众号名称
+              </p>
+            </div>
+
+            {wechatParsed && (
+              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+                <p className="text-sm text-green-400 font-medium">识别成功</p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-20 shrink-0">公众号:</span>
+                    <span className="text-white font-medium">{wechatParsed.nickname}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-20 shrink-0">文章标题:</span>
+                    <span className="text-gray-300 truncate">{wechatParsed.articleTitle}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="wechat-category" className="block text-xs text-gray-400 mb-1">
+                    分类 (可选)
+                  </label>
+                  <input
+                    id="wechat-category"
+                    type="text"
+                    value={wechatCategory}
+                    onChange={(e) => setWechatCategory(e.target.value)}
+                    placeholder="默认: 微信公众号"
+                    className="w-full px-3 py-1.5 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleWechatAdd}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>添加中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      <span>添加公众号「{wechatParsed.nickname}」</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* Newsletter Tab */
