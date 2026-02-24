@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { BrowserWindow, app } from 'electron';
 import { eq, and } from 'drizzle-orm';
 import { getDatabase, schema } from '../db';
 import { parseArticleContent } from './parser-service';
@@ -62,6 +63,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   try {
     if (method === 'GET' && pathname === '/api/status') {
       return json(res, { status: 'ok', version: '1.0.0' });
+    }
+
+    if (method === 'GET' && (pathname === '/' || pathname === '/api/open')) {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) {
+        if (win.isMinimized()) win.restore();
+        win.show();
+      } else {
+        app.emit('activate');
+      }
+      app.focus({ steal: true });
+
+      // 根路径返回自动关闭的 HTML 页面，避免浏览器留下空白标签
+      if (pathname === '/') {
+        res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html><html><head><title>Z-Reader</title></head><body><script>window.close()</script><p style="font-family:system-ui;color:#888;text-align:center;margin-top:40px">Z-Reader 已激活，可以关闭此页面。</p></body></html>`);
+        return;
+      }
+      return json(res, { success: true });
     }
 
     if (method === 'POST' && pathname === '/api/articles') {

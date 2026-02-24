@@ -1,10 +1,11 @@
-import { checkConnection, getHighlightsByUrl, saveArticle } from './api';
+import { checkConnection, getHighlightsByUrl, saveArticle, openApp } from './api';
 
 const statusEl = document.getElementById('status')!;
 const saveBtnEl = document.getElementById('save-btn')!;
 const articleInfoEl = document.getElementById('article-info')!;
 const articleTitleEl = document.getElementById('article-title')!;
 const articleMetaEl = document.getElementById('article-meta')!;
+const openAppEl = document.getElementById('open-app')!;
 
 async function init() {
   const connected = await checkConnection();
@@ -63,6 +64,14 @@ saveBtnEl.addEventListener('click', async () => {
     saveBtnEl.textContent = '❌ 保存失败';
     saveBtnEl.removeAttribute('disabled');
     console.error('保存失败:', error);
+  }
+});
+
+openAppEl.addEventListener('click', async () => {
+  try {
+    await openApp();
+  } catch {
+    // 应用未启动
   }
 });
 

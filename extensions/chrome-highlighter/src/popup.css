@@ -110,12 +110,19 @@ body {
   text-align: center;
 }
 
-.footer a {
+.footer a,
+.footer .btn-link {
   font-size: 12px;
   color: #60a5fa;
   text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
 }
 
-.footer a:hover {
+.footer a:hover,
+.footer .btn-link:hover {
   text-decoration: underline;
 }
