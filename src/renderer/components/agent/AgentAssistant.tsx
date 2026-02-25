@@ -37,6 +37,13 @@ export function AgentAssistant() {
   const firedTriggersRef = useRef<Set<string>>(new Set());
   const cooldownMapRef = useRef<Map<string, number>>(new Map());
 
+  // 用 ref 保存最新 viewState，避免 setTimeout 闭包中拿到旧值
+  const viewStateRef = useRef(viewState);
+  viewStateRef.current = viewState;
+
+  // 用 ref 保存最新的 sendDirect 函数，避免 setTimeout 闭包过期
+  const sendDirectRef = useRef<(message: string) => Promise<void>>(async () => {});
+
   // 监听 viewState 变化，执行建议触发器
   useEffect(() => {
     // 只在 collapsed 模式下展示建议
@@ -84,9 +91,9 @@ export function AgentAssistant() {
   const handleSuggestionAction = useCallback((prompt: string) => {
     setActiveSuggestion(null);
     setMode('mini');
-    // 延迟发送，等 mini 模式的流式监听挂载
+    // 延迟发送，等 mini 模式的流式监听挂载；通过 ref 获取最新函数避免闭包过期
     setTimeout(() => {
-      handleMiniSendDirect(prompt);
+      sendDirectRef.current(prompt);
     }, 100);
   }, []);
 
@@ -130,6 +137,7 @@ export function AgentAssistant() {
       }
     }
 
+    const currentViewState = viewStateRef.current;
     setMiniIsStreaming(true);
     setMiniStreamingText('');
     setMiniMessages((prev) => [
@@ -140,9 +148,12 @@ export function AgentAssistant() {
     window.electronAPI.agentSend({
       sessionId: sid,
       message,
-      viewState,
+      viewState: currentViewState,
     });
-  }, [miniSessionId, viewState]);
+  }, [miniSessionId]);
+
+  // 保持 ref 始终指向最新的 sendDirect 函数
+  sendDirectRef.current = handleMiniSendDirect;
 
   // Mini 模式发送消息
   const handleMiniSend = useCallback(async (message: string) => {
