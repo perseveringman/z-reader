@@ -583,10 +583,15 @@ export interface AgentCommonViewState {
 export type AgentPageSpecificState =
   | { page: 'library-articles'; selectedArticleId: string | null; listFilters: Record<string, unknown>; visibleCount: number }
   | { page: 'reader'; articleId: string; mediaType: string; scrollProgress: number }
-  | { page: 'knowledge-graph'; visibleNodeCount: number; selectedNodeId: string | null }
+  | { page: 'video-reader'; articleId: string; currentTime: number; hasTranscript: boolean }
+  | { page: 'podcast-reader'; articleId: string; currentTime: number; contentTab: string }
+  | { page: 'book-reader'; bookId: string; readProgress: number }
+  | { page: 'knowledge-graph'; visibleNodeCount: number; selectedNodeId: string | null; viewMode?: string }
   | { page: 'writing-assist'; currentDocId: string | null; wordCount: number }
   | { page: 'feeds'; selectedFeedId: string | null; unreadCount: number }
-  | { page: 'books'; selectedBookId: string | null }
+  | { page: 'books'; selectedBookId: string | null; bookCount: number }
+  | { page: 'discover' }
+  | { page: 'manage-feeds'; selectedFeedId: string | null }
   | { page: string; [key: string]: unknown };
 
 /** 完整的上下文快照 */

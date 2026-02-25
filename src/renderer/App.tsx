@@ -184,10 +184,19 @@ function AppContent() {
   useEffect(() => {
     const pageState = (() => {
       if (readerMode && readerArticleId) {
+        if (readerMediaType === 'video') {
+          return { page: 'video-reader' as const, articleId: readerArticleId, currentTime: 0, hasTranscript: false };
+        }
+        if (readerMediaType === 'podcast') {
+          return { page: 'podcast-reader' as const, articleId: readerArticleId, currentTime: 0, contentTab: 'summary' };
+        }
         return { page: 'reader' as const, articleId: readerArticleId, mediaType: readerMediaType, scrollProgress: 0 };
       }
+      if (bookReaderMode && bookReaderId) {
+        return { page: 'book-reader' as const, bookId: bookReaderId, readProgress: 0 };
+      }
       if (activeView === 'books') {
-        return { page: 'books' as const, selectedBookId };
+        return { page: 'books' as const, selectedBookId, bookCount: 0 };
       }
       if (activeView === 'knowledge-graph') {
         return { page: 'knowledge-graph' as const, visibleNodeCount: 0, selectedNodeId: null };
@@ -195,21 +204,35 @@ function AppContent() {
       if (activeView === 'writing-assist') {
         return { page: 'writing-assist' as const, currentDocId: null, wordCount: 0 };
       }
+      if (activeView === 'discover') {
+        return { page: 'discover' as const };
+      }
+      if (activeView === 'manage-feeds') {
+        return { page: 'manage-feeds' as const, selectedFeedId: manageFeedSelectedId };
+      }
       if (activeView === 'feeds' || activeView === 'feed-unseen' || activeView === 'feed-seen') {
         return { page: 'feeds' as const, selectedFeedId, unreadCount: 0 };
       }
       return { page: 'library-articles' as const, selectedArticleId, listFilters: {}, visibleCount: 0 };
     })();
 
+    const currentPage = (() => {
+      if (readerMode && readerMediaType === 'video') return 'video-reader';
+      if (readerMode && readerMediaType === 'podcast') return 'podcast-reader';
+      if (readerMode) return 'reader';
+      if (bookReaderMode) return 'book-reader';
+      return activeView;
+    })();
+
     reportContext({
       common: {
-        currentPage: readerMode ? 'reader' : activeView,
-        readerMode,
+        currentPage,
+        readerMode: readerMode || bookReaderMode,
         selectedText: null,
       },
       pageState,
     });
-  }, [activeView, readerMode, readerArticleId, readerMediaType, selectedArticleId, selectedBookId, selectedFeedId, reportContext]);
+  }, [activeView, readerMode, readerArticleId, readerMediaType, bookReaderMode, bookReaderId, selectedArticleId, selectedBookId, selectedFeedId, manageFeedSelectedId, reportContext]);
 
   const handleCommandExecute = useCallback(
     (commandId: string) => {
