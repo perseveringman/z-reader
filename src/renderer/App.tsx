@@ -179,7 +179,7 @@ function AppContent() {
     return () => document.removeEventListener('click', handleDocumentLinkClick, true);
   }, []);
 
-  const { reportContext } = useAgentContext();
+  const { reportContext, registerNavigator } = useAgentContext();
 
   useEffect(() => {
     const pageState = (() => {
@@ -294,6 +294,30 @@ function AppContent() {
     setReaderArticleId(articleId);
     setReaderMode(true);
   }, []);
+
+  // 注册 Agent 导航处理器
+  useEffect(() => {
+    registerNavigator((targetType: string, targetId: string) => {
+      switch (targetType) {
+        case 'article':
+          handleOpenReader(targetId);
+          break;
+        case 'feed':
+          setSelectedFeedId(targetId);
+          setActiveView('feeds');
+          break;
+        case 'book':
+          setSelectedBookId(targetId);
+          setActiveView('books');
+          break;
+        case 'knowledge-graph':
+          setActiveView('knowledge-graph');
+          break;
+        default:
+          console.warn(`Unknown agent navigation targetType: ${targetType}`);
+      }
+    });
+  }, [registerNavigator, handleOpenReader]);
 
   const handleCloseReader = useCallback(() => {
     setReaderMode(false);
