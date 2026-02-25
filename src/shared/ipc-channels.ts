@@ -136,6 +136,17 @@ export const IPC_CHANNELS = {
   AI_CHAT_SESSION_GET: 'ai:chat:session:get',
   AI_CHAT_SESSION_DELETE: 'ai:chat:session:delete',
 
+  // Agent 助手
+  AGENT_SEND: 'agent:send',
+  AGENT_STREAM: 'agent:stream',
+  AGENT_CONFIRM: 'agent:confirm',
+  AGENT_SESSION_CREATE: 'agent:session:create',
+  AGENT_SESSION_LIST: 'agent:session:list',
+  AGENT_SESSION_GET: 'agent:session:get',
+  AGENT_SESSION_DELETE: 'agent:session:delete',
+  AGENT_TRUSTED_ACTIONS_GET: 'agent:trustedActions:get',
+  AGENT_TRUSTED_ACTIONS_SET: 'agent:trustedActions:set',
+
   // AI 新增
   AI_EXTRACT_TOPICS: 'ai:extractTopics',
   AI_TASK_LOG_DETAIL: 'ai:taskLogDetail',
