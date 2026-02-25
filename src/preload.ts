@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent, WritingAssistStreamChunk, RAGBackfillProgress, EmbeddingConfig } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk, AgentStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent, WritingAssistStreamChunk, RAGBackfillProgress, EmbeddingConfig } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -151,6 +151,21 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_GET, id),
   aiChatSessionDelete: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_DELETE, id),
+
+  // Agent 助手流式通信
+  agentSend: (input) => ipcRenderer.send(IPC_CHANNELS.AGENT_SEND, input),
+  agentOnStream: (callback: (chunk: AgentStreamChunk) => void) => {
+    const handler = (_event: IpcRendererEvent, chunk: AgentStreamChunk) => callback(chunk);
+    ipcRenderer.on(IPC_CHANNELS.AGENT_STREAM, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_STREAM, handler);
+  },
+  agentConfirm: (response) => ipcRenderer.send(IPC_CHANNELS.AGENT_CONFIRM, response),
+  agentSessionCreate: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_CREATE),
+  agentSessionList: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_LIST),
+  agentSessionGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_GET, id),
+  agentSessionDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SESSION_DELETE, id),
+  agentGetTrustedActions: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_TRUSTED_ACTIONS_GET),
+  agentSetTrustedActions: (actions) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_TRUSTED_ACTIONS_SET, actions),
 
   // AI 主题提取
   aiExtractTopics: (input) =>
