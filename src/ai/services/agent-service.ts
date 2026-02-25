@@ -127,12 +127,22 @@ export class AgentService {
   buildSystemPrompt(
     activeModules: AgentModuleBackend[],
     viewState: AgentViewState,
+    articleContext?: string | null,
   ): string {
     let prompt = `你是 Z-Reader 的 AI 助手，帮助用户管理和理解他们的 RSS 订阅内容。
 回答请使用用户的语言。`;
 
     // 注入当前页面上下文
     prompt += `\n\n当前页面：${viewState.pageState.page}`;
+
+    // 注入当前文章/内容上下文
+    if (articleContext) {
+      prompt += `\n\n当前正在阅读的文章内容：\n${articleContext.slice(0, 6000)}`;
+    }
+
+    if (viewState.common.selectedText) {
+      prompt += `\n\n用户选中的文本：${viewState.common.selectedText.slice(0, 500)}`;
+    }
 
     // 注入活跃模块的能力描述
     if (activeModules.length > 0) {
@@ -190,8 +200,22 @@ export class AgentService {
       }
     }
 
-    // 3. 构建 system prompt
-    const systemPrompt = this.buildSystemPrompt(activeModules, viewState);
+    // 3. 自动拉取当前文章上下文（Pull 模式）
+    let articleContext: string | null = null;
+    const ps = viewState.pageState;
+    if (ps.page === 'reader' || ps.page === 'video-reader' || ps.page === 'podcast-reader') {
+      const articleId = 'articleId' in ps ? (ps as { articleId: string }).articleId : null;
+      if (articleId) {
+        try {
+          articleContext = await this.deps.toolContext.getArticleContent(articleId);
+        } catch {
+          // 拉取失败不影响对话
+        }
+      }
+    }
+
+    // 4. 构建 system prompt（含文章上下文）
+    const systemPrompt = this.buildSystemPrompt(activeModules, viewState, articleContext);
 
     // 4. 构建 messages 数组
     const messages = this.toSDKMessages(history, userMessage);
