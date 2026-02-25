@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2, BookOpen, FileText } from 'lucide-react';
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2, BookOpen, FileText, Languages } from 'lucide-react';
 import { useAgentContext } from '../hooks/useAgentContext';
-import type { Book, Highlight } from '../../shared/types';
+import type { Book, Highlight, Translation } from '../../shared/types';
 import { BookReaderToc, type TocItem } from './BookReaderToc';
 import { BookReaderDetailPanel, type DetailTab } from './BookReaderDetailPanel';
 import { BookReaderSettings, loadBookReaderSettings, type BookReaderSettingsValues } from './BookReaderSettings';
@@ -32,6 +32,11 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
   const [focusSignal, setFocusSignal] = useState(0);
   const readerRef = useRef<BookReaderHandle>(null);
   const { reportContext } = useAgentContext();
+
+  // ===== 翻译功能状态（预留） =====
+  const [translationVisible, setTranslationVisible] = useState(false);
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationData, setTranslationData] = useState<Translation | null>(null);
 
   useEffect(() => {
     reportContext({
@@ -179,6 +184,21 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
               title="排版设置"
             >
               <Settings2 className="w-4 h-4" />
+            </button>
+            {/* 翻译按钮（电子书翻译功能预留） */}
+            <button
+              onClick={() => {
+                // TODO: 电子书按页懒加载翻译 — 需要在翻页回调中：
+                // 1. 检查当前章节/页是否有翻译缓存
+                // 2. 如有，注入翻译 DOM
+                // 3. 如无，发起翻译请求
+                // 4. Prefetch 下一页翻译
+                console.log('[BookReaderView] 电子书翻译功能开发中，敬请期待');
+              }}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
+              title="翻译（开发中）"
+            >
+              <Languages className="w-4 h-4" />
             </button>
             <button
               onClick={() => setDetailCollapsed((prev) => {
