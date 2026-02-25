@@ -65,6 +65,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
   const [translationData, setTranslationData] = useState<Translation | null>(null);
   const [translationParagraphs, setTranslationParagraphs] = useState<TranslationParagraph[]>([]);
+  const [defaultTargetLang, setDefaultTargetLang] = useState('zh-CN');
   const translationDisplayRef = useRef({ fontSize: 14, color: '#9ca3af', opacity: 0.85 });
 
   // Transcript / ASR 状态
@@ -95,6 +96,13 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
       },
     });
   }, [articleId, currentTime, contentTab, reportContext]);
+
+  // 加载用户配置的默认翻译目标语言
+  useEffect(() => {
+    window.electronAPI.translationSettingsGet().then((settings) => {
+      if (settings?.defaultTargetLang) setDefaultTargetLang(settings.defaultTargetLang);
+    }).catch(() => {});
+  }, []);
 
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const aboutContentRef = useRef<HTMLDivElement>(null);
@@ -842,7 +850,7 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handleTranslate('zh-CN')}
+              onClick={() => handleTranslate(defaultTargetLang)}
               className={`p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer ${
                 translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
               }`}

@@ -288,7 +288,7 @@ const electronAPI: ElectronAPI = {
   translationStart: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_START, input),
   translationCancel: (id) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_CANCEL, id),
   translationGet: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_GET, input),
-  translationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_DELETE, id),
+  translationDelete: (id, confirmed) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_DELETE, id, confirmed),
   translationList: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_LIST, articleId),
   translationOnProgress: (callback: (event: TranslationProgressEvent) => void) => {
     const handler = (_event: IpcRendererEvent, event: TranslationProgressEvent) => callback(event);

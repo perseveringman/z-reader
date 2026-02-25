@@ -54,6 +54,7 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
   const [translationData, setTranslationData] = useState<Translation | null>(null);
   const [translationParagraphs, setTranslationParagraphs] = useState<TranslationParagraph[]>([]);
+  const [defaultTargetLang, setDefaultTargetLang] = useState('zh-CN');
   const translationDisplayRef = useRef({ fontSize: 14, color: '#9ca3af', opacity: 0.85 });
 
   // 外部触发 TranscriptView 滚动到某个 segment（使用自增计数器触发更新）
@@ -73,6 +74,13 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
       },
     });
   }, [articleId, currentTime, segments, reportContext]);
+
+  // 加载用户配置的默认翻译目标语言
+  useEffect(() => {
+    window.electronAPI.translationSettingsGet().then((settings) => {
+      if (settings?.defaultTargetLang) setDefaultTargetLang(settings.defaultTargetLang);
+    }).catch(() => {});
+  }, []);
 
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const progressSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -477,7 +485,7 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
           {article.title}
         </h1>
         <button
-          onClick={() => handleTranslate('zh-CN')}
+          onClick={() => handleTranslate(defaultTargetLang)}
           className={`p-1.5 rounded-md hover:bg-white/10 transition-colors cursor-pointer ${
             translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
           }`}

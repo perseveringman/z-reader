@@ -83,6 +83,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [translationLoading, setTranslationLoading] = useState(false);
   const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
   const [translationData, setTranslationData] = useState<Translation | null>(null);
+  const [defaultTargetLang, setDefaultTargetLang] = useState('zh-CN');
 
   const { reportContext } = useAgentContext();
 
@@ -101,6 +102,13 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   useEffect(() => {
     if (forceTab) setCurrentDetailTab(forceTab.tab);
   }, [forceTab]);
+
+  // 加载用户配置的默认翻译目标语言
+  useEffect(() => {
+    window.electronAPI.translationSettingsGet().then((settings) => {
+      if (settings?.defaultTargetLang) setDefaultTargetLang(settings.defaultTargetLang);
+    }).catch(() => {});
+  }, []);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -700,7 +708,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           setTranslationVisible(nextVisible);
         } else {
           // 未翻译时触发默认语言翻译
-          handleTranslate('zh-CN');
+          handleTranslate(defaultTargetLang);
         }
         return;
       }
@@ -980,7 +988,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           <div className="flex items-center gap-1">
             {/* 翻译按钮 */}
             <button
-              onClick={() => handleTranslate('zh-CN')}
+              onClick={() => handleTranslate(defaultTargetLang)}
               className={`p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer ${
                 translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
               }`}

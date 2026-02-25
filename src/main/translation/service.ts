@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS: TranslationSettings = {
 // ==================== HTML 段落提取 ====================
 
 /** 匹配块级标签内容的正则 */
-const BLOCK_TAG_RE = /<(p|li|blockquote|h[1-6])(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi;
+const BLOCK_TAG_RE = /<(p|li|blockquote)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi;
 
 /** 去除 HTML 标签的正则 */
 const STRIP_TAGS_RE = /<[^>]+>/g;
@@ -61,7 +61,7 @@ const STRIP_TAGS_RE = /<[^>]+>/g;
 /**
  * 从 HTML 内容中提取段落文本
  *
- * 匹配 <p>, <li>, <blockquote>, <h1>~<h6> 标签的内容，
+ * 匹配 <p>, <li>, <blockquote> 标签的内容，
  * 去除内部 HTML 标签得到纯文本。
  * 注意：运行在 Node.js 主进程环境，没有真实 DOM，使用正则匹配。
  */
@@ -464,13 +464,15 @@ async function translateInBackground(
         })
         .where(eq(schema.translations.id, translationId));
 
-      // 广播进度事件（推送最后一段的翻译结果）
-      broadcastProgress({
-        translationId,
-        index: batchEnd - 1,
-        translated: translatedTexts[translatedTexts.length - 1],
-        progress,
-      });
+      // 广播进度事件（每一段都推送）
+      for (let j = 0; j < translatedTexts.length; j++) {
+        broadcastProgress({
+          translationId,
+          index: i + j,
+          translated: translatedTexts[j],
+          progress,
+        });
+      }
     }
 
     // 全部完成

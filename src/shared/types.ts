@@ -998,7 +998,7 @@ export interface ElectronAPI {
   translationStart: (input: TranslationStartInput) => Promise<Translation>;
   translationCancel: (id: string) => Promise<void>;
   translationGet: (input: TranslationGetInput) => Promise<Translation | null>;
-  translationDelete: (id: string) => Promise<void>;
+  translationDelete: (id: string, confirmed?: boolean) => Promise<{ needConfirm: boolean; highlightCount: number }>;
   translationList: (articleId: string) => Promise<Translation[]>;
   translationOnProgress: (callback: (event: TranslationProgressEvent) => void) => () => void;
   translationSettingsGet: () => Promise<TranslationSettings>;
