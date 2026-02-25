@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter, Image as ImageIcon } from 'lucide-react';
-import type { Article, Highlight, Tag } from '../../shared/types';
+import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter, Image as ImageIcon, Languages } from 'lucide-react';
+import type { Article, Highlight, Tag, Translation, TranslationProgressEvent } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP, FONTS, LINE_HEIGHTS, saveReaderSettings } from './ReaderSettings';
@@ -19,6 +19,7 @@ import {
   textSearchInElement,
   rangeToBlockOffsets,
 } from '../highlight-engine';
+import { injectTranslations, injectSingleTranslation, clearTranslations, toggleTranslations } from '../translation-injector';
 import type { ReaderSettingsValues } from './ReaderSettings';
 
 interface ReaderViewProps {
@@ -77,6 +78,12 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const [shareCardHighlights, setShareCardHighlights] = useState<Highlight[]>([]);
 
+  // ==================== 翻译状态 ====================
+  const [translationVisible, setTranslationVisible] = useState(false);
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
+  const [translationData, setTranslationData] = useState<Translation | null>(null);
+
   const { reportContext } = useAgentContext();
 
   useEffect(() => {
@@ -103,6 +110,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const selectionRangeRef = useRef<Range | null>(null);
   const readProgressRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const translationDisplayRef = useRef({ fontSize: 14, color: '#9ca3af', opacity: 0.85 });
 
   highlightsRef.current = highlights;
 
@@ -112,6 +120,11 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      // 切换文章时重置翻译状态
+      setTranslationData(null);
+      setTranslationVisible(false);
+      setTranslationLoading(false);
+      setTranslationProgress(null);
       try {
         const data = await window.electronAPI.articleGet(articleId);
         if (cancelled) return;
@@ -248,6 +261,86 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     }
   }, []);
 
+  // ==================== 翻译触发 ====================
+
+  const handleTranslate = useCallback(async (targetLang: string) => {
+    if (!article || !contentRef.current) return;
+
+    // 如果已有翻译且可见，则隐藏
+    if (translationVisible && translationData) {
+      toggleTranslations(contentRef.current, false);
+      setTranslationVisible(false);
+      return;
+    }
+
+    // 如果已有翻译数据但隐藏中，则显示
+    if (translationData && !translationVisible) {
+      toggleTranslations(contentRef.current, true);
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 检查缓存
+    const cached = await window.electronAPI.translationGet({
+      articleId: article.id,
+      targetLang,
+    });
+    if (cached && cached.status === 'completed') {
+      setTranslationData(cached);
+      injectTranslations(contentRef.current, cached.paragraphs, translationDisplayRef.current);
+      applyHighlights();
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 发起翻译
+    setTranslationLoading(true);
+    setTranslationProgress(null);
+    try {
+      const translation = await window.electronAPI.translationStart({
+        articleId: article.id,
+        sourceType: 'article',
+        targetLang,
+      });
+      setTranslationData(translation);
+    } catch (err) {
+      console.error('翻译启动失败:', err);
+      setTranslationLoading(false);
+    }
+  }, [article, translationVisible, translationData, applyHighlights]);
+
+  // ==================== 翻译进度监听 ====================
+
+  useEffect(() => {
+    if (!translationData?.id) return;
+
+    const unsubscribe = window.electronAPI.translationOnProgress((event: TranslationProgressEvent) => {
+      if (!contentRef.current || event.translationId !== translationData.id) return;
+
+      // 注入单个段落的翻译
+      injectSingleTranslation(
+        contentRef.current,
+        { index: event.index, original: '', translated: event.translated },
+        translationDisplayRef.current,
+      );
+      // 刷新高亮
+      applyHighlights();
+
+      // 更新进度
+      const total = translationData.paragraphs.length || 1;
+      const done = Math.ceil(event.progress * total);
+      setTranslationProgress({ done, total });
+
+      if (event.progress >= 1) {
+        setTranslationLoading(false);
+        setTranslationVisible(true);
+        setTranslationProgress(null);
+      }
+    });
+
+    return unsubscribe;
+  }, [translationData, applyHighlights]);
+
   // 手动管理内容 DOM：只在 article.content 变化时设置 innerHTML 并应用高亮
   // 这样 toolbar、focusedParagraphIndex 等 state 变化不会重置内容 DOM，高亮自然保留
   useEffect(() => {
@@ -255,7 +348,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     contentRef.current.innerHTML = article.content;
 
     // TOC 提取必须在 innerHTML 设置后执行，使用 setTimeout 确保 DOM 已更新
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!contentRef.current) return;
       const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
       const items: TocItem[] = Array.from(headings).map((h, i) => {
@@ -264,6 +357,32 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         return { id, text: h.textContent?.trim() ?? '', level: parseInt(h.tagName.charAt(1)) };
       });
       setTocItems(items);
+
+      // 自动恢复已完成的翻译
+      try {
+        const settings = await window.electronAPI.translationSettingsGet();
+        const cached = await window.electronAPI.translationGet({
+          articleId: article.id,
+          targetLang: settings.defaultTargetLang,
+        });
+        if (cached && cached.status === 'completed' && contentRef.current) {
+          setTranslationData(cached);
+          injectTranslations(contentRef.current, cached.paragraphs, {
+            fontSize: settings.display.fontSize,
+            color: settings.display.color,
+            opacity: settings.display.opacity,
+          });
+          translationDisplayRef.current = {
+            fontSize: settings.display.fontSize,
+            color: settings.display.color,
+            opacity: settings.display.opacity,
+          };
+          applyHighlights();
+          setTranslationVisible(true);
+        }
+      } catch (err) {
+        console.error('翻译恢复失败:', err);
+      }
     }, 0);
   }, [loading, article?.content]);
 
@@ -572,6 +691,20 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
       if (inInput) return;
 
+      // Cmd/Ctrl+Shift+T — 切换翻译显示/隐藏
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        if (translationData && contentRef.current) {
+          const nextVisible = !translationVisible;
+          toggleTranslations(contentRef.current, nextVisible);
+          setTranslationVisible(nextVisible);
+        } else {
+          // 未翻译时触发默认语言翻译
+          handleTranslate('zh-CN');
+        }
+        return;
+      }
+
       // N — 为聚焦段落的高亮添加笔记
       if (e.key === 'n' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         if (focusedParagraphIndex >= 0 && contentRef.current) {
@@ -767,7 +900,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, toolbar, editingAnnotation, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight, readerSettings, currentDetailTab]);
+  }, [onClose, toolbar, editingAnnotation, focusedParagraphIndex, article, createHighlightFromRange, handleDeleteHighlight, readerSettings, currentDetailTab, handleTranslate, translationVisible, translationData]);
 
   const isLoading = loading || parsing;
   const themeClass = readerSettings.theme === 'light' ? 'reader-theme-light' : readerSettings.theme === 'sepia' ? 'reader-theme-sepia' : 'reader-theme-dark';
@@ -845,6 +978,21 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
             <span className="text-gray-400 truncate">{article?.title ?? '加载中…'}</span>
           </div>
           <div className="flex items-center gap-1">
+            {/* 翻译按钮 */}
+            <button
+              onClick={() => handleTranslate('zh-CN')}
+              className={`p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer ${
+                translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+              }`}
+              title={translationLoading ? `翻译中${translationProgress ? ` ${translationProgress.done}/${translationProgress.total}` : ''}` : translationVisible ? '隐藏翻译' : '翻译全文'}
+              disabled={translationLoading}
+            >
+              {translationLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Languages className="w-4 h-4" />
+              )}
+            </button>
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
               className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
