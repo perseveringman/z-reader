@@ -87,7 +87,8 @@
 
 ## 后续迭代
 
-- [ ] 主动建议能力（`suggestWhen` 接口已预留）
+- [x] 导航卡片跳转（AgentDrawer 导航卡片点击跳转到对应页面）
+- [x] 主动建议能力（viewState 变化触发建议气泡，含防骚扰机制）
 - [ ] 白名单管理 UI（偏好设置页）
 - [ ] 新模块注册（笔记、写作等）
 - [ ] 卡片渲染器注册机制（各模块注册自定义结果展示组件）
@@ -97,6 +98,13 @@
 ## Commits 记录
 
 ```
+ee741ae feat(agent): AgentAssistant 集成主动建议触发能力
+f784e56 feat(agent): AgentDrawer 导航卡片点击跳转实现
+5987c6d feat(agent): 实现 AgentSuggestionBubble 建议气泡组件
+1f59004 feat(agent): App.tsx 注册 Agent 导航处理器
+d7080d6 feat(agent): 定义内置建议触发器规则
+ea393f7 feat(agent): 新增 Agent 建议相关类型定义
+3fb9a78 feat(agent): AgentContextProvider 新增导航回调注册机制
 407769f fix(agent): 阅读器页面自动拉取文章内容注入 system prompt
 0dd6dcc feat(agent): 扩展页面类型定义，完善 App.tsx 上下文上报
 343a928 feat(agent): Reader 系列组件上下文上报
