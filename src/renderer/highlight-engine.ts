@@ -12,8 +12,16 @@ export const COLOR_BG_MAP: Record<string, string> = {
 
 export const HIGHLIGHT_BORDER_COLOR = 'rgba(251, 191, 36, 0.45)';
 
-export function getTextNodes(root: Node): Text[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+export function getTextNodes(root: Node, skipTranslation = true): Text[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      // 跳过翻译节点内的文本，保护原文 offset 计算
+      if (skipTranslation && node.parentElement?.closest('[data-translation]')) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
   const nodes: Text[] = [];
   let n: Node | null;
   while ((n = walker.nextNode())) nodes.push(n as Text);
@@ -21,7 +29,9 @@ export function getTextNodes(root: Node): Text[] {
 }
 
 export function offsetsToRange(root: Node, start: number, end: number): Range | null {
-  const nodes = getTextNodes(root);
+  // 当 root 是翻译节点时，需要遍历其内部文本（不跳过）
+  const isTranslation = root instanceof HTMLElement && root.hasAttribute('data-translation');
+  const nodes = getTextNodes(root, !isTranslation);
   let offset = 0;
   const range = document.createRange();
   let setStart = false;
@@ -108,12 +118,14 @@ export function unwrapHighlight(root: HTMLElement, hlId: string) {
   });
 }
 
-/** 找到最近的块级祖先元素 */
+/** 找到最近的块级祖先元素（包括翻译节点） */
 export function getBlockAncestor(node: Node, contentRoot: HTMLElement): HTMLElement | null {
   let current: Node | null = node;
   while (current && current !== contentRoot) {
-    if (current instanceof HTMLElement && current.matches(BLOCK_SELECTOR)) {
-      return current;
+    if (current instanceof HTMLElement) {
+      if (current.matches(BLOCK_SELECTOR) || current.hasAttribute('data-translation')) {
+        return current;
+      }
     }
     current = current.parentNode;
   }
@@ -160,7 +172,9 @@ export function textSearchInElement(el: Node, text: string): { startOffset: numb
 export function rangeToBlockOffsets(blockEl: HTMLElement, range: Range): { startOffset: number; endOffset: number } | null {
   // 将 range 的端点规范化为 text node 级别
   // range.startContainer 可能是 Element（例如 selectNodeContents 后）
-  const nodes = getTextNodes(blockEl);
+  // 当 blockEl 是翻译节点时，需要遍历其内部文本（不跳过）
+  const isTranslation = blockEl.hasAttribute('data-translation');
+  const nodes = getTextNodes(blockEl, !isTranslation);
   if (nodes.length === 0) return null;
 
   let startOffset = -1;
