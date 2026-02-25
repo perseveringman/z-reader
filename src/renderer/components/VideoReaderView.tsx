@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Loader2, Mic, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { Article, TranscriptSegment, Highlight, HighlightTagsMap, AppTask } from '../../shared/types';
+import { useAgentContext } from '../hooks/useAgentContext';
 import { VideoPlayer, type VideoPlayerRef } from './VideoPlayer';
 import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
@@ -49,6 +50,20 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   // 外部触发 TranscriptView 滚动到某个 segment（使用自增计数器触发更新）
   const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
   const scrollTriggerRef = useRef(0);
+
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'video-reader', readerMode: true, selectedText: null },
+      pageState: {
+        page: 'video-reader',
+        articleId,
+        currentTime: currentTime ?? 0,
+        hasTranscript: !!(segments && segments.length > 0),
+      },
+    });
+  }, [articleId, currentTime, segments, reportContext]);
 
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const progressSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);

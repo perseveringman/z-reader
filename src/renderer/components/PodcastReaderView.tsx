@@ -4,6 +4,7 @@ import {
   FileText, Sparkles, Mic, Settings, Download, RefreshCw, XCircle, Cloud,
 } from 'lucide-react';
 import type { Article, Highlight, HighlightTagsMap, TranscriptSegment, AppSettings, AppTask } from '../../shared/types';
+import { useAgentContext } from '../hooks/useAgentContext';
 import { AudioPlayer, type AudioPlayerRef } from './AudioPlayer';
 import { TranscriptView } from './TranscriptView';
 import { DetailPanel } from './DetailPanel';
@@ -72,6 +73,20 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   // 外部触发 TranscriptView 滚动到某个 segment
   const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
   const scrollTriggerRef = useRef(0);
+
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'podcast-reader', readerMode: true, selectedText: null },
+      pageState: {
+        page: 'podcast-reader',
+        articleId,
+        currentTime: currentTime ?? 0,
+        contentTab: contentTab ?? 'summary',
+      },
+    });
+  }, [articleId, currentTime, contentTab, reportContext]);
 
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const aboutContentRef = useRef<HTMLDivElement>(null);

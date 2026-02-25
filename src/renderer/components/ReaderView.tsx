@@ -5,6 +5,7 @@ import ShareCardModal from './share-card/ShareCardModal';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP, FONTS, LINE_HEIGHTS, saveReaderSettings } from './ReaderSettings';
 import { AnnotationLayer, type EditingAnnotation } from './AnnotationLayer';
+import { useAgentContext } from '../hooks/useAgentContext';
 import {
   BLOCK_SELECTOR,
   COLOR_BG_MAP,
@@ -75,6 +76,20 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [highlightTagsMap, setHighlightTagsMap] = useState<Record<string, Tag[]>>({});
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const [shareCardHighlights, setShareCardHighlights] = useState<Highlight[]>([]);
+
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'reader', readerMode: true, selectedText: null },
+      pageState: {
+        page: 'reader',
+        articleId,
+        mediaType: article?.mediaType ?? 'article',
+        scrollProgress: readProgress ?? 0,
+      },
+    });
+  }, [articleId, article?.mediaType, readProgress, reportContext]);
 
   useEffect(() => {
     if (forceTab) setCurrentDetailTab(forceTab.tab);
