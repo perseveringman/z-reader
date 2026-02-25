@@ -27,7 +27,9 @@
     "saveUrl": "Save URL to Library",
     "addFeed": "Add RSS Feed",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "knowledgeGraph": "Knowledge Graph",
+    "writingAssist": "Writing Assistant"
   },
   "contentList": {
     "inbox": "Inbox",
@@ -565,6 +567,9 @@
     "extractTopics": "Extract Topics",
     "topics": "Topics",
     "mindmap": "MindMap",
+    "knowledgeGraph": "Knowledge Graph",
+    "extractEntities": "Extract Entities",
+    "extractingEntities": "Extracting entities...",
     "generateMindmap": "Generate MindMap",
     "debugPanel": "AI Debug Panel",
     "callHistory": "Call History",
@@ -607,5 +612,35 @@
     "unknown": "Unknown error",
     "retry": "Retry",
     "report": "Report issue"
+  },
+  "kg": {
+    "overview": "Overview",
+    "entityCount": "entities",
+    "relationCount": "relations",
+    "noData": "No knowledge graph data",
+    "generateHint": "Entities are automatically extracted when saving articles to Library",
+    "searchPlaceholder": "Search entities...",
+    "stats": "Graph Stats"
+  },
+  "writingAssist": {
+    "title": "Writing Assistant",
+    "searchPlaceholder": "Enter a writing topic...",
+    "search": "Search Materials",
+    "generate": "Generate Writing Materials",
+    "copy": "Copy to Clipboard",
+    "copied": "Copied",
+    "relatedArticles": "Related Articles",
+    "relatedEntities": "Related Concepts",
+    "relatedHighlights": "Related Notes",
+    "noResults": "No related materials found",
+    "noApiKey": "Please configure AI API Key in Settings first",
+    "configureAI": "Go to Settings",
+    "generating": "Generating...",
+    "relevance": "Relevance",
+    "snippets": "Snippets"
+  },
+  "relevance": {
+    "high": "Highly Relevant",
+    "medium": "Possibly Relevant"
   }
 }

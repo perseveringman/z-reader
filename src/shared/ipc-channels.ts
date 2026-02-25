@@ -180,4 +180,45 @@ export const IPC_CHANNELS = {
   WECHAT_GET_COMMENTS: 'wechat:getComments',
   WECHAT_CANCEL_TASK: 'wechat:cancelTask',
   WECHAT_PROGRESS: 'wechat:progress',
+
+  // RAG (知识库)
+  RAG_INGEST: 'rag:ingest',
+  RAG_SEARCH: 'rag:search',
+  RAG_REMOVE: 'rag:remove',
+  RAG_GET_STATUS: 'rag:getStatus',
+  RAG_PROCESS_PENDING: 'rag:processPending',
+  RAG_CHAT_SEND: 'rag:chat:send',
+  RAG_CHAT_STREAM: 'rag:chat:stream',
+
+  // Knowledge Graph (知识图谱)
+  KG_EXTRACT: 'kg:extract',
+  KG_GET_ARTICLE_GRAPH: 'kg:articleGraph',
+  KG_GET_OVERVIEW: 'kg:overview',
+  KG_SEARCH_ENTITIES: 'kg:searchEntities',
+  KG_GET_SUBGRAPH: 'kg:subgraph',
+  KG_GET_STATS: 'kg:stats',
+  KG_REMOVE: 'kg:remove',
+
+  // Feed Relevance (智能推荐)
+  FEED_RELEVANCE_COMPUTE: 'feedRelevance:compute',
+  FEED_RELEVANCE_BATCH: 'feedRelevance:batch',
+
+  // Writing Assist (写作辅助)
+  WRITING_ASSIST_SEARCH: 'writingAssist:search',
+  WRITING_ASSIST_GENERATE: 'writingAssist:generate',
+  WRITING_ASSIST_STREAM: 'writingAssist:stream',
+
+  // RAG Backfill (批量回填)
+  RAG_BACKFILL_START: 'rag:backfill:start',
+  RAG_BACKFILL_CANCEL: 'rag:backfill:cancel',
+  RAG_BACKFILL_STATUS: 'rag:backfill:status',
+  RAG_BACKFILL_PROGRESS: 'rag:backfill:progress',
+
+  // RAG Incremental (增量索引)
+  RAG_REINDEX: 'rag:reindex',
+  RAG_CLEANUP: 'rag:cleanup',
+
+  // Embedding Config (Embedding 独立配置)
+  EMBEDDING_CONFIG_GET: 'embedding:config:get',
+  EMBEDDING_CONFIG_SET: 'embedding:config:set',
 } as const;

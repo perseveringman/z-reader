@@ -27,7 +27,9 @@
     "saveUrl": "保存链接到文库",
     "addFeed": "添加订阅",
     "collapse": "收起侧边栏",
-    "expand": "展开侧边栏"
+    "expand": "展开侧边栏",
+    "knowledgeGraph": "知识图谱",
+    "writingAssist": "写作辅助"
   },
   "contentList": {
     "inbox": "收件箱",
@@ -565,6 +567,9 @@
     "extractTopics": "提取主题",
     "topics": "主题关键词",
     "mindmap": "思维导图",
+    "knowledgeGraph": "知识图谱",
+    "extractEntities": "提取实体",
+    "extractingEntities": "正在提取实体...",
     "generateMindmap": "生成思维导图",
     "debugPanel": "AI 调试面板",
     "callHistory": "调用历史",
@@ -607,5 +612,35 @@
     "unknown": "未知错误",
     "retry": "重试",
     "report": "报告问题"
+  },
+  "kg": {
+    "overview": "全局概览",
+    "entityCount": "个实体",
+    "relationCount": "个关系",
+    "noData": "暂无知识图谱数据",
+    "generateHint": "保存文章到文库时会自动提取实体",
+    "searchPlaceholder": "搜索实体...",
+    "stats": "图谱统计"
+  },
+  "writingAssist": {
+    "title": "写作辅助",
+    "searchPlaceholder": "输入写作主题...",
+    "search": "搜索素材",
+    "generate": "生成写作素材",
+    "copy": "复制到剪贴板",
+    "copied": "已复制",
+    "relatedArticles": "相关文章",
+    "relatedEntities": "相关概念",
+    "relatedHighlights": "相关笔记",
+    "noResults": "未找到相关材料",
+    "noApiKey": "请先在设置中配置 AI API Key",
+    "configureAI": "前往设置",
+    "generating": "正在生成...",
+    "relevance": "相关度",
+    "snippets": "片段"
+  },
+  "relevance": {
+    "high": "高度相关",
+    "medium": "可能相关"
   }
 }

@@ -29,6 +29,8 @@ import {
   CheckSquare,
   Bell,
   MessageSquare,
+  Network,
+  PenTool,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
 
@@ -248,6 +250,20 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
               active={activeView === 'library-podcasts'}
               collapsed={collapsed}
               onClick={() => onViewChange('library-podcasts')}
+            />
+            <NavItem
+              icon={<Network size={iconSize} />}
+              label={t('sidebar.knowledgeGraph')}
+              active={activeView === 'knowledge-graph'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('knowledge-graph')}
+            />
+            <NavItem
+              icon={<PenTool size={iconSize} />}
+              label={t('sidebar.writingAssist')}
+              active={activeView === 'writing-assist'}
+              collapsed={collapsed}
+              onClick={() => onViewChange('writing-assist')}
             />
             <NavItem
               icon={<Star size={iconSize} />}

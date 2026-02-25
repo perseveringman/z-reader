@@ -5,10 +5,11 @@ import type { Article, Highlight } from '../../shared/types';
 import { TagPicker } from './TagPicker';
 import { ChatPanel } from './ChatPanel';
 import { MindMapPanel } from './MindMapPanel';
+import { ArticleKGPanel } from './ArticleKGPanel';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 import { WechatStatsSection } from './WechatStatsSection';
 
-type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat';
+type DetailTab = 'info' | 'notebook' | 'mindmap' | 'knowledge-graph' | 'chat';
 
 interface DetailPanelProps {
   articleId: string | null;
@@ -81,6 +82,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
     { key: 'info', label: t('feedDetail.info') },
     { key: 'notebook', label: t('detailPanel.highlights') },
     { key: 'mindmap', label: t('ai.mindmap') },
+    { key: 'knowledge-graph', label: t('ai.knowledgeGraph') },
     { key: 'chat', label: t('chat.title') },
   ];
   const [article, setArticle] = useState<Article | null>(null);
@@ -350,7 +352,7 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
       </div>
 
       {/* 内容区域 */}
-      <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'chat' || activeTab === 'mindmap' ? '' : 'overflow-y-auto p-4'}`}>
+      <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'chat' || activeTab === 'mindmap' || activeTab === 'knowledge-graph' ? '' : 'overflow-y-auto p-4'}`}>
         {!articleId ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             {t('detailPanel.noSelection')}
@@ -707,6 +709,12 @@ export function DetailPanel({ articleId, collapsed, externalHighlights, onExtern
               <MindMapPanel
                 articleId={article.id}
                 generateSignal={mindmapGenerateSignal}
+              />
+            )}
+
+            {activeTab === 'knowledge-graph' && (
+              <ArticleKGPanel
+                articleId={article.id}
               />
             )}
           </>

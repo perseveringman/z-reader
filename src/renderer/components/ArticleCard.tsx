@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Archive, Clock, MoreHorizontal, Star, RotateCcw, Trash2, Check, BookmarkPlus } from 'lucide-react';
 import type { Article, ArticleSource, ReadStatus } from '../../shared/types';
+import { RelevanceBadge } from './RelevanceBadge';
 
 interface ArticleCardProps {
   article: Article;
@@ -191,6 +192,7 @@ export function ArticleCard({ article, isSelected, onHover, onClick, onStatusCha
                 <span className="truncate max-w-[120px]">{part}</span>
               </span>
             ))}
+            {source === 'feed' && <RelevanceBadge metadata={article.metadata} compact={compact} />}
           </div>
         )}
       </div>

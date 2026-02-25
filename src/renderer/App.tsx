@@ -21,6 +21,8 @@ import { PodcastReaderView } from './components/PodcastReaderView';
 import { DownloadManager } from './components/DownloadManager';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { DiscoverPage } from './components/discover/DiscoverPage';
+import { KGOverviewPage } from './components/KGOverviewPage';
+import { WritingAssistPage } from './components/WritingAssistPage';
 import { TaskDrawer } from './components/TaskDrawer';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import type { Feed, ArticleSource, MediaType, Article, Book } from '../shared/types';
@@ -324,7 +326,11 @@ function AppContent() {
                 if (tagId) setActiveView('tags');
               }}
             />
-            {activeView === 'discover' ? (
+            {activeView === 'knowledge-graph' ? (
+              <KGOverviewPage />
+            ) : activeView === 'writing-assist' ? (
+              <WritingAssistPage />
+            ) : activeView === 'discover' ? (
               <DiscoverPage onFeedAdded={handleRefresh} />
             ) : activeView === 'manage-feeds' ? (
               <>

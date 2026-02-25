@@ -14,6 +14,7 @@ export type SecondaryPreferenceSectionId =
   | 'ai-models'
   | 'ai-prompts'
   | 'ai-debug'
+  | 'ai-smart'
   | 'sync-general';
 
 export interface PrimaryPreferenceSection {
@@ -62,7 +63,7 @@ export function getSecondarySectionsForPrimary(
     return [{ id: 'sync-general' }];
   }
 
-  return [{ id: 'ai-models' }, { id: 'ai-prompts' }, { id: 'ai-debug' }];
+  return [{ id: 'ai-models' }, { id: 'ai-prompts' }, { id: 'ai-smart' }, { id: 'ai-debug' }];
 }
 
 export function getFirstSecondarySection(

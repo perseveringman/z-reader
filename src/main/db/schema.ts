@@ -54,6 +54,7 @@ export const articles = sqliteTable('articles', {
   audioDuration: integer('audio_duration'),
   episodeNumber: integer('episode_number'),
   seasonNumber: integer('season_number'),
+  metadata: text('metadata'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),

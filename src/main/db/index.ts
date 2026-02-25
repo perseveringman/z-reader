@@ -2,11 +2,13 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { app } from 'electron';
 import path from 'node:path';
+import * as sqliteVec from 'sqlite-vec';
 import * as schema from './schema';
 import { initSyncTables } from '../services/sync/sync-tables';
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let sqliteInstance: Database.Database | null = null;
+let sqliteVecLoaded = false;
 
 export function getDatabase() {
   if (db) return db;
@@ -21,6 +23,17 @@ export function getDatabase() {
   // 开启外键约束
   sqlite.pragma('foreign_keys = ON');
 
+  // 加载 sqlite-vec 扩展
+  try {
+    sqliteVec.load(sqlite);
+    sqliteVecLoaded = true;
+    console.log('sqlite-vec extension loaded successfully');
+  } catch (error) {
+    sqliteVecLoaded = false;
+    console.error('Failed to load sqlite-vec extension:', error);
+    // 降级处理：向量功能不可用，其余功能正常
+  }
+
   sqliteInstance = sqlite;
   db = drizzle(sqlite, { schema });
 
@@ -28,6 +41,11 @@ export function getDatabase() {
   initTables(sqlite);
 
   return db;
+}
+
+/** 检查 sqlite-vec 扩展是否成功加载 */
+export function isSqliteVecAvailable(): boolean {
+  return sqliteVecLoaded;
 }
 
 export function getSqlite() {
@@ -440,6 +458,11 @@ function initTables(sqlite: Database.Database) {
 
   // Migration: sync 同步表
   initSyncTables(sqlite);
+
+  // Migration: articles 表新增 metadata 列
+  try {
+    sqlite.exec(`ALTER TABLE articles ADD COLUMN metadata TEXT`);
+  } catch { /* Column already exists */ }
 }
 
 export { schema };

@@ -29,6 +29,7 @@ import type {
   AIPromptPreset,
   AIPromptPresetTarget,
   SyncStatus,
+  EmbeddingConfig,
 } from '../../shared/types';
 import { changeLanguage, supportedLanguages } from '../../i18n';
 import {
@@ -73,6 +74,7 @@ const SECONDARY_SECTION_LABELS: Record<SecondaryPreferenceSectionId, string> = {
   'asr-credentials-tencent': '腾讯云凭据',
   'ai-models': '模型与密钥',
   'ai-prompts': '快捷提示词',
+  'ai-smart': '智能功能',
   'ai-debug': '调试面板',
   'sync-general': 'iCloud 同步',
 };
@@ -106,6 +108,19 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [draggingPromptId, setDraggingPromptId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillPhase, setBackfillPhase] = useState('');
+  const [backfillCurrent, setBackfillCurrent] = useState(0);
+  const [backfillTotal, setBackfillTotal] = useState(0);
+  const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
+    apiKey: '',
+    baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+    modelId: 'doubao-embedding-vision-251215',
+    dimensions: 2048,
+  });
+  const [embeddingDirty, setEmbeddingDirty] = useState(false);
+  const [embeddingSaving, setEmbeddingSaving] = useState(false);
+  const [showEmbeddingKey, setShowEmbeddingKey] = useState(false);
 
   const { showToast } = useToast();
 
@@ -123,6 +138,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setNewPromptTitle('');
       setNewPromptContent('');
       setNewPromptEnabled(true);
+      setEmbeddingDirty(false);
+      setShowEmbeddingKey(false);
       setPromptPresetsLoading(true);
 
       Promise.all([
@@ -130,8 +147,9 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
         window.electronAPI.aiSettingsGet().catch(() => null),
         window.electronAPI.aiPromptPresetList().catch(() => []),
         window.electronAPI.syncGetStatus().catch(() => null),
+        window.electronAPI.embeddingConfigGet().catch(() => null),
       ])
-        .then(([s, ai, presets, sync]) => {
+        .then(([s, ai, presets, sync, embConf]) => {
           setSettings(s);
           if (ai) {
             setAiSettings(ai);
@@ -139,6 +157,9 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
           setPromptPresets(presets as AIPromptPreset[]);
           if (sync) {
             setSyncStatus(sync);
+          }
+          if (embConf) {
+            setEmbeddingConfig(embConf);
           }
         })
         .catch((err) => console.error('Failed to load settings:', err))
@@ -167,6 +188,37 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       setActiveSecondary(getFirstSecondarySection(activePrimary, settings));
     }
   }, [open, activePrimary, activeSecondary, settings.asrProvider]);
+
+  // Backfill progress listener + initial status query
+  useEffect(() => {
+    if (!open) return;
+    // Query initial backfill status
+    window.electronAPI.ragBackfillStatus().then((status) => {
+      setBackfillRunning(status.running);
+      if (status.running) {
+        setBackfillPhase(status.phase || '');
+        setBackfillCurrent(status.current || 0);
+        setBackfillTotal(status.total || 0);
+      }
+    }).catch(() => {});
+
+    // Subscribe to progress events
+    const unsubscribe = window.electronAPI.ragBackfillOnProgress((progress) => {
+      if (progress.phase === 'done') {
+        setBackfillRunning(false);
+        setBackfillPhase('');
+        setBackfillCurrent(0);
+        setBackfillTotal(0);
+      } else {
+        setBackfillRunning(true);
+        setBackfillPhase(progress.phase);
+        setBackfillCurrent(progress.current);
+        setBackfillTotal(progress.total);
+      }
+    });
+
+    return unsubscribe;
+  }, [open]);
 
   const secondarySections = getSecondarySectionsForPrimary(activePrimary, settings);
   const dialogLayout = getPreferencesDialogLayout();
@@ -221,6 +273,25 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
       showToast(t('preferences.saveFailed'));
     } finally {
       setAiSaving(false);
+    }
+  };
+
+  const updateEmbeddingField = <K extends keyof EmbeddingConfig>(key: K, value: EmbeddingConfig[K]) => {
+    setEmbeddingConfig((prev) => ({ ...prev, [key]: value }));
+    setEmbeddingDirty(true);
+  };
+
+  const handleEmbeddingSave = async () => {
+    setEmbeddingSaving(true);
+    try {
+      await window.electronAPI.embeddingConfigSet(embeddingConfig);
+      setEmbeddingDirty(false);
+      showToast('Embedding 配置已保存');
+    } catch (err) {
+      console.error('Failed to save embedding config:', err);
+      showToast('保存 Embedding 配置失败');
+    } finally {
+      setEmbeddingSaving(false);
     }
   };
 
@@ -1019,6 +1090,247 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     </section>
   );
 
+  const renderAiSmartSection = () => {
+    const smartEnabled = settings.feedSmartRecommendEnabled ?? false;
+    const batchSize = settings.ragBackfillBatchSize ?? 50;
+    const progressPct = backfillTotal > 0 ? Math.round((backfillCurrent / backfillTotal) * 100) : 0;
+
+    const phaseLabel = backfillPhase === 'indexing'
+      ? '正在索引文章…'
+      : backfillPhase === 'relevance'
+        ? '正在计算相关度…'
+        : '';
+
+    return (
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Brain size={16} className="text-purple-400" />
+          <h3 className="text-sm font-medium text-white">智能功能</h3>
+        </div>
+
+        <div className="space-y-6">
+          {/* Embedding 独立配置 */}
+          <div>
+            <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Embedding 配置</h4>
+            <p className="text-[11px] text-gray-500 mb-3">
+              向量嵌入服务独立配置，用于 RAG 检索和相关度计算。
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="emb-api-key" className="block text-xs font-medium text-gray-400 mb-1.5">
+                  API Key
+                </label>
+                <div className="relative">
+                  <input
+                    id="emb-api-key"
+                    type={showEmbeddingKey ? 'text' : 'password'}
+                    value={embeddingConfig.apiKey}
+                    onChange={(e) => updateEmbeddingField('apiKey', e.target.value)}
+                    placeholder="输入 Embedding API Key"
+                    className="w-full px-3 py-2 pr-10 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmbeddingKey(!showEmbeddingKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-300"
+                  >
+                    {showEmbeddingKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="emb-base-url" className="block text-xs font-medium text-gray-400 mb-1.5">
+                  Base URL
+                </label>
+                <input
+                  id="emb-base-url"
+                  type="text"
+                  value={embeddingConfig.baseURL}
+                  onChange={(e) => updateEmbeddingField('baseURL', e.target.value)}
+                  placeholder="https://ark.cn-beijing.volces.com/api/v3"
+                  className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label htmlFor="emb-model-id" className="block text-xs font-medium text-gray-400 mb-1.5">
+                    Model ID
+                  </label>
+                  <input
+                    id="emb-model-id"
+                    type="text"
+                    value={embeddingConfig.modelId}
+                    onChange={(e) => updateEmbeddingField('modelId', e.target.value)}
+                    placeholder="doubao-embedding-vision-251215"
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="w-28">
+                  <label htmlFor="emb-dimensions" className="block text-xs font-medium text-gray-400 mb-1.5">
+                    维度
+                  </label>
+                  <input
+                    id="emb-dimensions"
+                    type="number"
+                    min={128}
+                    max={8192}
+                    value={embeddingConfig.dimensions}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 128) updateEmbeddingField('dimensions', val);
+                    }}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-600">
+                更改维度后，已有向量索引将自动清空并在下次回填时重建。
+              </p>
+
+              {embeddingDirty && (
+                <button
+                  disabled={embeddingSaving || !embeddingConfig.apiKey.trim()}
+                  onClick={handleEmbeddingSave}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-md text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {embeddingSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  <span>{embeddingSaving ? '保存中...' : '保存 Embedding 配置'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 分隔线 */}
+          <div className="border-t border-white/5" />
+
+          {/* Feed 智能推荐开关 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white">Feed 智能推荐</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                自动计算 Feed 文章与 Library 内容的相关度并标记
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                const newVal = !smartEnabled;
+                updateField('feedSmartRecommendEnabled', newVal);
+                try {
+                  await window.electronAPI.settingsSet({ feedSmartRecommendEnabled: newVal });
+                } catch (err) {
+                  console.error('Failed to save feedSmartRecommendEnabled:', err);
+                }
+              }}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                smartEnabled ? 'bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                smartEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          {/* 分隔线 */}
+          <div className="border-t border-white/5" />
+
+          {/* 批量回填 */}
+          <div>
+            <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">批量回填</h4>
+            <p className="text-[11px] text-gray-500 mb-3">
+              对已有文章执行 RAG 索引和相关度计算。新文章会自动处理，此功能用于处理历史数据。
+            </p>
+
+            <div className="mb-4">
+              <label
+                htmlFor="backfill-batch-size"
+                className="block text-xs font-medium text-gray-400 mb-1.5"
+              >
+                每批处理数量
+              </label>
+              <input
+                id="backfill-batch-size"
+                type="number"
+                min={10}
+                max={500}
+                value={batchSize}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 10) {
+                    updateField('ragBackfillBatchSize', val);
+                    window.electronAPI.settingsSet({ ragBackfillBatchSize: val }).catch((err: unknown) => {
+                      console.error('Failed to save ragBackfillBatchSize:', err);
+                    });
+                  }
+                }}
+                className="w-32 px-3 py-2 bg-[#111] border border-white/10 rounded-md text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-[11px] text-gray-600 mt-1">
+                每批处理的文章数量，默认 50。数值越大速度越快但占用更多资源。
+              </p>
+            </div>
+
+            {/* 进度条 */}
+            {backfillRunning && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-gray-400">{phaseLabel}</span>
+                  <span className="text-gray-500">{backfillCurrent} / {backfillTotal} ({progressPct}%)</span>
+                </div>
+                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2">
+              {!backfillRunning ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      setBackfillRunning(true);
+                      await window.electronAPI.ragBackfillStart();
+                    } catch (err) {
+                      console.error('Failed to start backfill:', err);
+                      setBackfillRunning(false);
+                      showToast('启动回填失败');
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-md text-sm text-white transition-colors"
+                >
+                  <RefreshCw size={14} />
+                  <span>开始回填</span>
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      await window.electronAPI.ragBackfillCancel();
+                    } catch (err) {
+                      console.error('Failed to cancel backfill:', err);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-md text-sm text-white transition-colors"
+                >
+                  <X size={14} />
+                  <span>取消回填</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderSyncSection = () => {
     const icloudAvailable = syncStatus?.icloudAvailable ?? false;
     const enabled = syncStatus?.enabled ?? false;
@@ -1137,6 +1449,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     if (activeSecondary === 'asr-credentials-tencent') return renderAsrTencentSection();
     if (activeSecondary === 'ai-models') return renderAiModelsSection();
     if (activeSecondary === 'ai-prompts') return renderAiPromptsSection();
+    if (activeSecondary === 'ai-smart') return renderAiSmartSection();
     if (activeSecondary === 'sync-general') return renderSyncSection();
     return <AIDebugPanel />;
   };

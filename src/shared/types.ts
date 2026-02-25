@@ -85,6 +85,7 @@ export interface Article {
   audioDuration: number | null;
   episodeNumber: number | null;
   seasonNumber: number | null;
+  metadata?: string | null;
   createdAt: string;
   updatedAt: string;
   feedTitle?: string | null;
@@ -326,6 +327,9 @@ export interface AppSettings {
   syncEnabled?: boolean;
   syncBooks?: boolean;
   syncPodcasts?: boolean;
+  // 智能功能
+  feedSmartRecommendEnabled?: boolean;
+  ragBackfillBatchSize?: number;
 }
 
 // ==================== Discover 相关类型 ====================
@@ -845,6 +849,38 @@ export interface ElectronAPI {
   wechatGetComments: (articleId: string) => Promise<WechatComment[]>;
   wechatCancelTask: (feedId: string) => Promise<void>;
   wechatOnProgress: (callback: (event: WechatProgressEvent) => void) => () => void;
+
+  // Knowledge Graph (知识图谱)
+  kgExtract: (input: KGExtractInput) => Promise<KGExtractResult>;
+  kgGetArticleGraph: (sourceType: string, sourceId: string) => Promise<KGGraphData>;
+  kgGetOverview: (topN?: number) => Promise<KGGraphData>;
+  kgSearchEntities: (query: string, type?: string) => Promise<KGEntity[]>;
+  kgGetSubgraph: (entityId: string, depth?: number) => Promise<KGGraphData>;
+  kgGetStats: () => Promise<KGStats>;
+  kgRemove: (sourceType: string, sourceId: string) => Promise<void>;
+
+  // Feed Relevance (智能推荐)
+  feedRelevanceCompute: (input: FeedRelevanceComputeInput) => Promise<FeedRelevanceResult>;
+  feedRelevanceBatch: (input: FeedRelevanceBatchInput) => Promise<FeedRelevanceResult[]>;
+
+  // Writing Assist (写作辅助)
+  writingAssistSearch: (input: WritingAssistSearchInput) => Promise<WritingAssistSearchResult>;
+  writingAssistGenerate: (input: WritingAssistGenerateInput) => void;
+  writingAssistOnStream: (callback: (chunk: WritingAssistStreamChunk) => void) => () => void;
+
+  // RAG Backfill (批量回填)
+  ragBackfillStart: () => Promise<void>;
+  ragBackfillCancel: () => Promise<void>;
+  ragBackfillStatus: () => Promise<RAGBackfillStatus>;
+  ragBackfillOnProgress: (callback: (progress: RAGBackfillProgress) => void) => () => void;
+
+  // RAG Incremental (增量索引)
+  ragReindex: (sourceType: string, sourceId: string) => Promise<void>;
+  ragCleanup: (sourceType: string, sourceId: string) => Promise<void>;
+
+  // Embedding Config (Embedding 独立配置)
+  embeddingConfigGet: () => Promise<EmbeddingConfig | null>;
+  embeddingConfigSet: (config: EmbeddingConfig) => Promise<void>;
 }
 
 // ── Sync ──
@@ -931,4 +967,239 @@ export interface WechatProgressEvent {
   currentTitle: string;
   status: 'running' | 'pausing' | 'completed' | 'error' | 'cancelled';
   error?: string;
+}
+
+// ==================== RAG 知识库相关类型 ====================
+
+/** RAG Chat 输入 */
+export interface RAGChatSendInput {
+  sessionId: string;
+  message: string;
+  filters?: {
+    sourceTypes?: ('article' | 'book' | 'highlight' | 'transcript')[];
+    partition?: 'library' | 'feed';
+  };
+}
+
+/** RAG Chat Stream Chunk */
+export interface RAGChatStreamChunk {
+  type: 'text-delta' | 'done' | 'error';
+  textDelta?: string;
+  error?: string;
+  tokenCount?: number;
+  fullText?: string;
+  references?: Array<{
+    sourceType: string;
+    sourceId: string;
+    title: string | null;
+    chunkIndex: number;
+  }>;
+}
+
+/** RAG 检索查询 */
+export interface RAGSearchQuery {
+  text: string;
+  topK?: number;
+  filters?: {
+    sourceTypes?: ('article' | 'book' | 'highlight' | 'transcript')[];
+    sourceIds?: string[];
+    partition?: 'library' | 'feed';
+  };
+  mode?: 'hybrid' | 'vector' | 'keyword';
+}
+
+/** RAG 检索结果 */
+export interface RAGSearchResult {
+  chunkId: string;
+  content: string;
+  score: number;
+  sourceType: string;
+  sourceId: string;
+  chunkIndex: number;
+  metadata: Record<string, unknown>;
+}
+
+/** RAG 入库输入 */
+export interface RAGIngestInput {
+  sourceType: 'article' | 'book' | 'highlight' | 'transcript';
+  sourceId: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** RAG 入库结果 */
+export interface RAGIngestResult {
+  sourceType: string;
+  sourceId: string;
+  chunksCreated: number;
+  embeddingsGenerated: number;
+  totalTokens: number;
+  success: boolean;
+  error?: string;
+}
+
+/** RAG 索引状态 */
+export interface RAGIndexStatus {
+  totalChunks: number;
+  pendingChunks: number;
+  doneChunks: number;
+  failedChunks: number;
+}
+
+// ==================== 知识图谱相关类型 ====================
+
+/** 知识图谱实体类型 */
+export type KGEntityType = 'concept' | 'person' | 'technology' | 'topic' | 'organization';
+
+/** 知识图谱关系类型 */
+export type KGRelationType =
+  | 'related_to'
+  | 'part_of'
+  | 'prerequisite'
+  | 'contrasts_with'
+  | 'applied_in'
+  | 'created_by';
+
+/** 知识图谱节点 */
+export interface KGGraphNode {
+  id: string;
+  name: string;
+  type: KGEntityType;
+  mentionCount: number;
+  sourceCount: number;
+  description?: string;
+}
+
+/** 知识图谱边 */
+export interface KGGraphEdge {
+  source: string;
+  target: string;
+  relationType: string;
+  strength: number;
+  evidenceCount: number;
+}
+
+/** 知识图谱数据 */
+export interface KGGraphData {
+  nodes: KGGraphNode[];
+  edges: KGGraphEdge[];
+}
+
+/** 知识图谱实体（完整信息） */
+export interface KGEntity {
+  id: string;
+  name: string;
+  type: KGEntityType;
+  description: string | null;
+  aliases: string[];
+  mentionCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 知识图谱抽取输入 */
+export interface KGExtractInput {
+  sourceType: 'article' | 'book' | 'highlight' | 'transcript';
+  sourceId: string;
+}
+
+/** 知识图谱抽取结果 */
+export interface KGExtractResult {
+  entitiesCreated: number;
+  entitiesUpdated: number;
+  relationsCreated: number;
+  relationsUpdated: number;
+  success: boolean;
+  error?: string;
+}
+
+/** 知识图谱统计 */
+export interface KGStats {
+  entityCount: number;
+  relationCount: number;
+  sourceCount: number;
+}
+
+// ==================== Feed 智能推荐类型 ====================
+
+export interface FeedRelevanceInfo {
+  score: number;
+  label: 'high' | 'medium' | 'none';
+  topMatches: string[];
+  computedAt: string;
+}
+
+export interface FeedRelevanceComputeInput {
+  articleId: string;
+}
+
+export interface FeedRelevanceBatchInput {
+  articleIds: string[];
+}
+
+export interface FeedRelevanceResult {
+  articleId: string;
+  relevance: FeedRelevanceInfo;
+}
+
+// ==================== 写作辅助类型 ====================
+
+export interface WritingAssistSearchInput {
+  topic: string;
+  topK?: number;
+}
+
+export interface WritingAssistSearchResult {
+  articles: Array<{
+    id: string;
+    title: string | null;
+    relevance: number;
+    snippets: string[];
+  }>;
+  entities: Array<{
+    name: string;
+    type: string;
+    description: string | null;
+  }>;
+  highlights: Array<{
+    text: string;
+    articleTitle: string | null;
+  }>;
+}
+
+export interface WritingAssistGenerateInput {
+  topic: string;
+  searchResults: WritingAssistSearchResult;
+}
+
+export interface WritingAssistStreamChunk {
+  type: 'text-delta' | 'done' | 'error';
+  textDelta?: string;
+  error?: string;
+  fullText?: string;
+}
+
+// ==================== 批量回填类型 ====================
+
+export interface RAGBackfillProgress {
+  phase: 'indexing' | 'relevance' | 'done';
+  current: number;
+  total: number;
+  currentTitle?: string;
+}
+
+export interface RAGBackfillStatus {
+  running: boolean;
+  phase?: string;
+  current?: number;
+  total?: number;
+}
+
+// ==================== Embedding 独立配置 ====================
+
+export interface EmbeddingConfig {
+  apiKey: string;
+  baseURL: string;
+  modelId: string;
+  dimensions: number;
 }

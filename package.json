@@ -75,8 +75,10 @@
     "pdfjs-dist": "^5.4.624",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-force-graph-2d": "^1.29.1",
     "react-i18next": "^16.5.4",
     "rss-parser": "^3.13.0",
+    "sqlite-vec": "0.1.7-alpha.2",
     "ws": "^8.19.0",
     "youtubei.js": "^16.0.1",
     "zod": "^4.3.6"

@@ -19,6 +19,12 @@ import { registerNotificationHandlers } from './notification-handlers';
 import { registerExternalHandlers } from './external-handlers';
 import { registerSyncHandlers } from './sync-handlers';
 import { registerWechatHandlers } from './wechat-handlers';
+import { registerRAGHandlers } from './rag-handlers';
+import { registerKGHandlers } from './kg-handlers';
+import { registerFeedRelevanceHandlers } from './feed-relevance-handlers';
+import { registerWritingAssistHandlers } from './writing-assist-handlers';
+import { registerBackfillHandlers } from './backfill-handlers';
+import { registerEmbeddingConfigHandlers } from './embedding-config-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -42,4 +48,10 @@ export function registerAllIpcHandlers() {
   registerExternalHandlers();
   registerSyncHandlers();
   registerWechatHandlers();
+  registerRAGHandlers();
+  registerKGHandlers();
+  registerFeedRelevanceHandlers();
+  registerWritingAssistHandlers();
+  registerBackfillHandlers();
+  registerEmbeddingConfigHandlers();
 }

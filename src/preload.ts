@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent, WritingAssistStreamChunk, RAGBackfillProgress, EmbeddingConfig } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -228,6 +228,46 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.on(IPC_CHANNELS.WECHAT_PROGRESS, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.WECHAT_PROGRESS, handler);
   },
+
+  // Knowledge Graph (知识图谱)
+  kgExtract: (input) => ipcRenderer.invoke(IPC_CHANNELS.KG_EXTRACT, input),
+  kgGetArticleGraph: (sourceType, sourceId) => ipcRenderer.invoke(IPC_CHANNELS.KG_GET_ARTICLE_GRAPH, sourceType, sourceId),
+  kgGetOverview: (topN) => ipcRenderer.invoke(IPC_CHANNELS.KG_GET_OVERVIEW, topN),
+  kgSearchEntities: (query, type) => ipcRenderer.invoke(IPC_CHANNELS.KG_SEARCH_ENTITIES, query, type),
+  kgGetSubgraph: (entityId, depth) => ipcRenderer.invoke(IPC_CHANNELS.KG_GET_SUBGRAPH, entityId, depth),
+  kgGetStats: () => ipcRenderer.invoke(IPC_CHANNELS.KG_GET_STATS),
+  kgRemove: (sourceType, sourceId) => ipcRenderer.invoke(IPC_CHANNELS.KG_REMOVE, sourceType, sourceId),
+
+  // Feed Relevance (智能推荐)
+  feedRelevanceCompute: (input) => ipcRenderer.invoke(IPC_CHANNELS.FEED_RELEVANCE_COMPUTE, input),
+  feedRelevanceBatch: (input) => ipcRenderer.invoke(IPC_CHANNELS.FEED_RELEVANCE_BATCH, input),
+
+  // Writing Assist (写作辅助)
+  writingAssistSearch: (input) => ipcRenderer.invoke(IPC_CHANNELS.WRITING_ASSIST_SEARCH, input),
+  writingAssistGenerate: (input) => ipcRenderer.send(IPC_CHANNELS.WRITING_ASSIST_GENERATE, input),
+  writingAssistOnStream: (callback: (chunk: WritingAssistStreamChunk) => void) => {
+    const handler = (_event: IpcRendererEvent, chunk: WritingAssistStreamChunk) => callback(chunk);
+    ipcRenderer.on(IPC_CHANNELS.WRITING_ASSIST_STREAM, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.WRITING_ASSIST_STREAM, handler);
+  },
+
+  // RAG Backfill (批量回填)
+  ragBackfillStart: () => ipcRenderer.invoke(IPC_CHANNELS.RAG_BACKFILL_START),
+  ragBackfillCancel: () => ipcRenderer.invoke(IPC_CHANNELS.RAG_BACKFILL_CANCEL),
+  ragBackfillStatus: () => ipcRenderer.invoke(IPC_CHANNELS.RAG_BACKFILL_STATUS),
+  ragBackfillOnProgress: (callback: (progress: RAGBackfillProgress) => void) => {
+    const handler = (_event: IpcRendererEvent, progress: RAGBackfillProgress) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.RAG_BACKFILL_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.RAG_BACKFILL_PROGRESS, handler);
+  },
+
+  // RAG Incremental (增量索引)
+  ragReindex: (sourceType, sourceId) => ipcRenderer.invoke(IPC_CHANNELS.RAG_REINDEX, sourceType, sourceId),
+  ragCleanup: (sourceType, sourceId) => ipcRenderer.invoke(IPC_CHANNELS.RAG_CLEANUP, sourceType, sourceId),
+
+  // Embedding Config (Embedding 独立配置)
+  embeddingConfigGet: () => ipcRenderer.invoke(IPC_CHANNELS.EMBEDDING_CONFIG_GET),
+  embeddingConfigSet: (config: EmbeddingConfig) => ipcRenderer.invoke(IPC_CHANNELS.EMBEDDING_CONFIG_SET, config),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

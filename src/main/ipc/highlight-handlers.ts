@@ -5,6 +5,7 @@ import { getDatabase, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import type { CreateHighlightInput, CreateBookHighlightInput, UpdateHighlightInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
+import { triggerIndexHighlight, triggerCleanupHighlight } from './incremental-index-hooks';
 
 export function registerHighlightHandlers() {
   const { HIGHLIGHT_LIST, HIGHLIGHT_CREATE, HIGHLIGHT_DELETE, HIGHLIGHT_UPDATE } = IPC_CHANNELS;
@@ -48,6 +49,17 @@ export function registerHighlightHandlers() {
       .from(schema.highlights)
       .where(eq(schema.highlights.id, id));
 
+    // 异步索引高亮到 RAG
+    if (result?.text && result.articleId) {
+      triggerIndexHighlight({
+        id: result.id,
+        articleId: result.articleId,
+        text: result.text,
+      }).catch((err) => {
+        console.error('Index highlight failed:', err);
+      });
+    }
+
     return result;
   });
 
@@ -59,6 +71,10 @@ export function registerHighlightHandlers() {
       .set({ deletedFlg: 1, updatedAt: now })
       .where(eq(schema.highlights.id, id));
     getGlobalTracker()?.trackChange({ table: 'highlights', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
+    // 异步清理 RAG 索引
+    triggerCleanupHighlight(id).catch((err) => {
+      console.error('Cleanup highlight failed:', err);
+    });
   });
 
   // Book 高亮列表

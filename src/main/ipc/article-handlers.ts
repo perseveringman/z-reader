@@ -19,6 +19,9 @@ import {
 } from '../services/local-media-import';
 import type { ArticleListQuery, UpdateArticleInput, ArticleSearchQuery, SaveUrlInput } from '../../shared/types';
 import { getGlobalTracker } from './sync-handlers';
+import { triggerRAGIndexForArticle } from './rag-index-hook';
+import { triggerKGExtractForArticle } from './kg-index-hook';
+import { triggerCleanupArticle } from './incremental-index-hooks';
 
 function isArxivPdfUrl(rawUrl: string): boolean {
   try {
@@ -142,6 +145,10 @@ export function registerArticleHandlers() {
     const now = new Date().toISOString();
     await db.update(schema.articles).set({ deletedFlg: 1, updatedAt: now }).where(eq(schema.articles.id, id));
     getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'delete', changedFields: { deletedFlg: 1 } });
+    // 异步清理 RAG/KG 索引
+    triggerCleanupArticle(id).catch((err) => {
+      console.error('Cleanup failed for deleted article', id, err);
+    });
   });
 
   ipcMain.handle(ARTICLE_PARSE_CONTENT, async (_event, id: string) => {
@@ -205,6 +212,10 @@ export function registerArticleHandlers() {
   // 永久删除文章
   ipcMain.handle(ARTICLE_PERMANENT_DELETE, async (_event, id: string) => {
     const db = getDatabase();
+    // 先清理索引再删除记录
+    triggerCleanupArticle(id).catch((err) => {
+      console.error('Cleanup failed for permanent delete', id, err);
+    });
     await db.delete(schema.articles).where(eq(schema.articles.id, id));
   });
 
@@ -519,6 +530,15 @@ export function registerArticleHandlers() {
     }).where(eq(schema.articles.id, id));
     getGlobalTracker()?.trackChange({ table: 'articles', recordId: id, operation: 'update', changedFields: { source: 'library', readStatus: 'inbox' } });
     const [result] = await db.select().from(schema.articles).where(eq(schema.articles.id, id));
+
+    // 异步触发 RAG 索引 → KG 实体抽取（不阻塞返回）
+    // KG 抽取依赖 RAG 的 chunks 数据，需串联在 RAG 之后
+    triggerRAGIndexForArticle(result)
+      .then(() => triggerKGExtractForArticle(result))
+      .catch((err) => {
+        console.error('RAG/KG index failed for article', id, err);
+      });
+
     return result;
   });
 }

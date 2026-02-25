@@ -5,6 +5,7 @@ import { getDatabase, schema } from '../db';
 import { parseArticleContent } from './parser-service';
 import { estimateReadingTimeMinutes, estimateWordCount } from './text-stats';
 import { buildArticleTextStatsPatch } from './article-text-stats';
+import { triggerFeedRelevanceCompute } from '../ipc/feed-relevance-hook';
 
 const parser = new Parser({
   timeout: 15000,
@@ -259,6 +260,15 @@ export async function fetchFeed(feedId: string): Promise<FetchResult> {
       }
 
       newArticles++;
+
+      // 异步触发 Feed 智能推荐相关度计算（不阻塞）
+      triggerFeedRelevanceCompute({
+        id: articleId,
+        title: item.title ?? null,
+        contentText: contentText || null,
+      }).catch((err) => {
+        console.error('Feed relevance compute failed for article', articleId, err);
+      });
     }
 
     const feedTitle = parsed.title ?? feed.title;

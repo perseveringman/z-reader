@@ -42,6 +42,7 @@ describe('preferences layout model', () => {
     expect(sections.map((section) => section.id)).toEqual([
       'ai-models',
       'ai-prompts',
+      'ai-smart',
       'ai-debug',
     ]);
   });

@@ -20,3 +20,24 @@ export const DEFAULT_AI_CONFIG: AIProviderConfig = {
     cheap: 'google/gemini-2.0-flash-001',
   },
 };
+
+import type { EmbeddingConfig } from '../../shared/types';
+import type Database from 'better-sqlite3';
+import { AIDatabase } from './db';
+import { DEFAULT_EMBEDDING_CONFIG } from '../services/embedding';
+
+/**
+ * 从数据库读取 Embedding 独立配置
+ * 如果未配置则返回 null
+ */
+export function getEmbeddingConfig(sqlite: Database.Database): EmbeddingConfig | null {
+  const aiDb = new AIDatabase(sqlite);
+  const saved = aiDb.getSetting('embeddingConfig') as EmbeddingConfig | null;
+  if (!saved || !saved.apiKey) return null;
+  return {
+    ...DEFAULT_EMBEDDING_CONFIG,
+    ...saved,
+    // dimensions 始终由 DEFAULT_EMBEDDING_CONFIG 决定，避免旧配置中残留的维度值
+    dimensions: DEFAULT_EMBEDDING_CONFIG.dimensions,
+  };
+}
