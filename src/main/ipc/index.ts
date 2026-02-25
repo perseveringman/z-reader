@@ -26,6 +26,7 @@ import { registerWritingAssistHandlers } from './writing-assist-handlers';
 import { registerBackfillHandlers } from './backfill-handlers';
 import { registerEmbeddingConfigHandlers } from './embedding-config-handlers';
 import { registerAgentHandlers } from './agent-handlers';
+import { registerTranslationHandlers } from './translation-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -56,4 +57,5 @@ export function registerAllIpcHandlers() {
   registerBackfillHandlers();
   registerEmbeddingConfigHandlers();
   registerAgentHandlers();
+  registerTranslationHandlers();
 }

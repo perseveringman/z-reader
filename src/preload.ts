@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from './shared/ipc-channels';
-import type { ElectronAPI, ChatStreamChunk, AgentStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent, WritingAssistStreamChunk, RAGBackfillProgress, EmbeddingConfig } from './shared/types';
+import type { ElectronAPI, ChatStreamChunk, AgentStreamChunk, AsrProgressEvent, AsrSegmentEvent, AsrCompleteEvent, AsrErrorEvent, AppTask, AppNotification, WechatProgressEvent, WritingAssistStreamChunk, RAGBackfillProgress, EmbeddingConfig, TranslationProgressEvent } from './shared/types';
 
 const electronAPI: ElectronAPI = {
   // Feed
@@ -283,6 +283,20 @@ const electronAPI: ElectronAPI = {
   // Embedding Config (Embedding 独立配置)
   embeddingConfigGet: () => ipcRenderer.invoke(IPC_CHANNELS.EMBEDDING_CONFIG_GET),
   embeddingConfigSet: (config: EmbeddingConfig) => ipcRenderer.invoke(IPC_CHANNELS.EMBEDDING_CONFIG_SET, config),
+
+  // Translation 沉浸式翻译
+  translationStart: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_START, input),
+  translationCancel: (id) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_CANCEL, id),
+  translationGet: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_GET, input),
+  translationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_DELETE, id),
+  translationList: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_LIST, articleId),
+  translationOnProgress: (callback: (event: TranslationProgressEvent) => void) => {
+    const handler = (_event: IpcRendererEvent, event: TranslationProgressEvent) => callback(event);
+    ipcRenderer.on(IPC_CHANNELS.TRANSLATION_ON_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.TRANSLATION_ON_PROGRESS, handler);
+  },
+  translationSettingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_SETTINGS_GET),
+  translationSettingsSet: (partial) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_SETTINGS_SET, partial),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
