@@ -632,6 +632,30 @@ export interface AgentConfirmResponse {
 /** Agent 操作分级 */
 export type AgentActionLevel = 'read' | 'write' | 'navigate';
 
+/** Agent 主动建议触发器 */
+export interface AgentSuggestionTrigger {
+  id: string;
+  reason: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+/** Agent 主动建议 */
+export interface AgentSuggestion {
+  message: string;
+  quickActions: Array<{
+    label: string;
+    prompt: string;
+  }>;
+  autoDismissMs?: number;
+}
+
+/** Agent 建议规则 */
+export interface AgentSuggestionRule {
+  id: string;
+  check: (prev: AgentViewState | null, next: AgentViewState) => AgentSuggestionTrigger | null;
+  generate: (trigger: AgentSuggestionTrigger, viewState: AgentViewState) => AgentSuggestion;
+}
+
 /** 主题提取输入 */
 export interface AIExtractTopicsInput {
   articleId: string;
