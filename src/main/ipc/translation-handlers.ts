@@ -36,26 +36,29 @@ export function registerTranslationHandlers() {
     // 如果未确认，先检查是否有关联高亮
     if (!confirmed) {
       const db = getDatabase();
-      // 查询高亮表中 anchorPath 包含 'data-translation' 的记录
-      // 这些高亮是在翻译文本上创建的
-      const highlights = await db.select()
-        .from(schema.highlights)
-        .where(
-          and(
-            // anchorPath 中包含 data-translation 表示是翻译文本上的高亮
-            sql`${schema.highlights.anchorPath} LIKE '%data-translation%'`,
-            eq(schema.highlights.deletedFlg, 0),
-          )
-        );
 
-      // 过滤出属于该翻译对应文章的高亮
-      // 需要先获取翻译记录来知道 articleId
+      // 先获取翻译记录
       const [translation] = await db.select()
         .from(schema.translations)
         .where(eq(schema.translations.id, id));
 
-      if (translation?.articleId) {
-        const relatedHighlights = highlights.filter(h => h.articleId === translation.articleId);
+      if (translation) {
+        // 构建条件：anchorPath 包含 data-translation + 未软删除 + 匹配 articleId 或 bookId
+        const conditions = [
+          sql`${schema.highlights.anchorPath} LIKE '%data-translation%'`,
+          eq(schema.highlights.deletedFlg, 0),
+        ];
+
+        if (translation.articleId) {
+          conditions.push(eq(schema.highlights.articleId, translation.articleId));
+        } else if (translation.bookId) {
+          conditions.push(eq(schema.highlights.bookId, translation.bookId));
+        }
+
+        const relatedHighlights = await db.select({ id: schema.highlights.id })
+          .from(schema.highlights)
+          .where(and(...conditions));
+
         if (relatedHighlights.length > 0) {
           return { needConfirm: true, highlightCount: relatedHighlights.length };
         }

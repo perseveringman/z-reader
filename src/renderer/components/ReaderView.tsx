@@ -331,8 +331,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         { index: event.index, original: '', translated: event.translated },
         translationDisplayRef.current,
       );
-      // 刷新高亮
-      applyHighlights();
 
       // 更新进度
       const total = translationData.paragraphs.length || 1;
@@ -343,6 +341,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         setTranslationLoading(false);
         setTranslationVisible(true);
         setTranslationProgress(null);
+        // 翻译全部完成后刷新高亮（避免频繁全量 DOM 操作）
+        applyHighlights();
       }
     });
 

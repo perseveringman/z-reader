@@ -42,8 +42,8 @@ const DEFAULT_SETTINGS: TranslationSettingsData = {
   provider: 'llm',
   llm: {
     apiKey: '',
-    baseUrl: '',
-    model: '',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
     style: 'professional',
     customPrompt: '',
   },
@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: TranslationSettingsData = {
   },
   microsoft: {
     apiKey: '',
-    region: '',
+    region: 'eastasia',
   },
   defaultTargetLang: 'zh-CN',
   autoDetectLang: true,
@@ -63,7 +63,7 @@ const DEFAULT_SETTINGS: TranslationSettingsData = {
     opacity: 0.85,
     showOriginal: true,
   },
-  shortcut: 'CommandOrControl+Shift+T',
+  shortcut: 'CmdOrCtrl+Shift+T',
 };
 
 export function TranslationSettings({ open, onClose }: TranslationSettingsProps) {

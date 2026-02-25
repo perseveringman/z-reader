@@ -291,58 +291,71 @@ export async function startTranslation(input: TranslationStartInput): Promise<Tr
     const existingParagraphs: TranslationParagraph[] = existing.paragraphs
       ? JSON.parse(existing.paragraphs)
       : [];
-    const lastTranslatedIndex = existingParagraphs.reduceRight(
-      (found: number, p: TranslationParagraph, i: number) =>
-        found === -1 && p.translated ? i : found,
-      -1,
-    );
 
-    // 如果有已翻译的段落，从断点继续
-    if (lastTranslatedIndex >= 0) {
-      // 将已翻译的段落合并到新的 paragraphs 中
-      for (let i = 0; i <= lastTranslatedIndex && i < paragraphs.length; i++) {
-        if (existingParagraphs[i]?.translated) {
-          paragraphs[i].translated = existingParagraphs[i].translated;
-        }
-      }
-
-      const resumeNow = new Date().toISOString();
-      const resumeProgress = (lastTranslatedIndex + 1) / paragraphs.length;
-
-      // 更新已有记录状态为 translating
+    // 检测内容是否变更，变更则不续传
+    const currentTexts = paragraphs.map(p => p.original);
+    const contentChanged = checkContentChanged(currentTexts, existingParagraphs);
+    if (contentChanged) {
+      // 内容已变更，不续传，将旧记录标记为已删除
       await db
         .update(schema.translations)
-        .set({
+        .set({ deletedFlg: 1, updatedAt: new Date().toISOString() })
+        .where(eq(schema.translations.id, existing.id));
+      // 落入下方的新建翻译逻辑
+    } else {
+      const lastTranslatedIndex = existingParagraphs.reduceRight(
+        (found: number, p: TranslationParagraph, i: number) =>
+          found === -1 && p.translated ? i : found,
+        -1,
+      );
+
+      // 如果有已翻译的段落，从断点继续
+      if (lastTranslatedIndex >= 0) {
+        // 将已翻译的段落合并到新的 paragraphs 中
+        for (let i = 0; i <= lastTranslatedIndex && i < paragraphs.length; i++) {
+          if (existingParagraphs[i]?.translated) {
+            paragraphs[i].translated = existingParagraphs[i].translated;
+          }
+        }
+
+        const resumeNow = new Date().toISOString();
+        const resumeProgress = (lastTranslatedIndex + 1) / paragraphs.length;
+
+        // 更新已有记录状态为 translating
+        await db
+          .update(schema.translations)
+          .set({
+            status: 'translating',
+            progress: resumeProgress,
+            paragraphs: JSON.stringify(paragraphs),
+            updatedAt: resumeNow,
+          })
+          .where(eq(schema.translations.id, existing.id));
+
+        // 使用已有记录 ID 开始后台翻译（从断点处开始）
+        const abortController = new AbortController();
+        runningTranslations.set(existing.id, abortController);
+
+        translateInBackground(
+          existing.id,
+          paragraphs,
+          engine,
+          sourceLang,
+          input.targetLang,
+          abortController,
+          lastTranslatedIndex + 1, // 从断点处开始
+        ).catch((err) => {
+          console.error(`翻译任务（续传）${existing.id} 异常:`, err);
+        });
+
+        return mapRowToTranslation({
+          ...existing,
           status: 'translating',
           progress: resumeProgress,
           paragraphs: JSON.stringify(paragraphs),
           updatedAt: resumeNow,
-        })
-        .where(eq(schema.translations.id, existing.id));
-
-      // 使用已有记录 ID 开始后台翻译（从断点处开始）
-      const abortController = new AbortController();
-      runningTranslations.set(existing.id, abortController);
-
-      translateInBackground(
-        existing.id,
-        paragraphs,
-        engine,
-        sourceLang,
-        input.targetLang,
-        abortController,
-        lastTranslatedIndex + 1, // 从断点处开始
-      ).catch((err) => {
-        console.error(`翻译任务（续传）${existing.id} 异常:`, err);
-      });
-
-      return mapRowToTranslation({
-        ...existing,
-        status: 'translating',
-        progress: resumeProgress,
-        paragraphs: JSON.stringify(paragraphs),
-        updatedAt: resumeNow,
-      });
+        });
+      }
     }
   }
 
