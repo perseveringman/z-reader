@@ -31,14 +31,14 @@ import type {
 import type { TaskLogRow, ChatSessionRow, PromptPresetRow, CreatePromptPresetInput, UpdatePromptPresetInput, MindmapRow } from '../../ai/providers/db';
 
 /** 获取 AI 数据库实例 */
-function getAIDatabase(): AIDatabase {
+export function getAIDatabase(): AIDatabase {
   const sqlite = getSqlite();
   if (!sqlite) throw new Error('数据库未初始化');
   return new AIDatabase(sqlite);
 }
 
 /** 加载 AI 配置（合并默认值与用户保存的配置） */
-function loadAIConfig(aiDb: AIDatabase): AIProviderConfig {
+export function loadAIConfig(aiDb: AIDatabase): AIProviderConfig {
   const saved = aiDb.getSetting('aiConfig');
   if (saved && typeof saved === 'object') {
     return { ...DEFAULT_AI_CONFIG, ...(saved as Partial<AIProviderConfig>) };
@@ -70,7 +70,7 @@ function mapTaskLogDetail(row: TaskLogRow): AITaskLogDetail {
 }
 
 /** 将 snake_case 的 ChatSessionRow 转换为 camelCase 的 ChatSession */
-function mapChatSessionRow(row: ChatSessionRow): ChatSession {
+export function mapChatSessionRow(row: ChatSessionRow): ChatSession {
   return {
     id: row.id,
     title: row.title,

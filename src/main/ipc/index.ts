@@ -25,6 +25,7 @@ import { registerFeedRelevanceHandlers } from './feed-relevance-handlers';
 import { registerWritingAssistHandlers } from './writing-assist-handlers';
 import { registerBackfillHandlers } from './backfill-handlers';
 import { registerEmbeddingConfigHandlers } from './embedding-config-handlers';
+import { registerAgentHandlers } from './agent-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -54,4 +55,5 @@ export function registerAllIpcHandlers() {
   registerWritingAssistHandlers();
   registerBackfillHandlers();
   registerEmbeddingConfigHandlers();
+  registerAgentHandlers();
 }
