@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   ArrowLeft, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  FileText, Sparkles, Mic, Settings, Download, RefreshCw, XCircle, Cloud,
+  FileText, Sparkles, Mic, Settings, Download, RefreshCw, XCircle, Cloud, Languages,
 } from 'lucide-react';
-import type { Article, Highlight, HighlightTagsMap, TranscriptSegment, AppSettings, AppTask } from '../../shared/types';
+import type { Article, Highlight, HighlightTagsMap, TranscriptSegment, AppSettings, AppTask, Translation, TranslationProgressEvent, TranslationParagraph } from '../../shared/types';
 import { useAgentContext } from '../hooks/useAgentContext';
 import { AudioPlayer, type AudioPlayerRef } from './AudioPlayer';
 import { TranscriptView } from './TranscriptView';
@@ -59,6 +59,14 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [highlightTagsMap, setHighlightTagsMap] = useState<HighlightTagsMap>({});
 
+  // 翻译状态
+  const [translationVisible, setTranslationVisible] = useState(false);
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
+  const [translationData, setTranslationData] = useState<Translation | null>(null);
+  const [translationParagraphs, setTranslationParagraphs] = useState<TranslationParagraph[]>([]);
+  const translationDisplayRef = useRef({ fontSize: 14, color: '#9ca3af', opacity: 0.85 });
+
   // Transcript / ASR 状态
   const [transcriptState, setTranscriptState] = useState<TranscriptState>('loading');
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -99,6 +107,12 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // 切换文章时重置翻译状态
+    setTranslationData(null);
+    setTranslationVisible(false);
+    setTranslationLoading(false);
+    setTranslationProgress(null);
+    setTranslationParagraphs([]);
 
     window.electronAPI.articleGet(articleId).then(async (data) => {
       if (cancelled || !data) {
@@ -539,6 +553,71 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     }
   }, [highlights, segments]);
 
+  // ==================== 翻译 ====================
+
+  // 翻译触发
+  const handleTranslate = useCallback(async (targetLang: string) => {
+    if (!article) return;
+
+    // 切换显示/隐藏
+    if (translationVisible && translationData) {
+      setTranslationVisible(false);
+      return;
+    }
+    if (translationData && !translationVisible) {
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 检查缓存
+    const cached = await window.electronAPI.translationGet({
+      articleId: article.id,
+      targetLang,
+    });
+    if (cached && cached.status === 'completed') {
+      setTranslationData(cached);
+      setTranslationParagraphs(cached.paragraphs);
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 发起翻译（sourceType 使用 'transcript'）
+    setTranslationLoading(true);
+    setTranslationProgress(null);
+    try {
+      const translation = await window.electronAPI.translationStart({
+        articleId: article.id,
+        sourceType: 'transcript',
+        targetLang,
+      });
+      setTranslationData(translation);
+    } catch (err) {
+      console.error('翻译启动失败:', err);
+      setTranslationLoading(false);
+    }
+  }, [article, translationVisible, translationData]);
+
+  // 翻译进度监听
+  useEffect(() => {
+    if (!translationData?.id) return;
+    const unsubscribe = window.electronAPI.translationOnProgress((event: TranslationProgressEvent) => {
+      if (event.translationId !== translationData.id) return;
+      setTranslationParagraphs((prev) => {
+        const next = [...prev];
+        next[event.index] = { index: event.index, original: '', translated: event.translated };
+        return next;
+      });
+      const total = translationData.paragraphs.length || 1;
+      setTranslationProgress({ done: Math.ceil(event.progress * total), total });
+      if (event.progress >= 1) {
+        setTranslationLoading(false);
+        setTranslationVisible(true);
+        setTranslationProgress(null);
+      }
+    });
+    return unsubscribe;
+  }, [translationData]);
+
   // ==================== AI 摘要 ====================
 
   const handleGenerateSummary = useCallback(async () => {
@@ -762,6 +841,16 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
             <span className="text-gray-400 truncate">{article.title ?? '加载中…'}</span>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleTranslate('zh-CN')}
+              className={`p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer ${
+                translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+              }`}
+              title={translationLoading ? `翻译中${translationProgress ? ` ${translationProgress.done}/${translationProgress.total}` : ''}` : translationVisible ? '隐藏翻译' : '翻译字幕'}
+              disabled={translationLoading}
+            >
+              {translationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Languages className="w-4 h-4" />}
+            </button>
             <button
               onClick={toggleDetail}
               className="p-1.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white"
@@ -1004,6 +1093,9 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
                         highlightTagsMap={highlightTagsMap}
                         scrollToSegment={scrollToSegmentInt}
                         speakerMap={speakerMap}
+                        translationParagraphs={translationParagraphs}
+                        translationVisible={translationVisible}
+                        translationDisplaySettings={translationDisplayRef.current}
                         onSpeakerRename={async (speakerId, name) => {
                           await window.electronAPI.transcriptUpdateSpeaker(articleId, speakerId, name);
                           setSpeakerMap((prev) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Loader2, Mic, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { Article, TranscriptSegment, Highlight, HighlightTagsMap, AppTask } from '../../shared/types';
+import { ArrowLeft, Loader2, Mic, PanelRightClose, PanelRightOpen, Languages } from 'lucide-react';
+import type { Article, TranscriptSegment, Highlight, HighlightTagsMap, AppTask, Translation, TranslationProgressEvent, TranslationParagraph } from '../../shared/types';
 import { useAgentContext } from '../hooks/useAgentContext';
 import { VideoPlayer, type VideoPlayerRef } from './VideoPlayer';
 import { TranscriptView } from './TranscriptView';
@@ -47,6 +47,15 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   // 高亮状态
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [highlightTagsMap, setHighlightTagsMap] = useState<HighlightTagsMap>({});
+
+  // 翻译状态
+  const [translationVisible, setTranslationVisible] = useState(false);
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
+  const [translationData, setTranslationData] = useState<Translation | null>(null);
+  const [translationParagraphs, setTranslationParagraphs] = useState<TranslationParagraph[]>([]);
+  const translationDisplayRef = useRef({ fontSize: 14, color: '#9ca3af', opacity: 0.85 });
+
   // 外部触发 TranscriptView 滚动到某个 segment（使用自增计数器触发更新）
   const [scrollToSegment, setScrollToSegment] = useState<number | null>(null);
   const scrollTriggerRef = useRef(0);
@@ -73,6 +82,12 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // 切换文章时重置翻译状态
+    setTranslationData(null);
+    setTranslationVisible(false);
+    setTranslationLoading(false);
+    setTranslationProgress(null);
+    setTranslationParagraphs([]);
 
     window.electronAPI.articleGet(articleId).then((data) => {
       if (!cancelled && data) {
@@ -329,6 +344,69 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
     }
   }, [articleId, article?.title]);
 
+  // 翻译触发
+  const handleTranslate = useCallback(async (targetLang: string) => {
+    if (!article) return;
+
+    // 切换显示/隐藏
+    if (translationVisible && translationData) {
+      setTranslationVisible(false);
+      return;
+    }
+    if (translationData && !translationVisible) {
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 检查缓存
+    const cached = await window.electronAPI.translationGet({
+      articleId: article.id,
+      targetLang,
+    });
+    if (cached && cached.status === 'completed') {
+      setTranslationData(cached);
+      setTranslationParagraphs(cached.paragraphs);
+      setTranslationVisible(true);
+      return;
+    }
+
+    // 发起翻译（sourceType 使用 'transcript'）
+    setTranslationLoading(true);
+    setTranslationProgress(null);
+    try {
+      const translation = await window.electronAPI.translationStart({
+        articleId: article.id,
+        sourceType: 'transcript',
+        targetLang,
+      });
+      setTranslationData(translation);
+    } catch (err) {
+      console.error('翻译启动失败:', err);
+      setTranslationLoading(false);
+    }
+  }, [article, translationVisible, translationData]);
+
+  // 翻译进度监听
+  useEffect(() => {
+    if (!translationData?.id) return;
+    const unsubscribe = window.electronAPI.translationOnProgress((event: TranslationProgressEvent) => {
+      if (event.translationId !== translationData.id) return;
+      setTranslationParagraphs((prev) => {
+        const next = [...prev];
+        next[event.index] = { index: event.index, original: '', translated: event.translated };
+        return next;
+      });
+      const total = translationData.paragraphs.length || 1;
+      setTranslationProgress({ done: Math.ceil(event.progress * total), total });
+      if (event.progress >= 1) {
+        setTranslationLoading(false);
+        setTranslationVisible(true);
+        setTranslationProgress(null);
+      }
+    });
+    return unsubscribe;
+  }, [translationData]);
+
   // 关闭时保存最终进度
   const handleClose = useCallback(() => {
     const duration = durationRef.current;
@@ -399,6 +477,16 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
           {article.title}
         </h1>
         <button
+          onClick={() => handleTranslate('zh-CN')}
+          className={`p-1.5 rounded-md hover:bg-white/10 transition-colors cursor-pointer ${
+            translationVisible ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+          }`}
+          title={translationLoading ? `翻译中${translationProgress ? ` ${translationProgress.done}/${translationProgress.total}` : ''}` : translationVisible ? '隐藏翻译' : '翻译字幕'}
+          disabled={translationLoading}
+        >
+          {translationLoading ? <Loader2 size={18} className="animate-spin" /> : <Languages size={18} />}
+        </button>
+        <button
           onClick={toggleDetail}
           className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
           title={detailCollapsed ? '显示详情面板' : '隐藏详情面板'}
@@ -463,6 +551,9 @@ export function VideoReaderView({ articleId, onClose }: VideoReaderViewProps) {
                 onUpdateHighlight={handleUpdateHighlight}
                 highlightTagsMap={highlightTagsMap}
                 scrollToSegment={scrollToSegmentInt}
+                translationParagraphs={translationParagraphs}
+                translationVisible={translationVisible}
+                translationDisplaySettings={translationDisplayRef.current}
               />
             )}
           </div>
