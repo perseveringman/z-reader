@@ -710,6 +710,85 @@ export interface AsrErrorEvent {
   error: string;
 }
 
+// ==================== Translation 沉浸式翻译 ====================
+
+export type TranslationProvider = 'llm' | 'google' | 'microsoft';
+export type TranslationStatus = 'pending' | 'translating' | 'completed' | 'failed';
+export type TranslationSourceType = 'article' | 'transcript' | 'book';
+export type TranslationStyle = 'professional' | 'casual' | 'literal';
+
+export interface TranslationParagraph {
+  index: number;
+  original: string;
+  translated: string;
+}
+
+export interface Translation {
+  id: string;
+  articleId: string | null;
+  bookId: string | null;
+  sourceType: TranslationSourceType;
+  sourceLang: string | null;
+  targetLang: string;
+  paragraphs: TranslationParagraph[];
+  model: string | null;
+  promptTemplate: string | null;
+  tokenCount: number;
+  status: TranslationStatus;
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TranslationStartInput {
+  articleId?: string;
+  bookId?: string;
+  sourceType: TranslationSourceType;
+  targetLang: string;
+  provider?: TranslationProvider;
+}
+
+export interface TranslationGetInput {
+  articleId?: string;
+  bookId?: string;
+  targetLang: string;
+}
+
+export interface TranslationProgressEvent {
+  translationId: string;
+  index: number;
+  translated: string;
+  progress: number; // 0-1
+}
+
+export interface TranslationSettings {
+  provider: TranslationProvider;
+  llm: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    style: TranslationStyle;
+    customPrompt: string;
+  };
+  google: {
+    apiKey: string;
+  };
+  microsoft: {
+    apiKey: string;
+    region: string;
+  };
+  defaultTargetLang: string;
+  autoDetectLang: boolean;
+  autoTranslateFeeds: string[];
+  display: {
+    fontSize: number;
+    color: string;
+    opacity: number;
+    showOriginal: boolean;
+  };
+  shortcut: string;
+}
+
 // ==================== App Task (通用任务系统) 类型 ====================
 export type AppTaskType = 'asr-realtime' | 'asr-standard' | 'download' | string;
 export type AppTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -914,6 +993,16 @@ export interface ElectronAPI {
   asrOnSegment: (callback: (event: AsrSegmentEvent) => void) => () => void;
   asrOnComplete: (callback: (event: AsrCompleteEvent) => void) => () => void;
   asrOnError: (callback: (event: AsrErrorEvent) => void) => () => void;
+
+  // Translation 沉浸式翻译
+  translationStart: (input: TranslationStartInput) => Promise<Translation>;
+  translationCancel: (id: string) => Promise<void>;
+  translationGet: (input: TranslationGetInput) => Promise<Translation | null>;
+  translationDelete: (id: string) => Promise<void>;
+  translationList: (articleId: string) => Promise<Translation[]>;
+  translationOnProgress: (callback: (event: TranslationProgressEvent) => void) => () => void;
+  translationSettingsGet: () => Promise<TranslationSettings>;
+  translationSettingsSet: (partial: Partial<TranslationSettings>) => Promise<void>;
 
   // App Task (通用任务系统)
   appTaskCreate: (input: CreateAppTaskInput) => Promise<AppTask>;

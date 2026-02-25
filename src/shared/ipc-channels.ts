@@ -159,6 +159,16 @@ export const IPC_CHANNELS = {
   ASR_COMPLETE: 'asr:complete',
   ASR_ERROR: 'asr:error',
 
+  // Translation (沉浸式翻译)
+  TRANSLATION_START: 'translation:start',
+  TRANSLATION_CANCEL: 'translation:cancel',
+  TRANSLATION_GET: 'translation:get',
+  TRANSLATION_DELETE: 'translation:delete',
+  TRANSLATION_LIST: 'translation:list',
+  TRANSLATION_ON_PROGRESS: 'translation:onProgress',
+  TRANSLATION_SETTINGS_GET: 'translation:settings:get',
+  TRANSLATION_SETTINGS_SET: 'translation:settings:set',
+
   // App Task (通用任务系统)
   APP_TASK_CREATE: 'app-task:create',
   APP_TASK_CANCEL: 'app-task:cancel',
