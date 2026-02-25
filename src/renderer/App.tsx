@@ -25,6 +25,9 @@ import { KGOverviewPage } from './components/KGOverviewPage';
 import { WritingAssistPage } from './components/WritingAssistPage';
 import { TaskDrawer } from './components/TaskDrawer';
 import { NotificationDrawer } from './components/NotificationDrawer';
+import { AgentContextProvider } from './contexts/AgentContextProvider';
+import { AgentAssistant } from './components/agent';
+import { useAgentContext } from './hooks/useAgentContext';
 import type { Feed, ArticleSource, MediaType, Article, Book } from '../shared/types';
 import { changeLanguage } from '../i18n';
 import { findAnchorExternalUrl } from './utils/external-links';
@@ -175,6 +178,38 @@ function AppContent() {
     document.addEventListener('click', handleDocumentLinkClick, true);
     return () => document.removeEventListener('click', handleDocumentLinkClick, true);
   }, []);
+
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    const pageState = (() => {
+      if (readerMode && readerArticleId) {
+        return { page: 'reader' as const, articleId: readerArticleId, mediaType: readerMediaType, scrollProgress: 0 };
+      }
+      if (activeView === 'books') {
+        return { page: 'books' as const, selectedBookId };
+      }
+      if (activeView === 'knowledge-graph') {
+        return { page: 'knowledge-graph' as const, visibleNodeCount: 0, selectedNodeId: null };
+      }
+      if (activeView === 'writing-assist') {
+        return { page: 'writing-assist' as const, currentDocId: null, wordCount: 0 };
+      }
+      if (activeView === 'feeds' || activeView === 'feed-unseen' || activeView === 'feed-seen') {
+        return { page: 'feeds' as const, selectedFeedId, unreadCount: 0 };
+      }
+      return { page: 'library-articles' as const, selectedArticleId, listFilters: {}, visibleCount: 0 };
+    })();
+
+    reportContext({
+      common: {
+        currentPage: readerMode ? 'reader' : activeView,
+        readerMode,
+        selectedText: null,
+      },
+      pageState,
+    });
+  }, [activeView, readerMode, readerArticleId, readerMediaType, selectedArticleId, selectedBookId, selectedFeedId, reportContext]);
 
   const handleCommandExecute = useCallback(
     (commandId: string) => {
@@ -499,6 +534,8 @@ function AppContent() {
           onClose={() => setNotificationDrawerOpen(false)}
           onNavigateToArticle={handleNavigateToArticle}
         />
+
+        <AgentAssistant />
       </div>
   );
 }
@@ -506,7 +543,9 @@ function AppContent() {
 export function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <AgentContextProvider>
+        <AppContent />
+      </AgentContextProvider>
     </ToastProvider>
   );
 }
