@@ -168,15 +168,17 @@ export function AgentAssistant() {
   return (
     <>
       {mode === 'collapsed' && (
-        <div className="fixed bottom-6 right-6 z-[9999] relative">
-          {activeSuggestion && (
-            <AgentSuggestionBubble
-              suggestion={activeSuggestion}
-              onAction={handleSuggestionAction}
-              onDismiss={handleSuggestionDismiss}
-            />
-          )}
-          <AgentBubble onClick={() => setMode('mini')} />
+        <div className="fixed bottom-6 right-6 z-[9999]">
+          <div className="relative">
+            {activeSuggestion && (
+              <AgentSuggestionBubble
+                suggestion={activeSuggestion}
+                onAction={handleSuggestionAction}
+                onDismiss={handleSuggestionDismiss}
+              />
+            )}
+            <AgentBubble onClick={() => setMode('mini')} />
+          </div>
         </div>
       )}
       {mode === 'mini' && (
