@@ -6,6 +6,7 @@ import { ArticleCard } from './ArticleCard';
 import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { ContextMenu, type ContextMenuEntry } from './ContextMenu';
+import { useAgentContext } from '../hooks/useAgentContext';
 
 type SortBy = 'saved_at' | 'published_at';
 type SortOrder = 'asc' | 'desc';
@@ -54,6 +55,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
   const [readingThreshold, setReadingThreshold] = useState(10);
   const { showToast } = useToast();
   const undoStack = useUndoStack();
+  const { reportContext } = useAgentContext();
 
   const isTrash = activeView === 'trash';
   const isFeedView = source === 'feed';
@@ -665,6 +667,19 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     const el = listRef.current.querySelector(`[data-article-id="${selectedArticleId}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedArticleId]);
+
+  // Agent 上下文上报
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'library-articles', readerMode: false, selectedText: null },
+      pageState: {
+        page: 'library-articles',
+        selectedArticleId: selectedArticleId ?? null,
+        listFilters: { source, mediaType, feedId, tagId, activeView },
+        visibleCount: articles.length,
+      },
+    });
+  }, [selectedArticleId, articles.length, source, mediaType, feedId, tagId, activeView, reportContext]);
 
   return (
     <div className={`flex flex-col min-w-0 border-r border-[#262626] bg-[#141414] h-full flex-1`}>

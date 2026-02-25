@@ -3,6 +3,7 @@ import { BookOpen, Upload, Loader2 } from 'lucide-react';
 import type { Book, BookReadStatus, BookListQuery } from '../../shared/types';
 import { useToast } from './Toast';
 import { useUndoStack } from '../hooks/useUndoStack';
+import { useAgentContext } from '../hooks/useAgentContext';
 
 type TabKey = 'inbox' | 'later' | 'archive';
 
@@ -35,6 +36,7 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
   const [importing, setImporting] = useState(false);
   const { showToast } = useToast();
   const undoStack = useUndoStack();
+  const { reportContext } = useAgentContext();
   const listRef = useRef<HTMLDivElement>(null);
 
   // 持久化 tab 选择
@@ -128,6 +130,18 @@ export function BookList({ selectedBookId, onSelectBook, onOpenReader, refreshTr
     const el = listRef.current.querySelector(`[data-book-id="${selectedBookId}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedBookId]);
+
+  // Agent 上下文上报
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'books', readerMode: false, selectedText: null },
+      pageState: {
+        page: 'books',
+        selectedBookId: selectedBookId ?? null,
+        bookCount: books.length,
+      },
+    });
+  }, [selectedBookId, books.length, reportContext]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
