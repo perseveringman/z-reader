@@ -31,8 +31,10 @@ import {
   MessageSquare,
   Network,
   PenTool,
+  Languages,
 } from 'lucide-react';
 import type { Feed, Tag as TagType } from '../../shared/types';
+import { TranslationSettings } from './TranslationSettings';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -119,6 +121,8 @@ function SectionLabel({
 export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange, onAddFeed, onAddUrl, onSearch, onShortcutsHelp, onDownloads, onPreferences, onTasks, onNotifications, selectedFeedId, onFeedSelect, selectedTagId, onTagSelect, refreshTrigger }: SidebarProps) {
   const { t } = useTranslation();
   const iconSize = 16;
+  // 翻译设置面板开关状态
+  const [translationSettingsOpen, setTranslationSettingsOpen] = useState(false);
   const [sections, setSections] = useState({
     library: true,
     feed: true,
@@ -408,6 +412,7 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
             { icon: <Download size={iconSize} />, label: t('sidebar.downloads'), onClick: onDownloads },
             { icon: <CheckSquare size={iconSize} />, label: '任务', onClick: onTasks },
             { icon: <Bell size={iconSize} />, label: '通知', onClick: onNotifications },
+            { icon: <Languages size={iconSize} />, label: '翻译设置', onClick: () => setTranslationSettingsOpen(true) },
             { icon: <Settings size={iconSize} />, label: t('sidebar.preferences'), onClick: onPreferences },
           ].map((item) => (
             <button
@@ -430,6 +435,12 @@ export function Sidebar({ collapsed, onToggleCollapse, activeView, onViewChange,
         </div>
       </div>
       </div>
+
+      {/* 翻译设置面板 */}
+      <TranslationSettings
+        open={translationSettingsOpen}
+        onClose={() => setTranslationSettingsOpen(false)}
+      />
     </aside>
   );
 }
