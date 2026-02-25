@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Loader2, Highlighter, X, MessageSquareText, Tag as TagIcon, Pencil } from 'lucide-react';
-import type { TranscriptSegment, Highlight, Tag } from '../../shared/types';
+import type { TranscriptSegment, Highlight, Tag, TranslationParagraph } from '../../shared/types';
 
 // ==================== 工具栏类型 ====================
 type ToolbarMode = 'selection' | 'highlight';
@@ -123,6 +123,12 @@ interface TranscriptViewProps {
   speakerMap?: Record<string, string>;
   /** 修改说话人名称的回调 */
   onSpeakerRename?: (speakerId: number, name: string) => void;
+  /** 翻译段落数据 */
+  translationParagraphs?: TranslationParagraph[];
+  /** 是否显示翻译 */
+  translationVisible?: boolean;
+  /** 翻译显示设置 */
+  translationDisplaySettings?: { fontSize: number; color: string; opacity: number };
 }
 
 function formatTimestamp(seconds: number): string {
@@ -147,6 +153,9 @@ export function TranscriptView({
   scrollToSegment,
   speakerMap = {},
   onSpeakerRename,
+  translationParagraphs,
+  translationVisible = false,
+  translationDisplaySettings,
 }: TranscriptViewProps) {
   const [syncMode, setSyncMode] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -517,6 +526,21 @@ export function TranscriptView({
                   ) : (
                     <span key={fi}>{frag.text}</span>
                   ),
+                )}
+                {/* 段落翻译渲染 */}
+                {translationVisible && translationParagraphs?.[index] && (
+                  <div
+                    data-translation="true"
+                    data-seg-index={index}
+                    className="z-translation"
+                    style={{
+                      fontSize: `${translationDisplaySettings?.fontSize ?? 14}px`,
+                      color: translationDisplaySettings?.color ?? '#9ca3af',
+                      opacity: translationDisplaySettings?.opacity ?? 0.85,
+                    }}
+                  >
+                    {translationParagraphs[index].translated}
+                  </div>
                 )}
               </span>
             </div>
