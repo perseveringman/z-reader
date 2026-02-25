@@ -67,7 +67,7 @@ interface InlineNavigationCard {
 // ==================== 组件 ====================
 
 export function AgentDrawer({ open, onClose, onCollapse }: AgentDrawerProps) {
-  const { viewState } = useAgentContext();
+  const { viewState, navigate } = useAgentContext();
 
   // 对话状态
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -314,11 +314,11 @@ export function AgentDrawer({ open, onClose, onCollapse }: AgentDrawerProps) {
     });
   }, []);
 
-  // 导航卡片点击
-  const handleNavigate = useCallback((_targetType: string, _targetId: string) => {
-    // TODO: 根据 targetType 导航到对应页面
-  }, []);
-
+  // 导航卡片点击 → 通过 context 导航 + 关闭抽屉
+  const handleNavigate = useCallback((targetType: string, targetId: string) => {
+    navigate(targetType, targetId);
+    onClose();
+  }, [navigate, onClose]);
   const currentPage = viewState.common.currentPage;
   const pageLabel = PAGE_LABELS[currentPage] || `📄 ${currentPage}`;
 
