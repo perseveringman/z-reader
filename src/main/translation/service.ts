@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow } from 'electron';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, or } from 'drizzle-orm';
 import { getDatabase, getSqlite } from '../db';
 import * as schema from '../db/schema';
 import { AIDatabase } from '../../ai/providers/db';
@@ -260,9 +260,95 @@ export async function startTranslation(input: TranslationStartInput): Promise<Tr
     translated: '',
   }));
 
+  const modelName = resolveModelName(provider, settings);
+
+  // ==================== 断点续传：检查已有的失败/进行中记录 ====================
+  const resumeConditions = [
+    eq(schema.translations.targetLang, input.targetLang),
+    eq(schema.translations.deletedFlg, 0),
+    or(
+      eq(schema.translations.status, 'failed'),
+      eq(schema.translations.status, 'translating'),
+    ),
+  ];
+  if (input.articleId) {
+    resumeConditions.push(eq(schema.translations.articleId, input.articleId));
+  }
+  if (input.bookId) {
+    resumeConditions.push(eq(schema.translations.bookId, input.bookId));
+  }
+
+  const existingRows = await db
+    .select()
+    .from(schema.translations)
+    .where(and(...resumeConditions))
+    .orderBy(desc(schema.translations.createdAt))
+    .limit(1);
+
+  const existing = existingRows[0];
+  if (existing && (existing.status === 'failed' || existing.status === 'translating')) {
+    // 解析已有段落数据，找到最后一个已翻译的 index
+    const existingParagraphs: TranslationParagraph[] = existing.paragraphs
+      ? JSON.parse(existing.paragraphs)
+      : [];
+    const lastTranslatedIndex = existingParagraphs.reduceRight(
+      (found: number, p: TranslationParagraph, i: number) =>
+        found === -1 && p.translated ? i : found,
+      -1,
+    );
+
+    // 如果有已翻译的段落，从断点继续
+    if (lastTranslatedIndex >= 0) {
+      // 将已翻译的段落合并到新的 paragraphs 中
+      for (let i = 0; i <= lastTranslatedIndex && i < paragraphs.length; i++) {
+        if (existingParagraphs[i]?.translated) {
+          paragraphs[i].translated = existingParagraphs[i].translated;
+        }
+      }
+
+      const resumeNow = new Date().toISOString();
+      const resumeProgress = (lastTranslatedIndex + 1) / paragraphs.length;
+
+      // 更新已有记录状态为 translating
+      await db
+        .update(schema.translations)
+        .set({
+          status: 'translating',
+          progress: resumeProgress,
+          paragraphs: JSON.stringify(paragraphs),
+          updatedAt: resumeNow,
+        })
+        .where(eq(schema.translations.id, existing.id));
+
+      // 使用已有记录 ID 开始后台翻译（从断点处开始）
+      const abortController = new AbortController();
+      runningTranslations.set(existing.id, abortController);
+
+      translateInBackground(
+        existing.id,
+        paragraphs,
+        engine,
+        sourceLang,
+        input.targetLang,
+        abortController,
+        lastTranslatedIndex + 1, // 从断点处开始
+      ).catch((err) => {
+        console.error(`翻译任务（续传）${existing.id} 异常:`, err);
+      });
+
+      return mapRowToTranslation({
+        ...existing,
+        status: 'translating',
+        progress: resumeProgress,
+        paragraphs: JSON.stringify(paragraphs),
+        updatedAt: resumeNow,
+      });
+    }
+  }
+
+  // ==================== 正常流程：创建新翻译记录 ====================
   const now = new Date().toISOString();
   const translationId = randomUUID();
-  const modelName = resolveModelName(provider, settings);
 
   // 创建 translations 记录
   await db.insert(schema.translations).values({
@@ -322,6 +408,7 @@ export async function startTranslation(input: TranslationStartInput): Promise<Tr
  * 后台逐批翻译执行
  *
  * 每批完成后更新数据库并推送进度，支持中断取消。
+ * @param startIndex 从第几个段落开始翻译（断点续传时使用），默认为 0
  */
 async function translateInBackground(
   translationId: string,
@@ -330,14 +417,15 @@ async function translateInBackground(
   sourceLang: string | null,
   targetLang: string,
   abortController: AbortController,
+  startIndex = 0,
 ): Promise<void> {
   const db = getDatabase();
   const total = paragraphs.length;
-  let completedCount = 0;
+  let completedCount = startIndex; // 从断点处开始计数
 
   try {
-    // 逐批翻译
-    for (let i = 0; i < total; i += BATCH_SIZE) {
+    // 逐批翻译（从 startIndex 开始）
+    for (let i = startIndex; i < total; i += BATCH_SIZE) {
       // 检查是否已取消
       if (abortController.signal.aborted) {
         await updateTranslationStatus(translationId, 'failed', paragraphs, completedCount / total);
@@ -434,12 +522,45 @@ export function cancelTranslation(translationId: string): void {
   }
 }
 
+// ==================== 内容变更检测 ====================
+
+/**
+ * 检测文章内容是否在翻译后发生了变更
+ *
+ * 比较策略：
+ * 1. 段落数量是否一致
+ * 2. 首段和末段原文文本是否一致
+ * 如果以上任一不同，认为内容已变更，翻译可能需要更新。
+ */
+function checkContentChanged(
+  currentParagraphs: string[],
+  savedParagraphs: TranslationParagraph[],
+): boolean {
+  // 段落数量不同
+  if (currentParagraphs.length !== savedParagraphs.length) return true;
+
+  if (currentParagraphs.length > 0) {
+    // 首段文本不同
+    if (currentParagraphs[0] !== savedParagraphs[0]?.original) return true;
+    // 末段文本不同
+    const last = currentParagraphs.length - 1;
+    if (currentParagraphs[last] !== savedParagraphs[last]?.original) return true;
+  }
+
+  return false;
+}
+
 // ==================== 查询翻译 ====================
 
 /**
  * 查询指定文章/书籍 + 目标语言的最新已完成翻译
+ *
+ * 对于文章类型的翻译，会额外检测内容是否在翻译后发生变更，
+ * 通过返回值的 contentChanged 字段标识。
  */
-export async function getTranslation(input: TranslationGetInput): Promise<Translation | null> {
+export async function getTranslation(
+  input: TranslationGetInput,
+): Promise<(Translation & { contentChanged?: boolean }) | null> {
   if (!input.articleId && !input.bookId) {
     throw new Error('必须提供 articleId 或 bookId');
   }
@@ -467,7 +588,28 @@ export async function getTranslation(input: TranslationGetInput): Promise<Transl
 
   if (rows.length === 0) return null;
 
-  return mapRowToTranslation(rows[0]);
+  const translation = mapRowToTranslation(rows[0]);
+
+  // 对文章类型的翻译进行内容变更检测
+  if (input.articleId && translation.sourceType === 'article') {
+    try {
+      const [article] = await db
+        .select({ content: schema.articles.content })
+        .from(schema.articles)
+        .where(eq(schema.articles.id, input.articleId));
+
+      if (article?.content) {
+        const currentParagraphs = extractFromHtml(article.content);
+        const contentChanged = checkContentChanged(currentParagraphs, translation.paragraphs);
+        return { ...translation, contentChanged };
+      }
+    } catch {
+      // 检测失败不影响返回翻译结果
+      console.warn('内容变更检测失败，跳过');
+    }
+  }
+
+  return translation;
 }
 
 /**
