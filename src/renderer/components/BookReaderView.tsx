@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Settings2, Loader2, BookOpen, FileText } from 'lucide-react';
+import { useAgentContext } from '../hooks/useAgentContext';
 import type { Book, Highlight } from '../../shared/types';
 import { BookReaderToc, type TocItem } from './BookReaderToc';
 import { BookReaderDetailPanel, type DetailTab } from './BookReaderDetailPanel';
@@ -30,6 +31,18 @@ export function BookReaderView({ bookId, onClose }: BookReaderViewProps) {
   const [focusedHighlightId, setFocusedHighlightId] = useState<string | null>(null);
   const [focusSignal, setFocusSignal] = useState(0);
   const readerRef = useRef<BookReaderHandle>(null);
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'book-reader', readerMode: true, selectedText: null },
+      pageState: {
+        page: 'book-reader',
+        bookId,
+        readProgress,
+      },
+    });
+  }, [bookId, readProgress, reportContext]);
 
   useEffect(() => {
     let cancelled = false;

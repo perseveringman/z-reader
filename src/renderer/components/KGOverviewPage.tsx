@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Network, Search, X } from 'lucide-react';
+import { useAgentContext } from '../hooks/useAgentContext';
 import { KnowledgeGraphView, TYPE_COLORS } from './KnowledgeGraphView';
 import type {
   KGGraphData,
@@ -18,6 +19,19 @@ export function KGOverviewPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'subgraph'>('overview');
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'knowledge-graph', readerMode: false, selectedText: null },
+      pageState: {
+        page: 'knowledge-graph',
+        visibleNodeCount: graphData?.nodes.length ?? 0,
+        selectedNodeId: selectedNodeId ?? null,
+        viewMode,
+      },
+    });
+  }, [graphData?.nodes.length, selectedNodeId, viewMode, reportContext]);
 
   // 加载全局概览
   const loadOverview = useCallback(async () => {

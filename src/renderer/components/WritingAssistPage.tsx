@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, PenTool, Copy, Check, Sparkles, FileText, Tag, Highlighter, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAgentContext } from '../hooks/useAgentContext';
 import type { WritingAssistSearchResult, WritingAssistStreamChunk, AISettingsData } from '../../shared/types';
 
 /**
@@ -17,6 +18,18 @@ export function WritingAssistPage() {
   const [copied, setCopied] = useState(false);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const generatedRef = useRef<HTMLDivElement>(null);
+  const { reportContext } = useAgentContext();
+
+  useEffect(() => {
+    reportContext({
+      common: { currentPage: 'writing-assist', readerMode: false, selectedText: null },
+      pageState: {
+        page: 'writing-assist',
+        currentDocId: null,
+        wordCount: generatedText.length,
+      },
+    });
+  }, [generatedText, reportContext]);
 
   // 检查 API Key 是否配置
   useEffect(() => {
