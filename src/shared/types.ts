@@ -569,6 +569,64 @@ export interface ChatSendInput {
   articleId?: string;
 }
 
+// ==================== Agent 助手类型 ====================
+
+/** 通用视图元数据（所有页面都有） */
+export interface AgentCommonViewState {
+  currentPage: string;
+  readerMode: boolean;
+  selectedText: string | null;
+  timestamp: number;
+}
+
+/** 各页面独有的元数据（联合类型） */
+export type AgentPageSpecificState =
+  | { page: 'library-articles'; selectedArticleId: string | null; listFilters: Record<string, unknown>; visibleCount: number }
+  | { page: 'reader'; articleId: string; mediaType: string; scrollProgress: number }
+  | { page: 'knowledge-graph'; visibleNodeCount: number; selectedNodeId: string | null }
+  | { page: 'writing-assist'; currentDocId: string | null; wordCount: number }
+  | { page: 'feeds'; selectedFeedId: string | null; unreadCount: number }
+  | { page: 'books'; selectedBookId: string | null }
+  | { page: string; [key: string]: unknown };
+
+/** 完整的上下文快照 */
+export interface AgentViewState {
+  common: AgentCommonViewState;
+  pageState: AgentPageSpecificState;
+}
+
+/** Agent 流式 Chunk */
+export interface AgentStreamChunk {
+  type: 'text-delta' | 'tool-call' | 'tool-result' | 'action-confirm' | 'navigation-card' | 'context-hint' | 'done' | 'error' | 'title-generated';
+  textDelta?: string;
+  toolCall?: { name: string; args: Record<string, unknown> };
+  toolResult?: { name: string; result: string; cardType?: string };
+  actionConfirm?: { toolName: string; preview: string; confirmId: string; allowTrust: boolean; args: Record<string, unknown> };
+  navigationCard?: { title: string; subtitle?: string; targetType: string; targetId: string; thumbnail?: string };
+  contextHint?: { activeModules: string[] };
+  error?: string;
+  tokenCount?: number;
+  fullText?: string;
+  title?: string;
+}
+
+/** Agent 发送消息输入 */
+export interface AgentSendInput {
+  sessionId: string;
+  message: string;
+  viewState: AgentViewState;
+}
+
+/** Agent 操作确认响应 */
+export interface AgentConfirmResponse {
+  confirmId: string;
+  confirmed: boolean;
+  trust: boolean;
+}
+
+/** Agent 操作分级 */
+export type AgentActionLevel = 'read' | 'write' | 'navigate';
+
 /** 主题提取输入 */
 export interface AIExtractTopicsInput {
   articleId: string;
@@ -798,6 +856,17 @@ export interface ElectronAPI {
   aiChatSessionList: () => Promise<ChatSession[]>;
   aiChatSessionGet: (id: string) => Promise<ChatSession | null>;
   aiChatSessionDelete: (id: string) => Promise<void>;
+
+  // Agent 助手
+  agentSend: (input: AgentSendInput) => void;
+  agentOnStream: (callback: (chunk: AgentStreamChunk) => void) => () => void;
+  agentConfirm: (response: AgentConfirmResponse) => void;
+  agentSessionCreate: () => Promise<ChatSession>;
+  agentSessionList: () => Promise<ChatSession[]>;
+  agentSessionGet: (id: string) => Promise<ChatSession | null>;
+  agentSessionDelete: (id: string) => Promise<void>;
+  agentGetTrustedActions: () => Promise<string[]>;
+  agentSetTrustedActions: (actions: string[]) => Promise<void>;
 
   // AI 主题提取
   aiExtractTopics: (input: AIExtractTopicsInput) => Promise<AIExtractTopicsResult>;
