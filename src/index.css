@@ -712,3 +712,21 @@
 .mindmap-dark .markmap-node circle {
   fill: rgba(56, 189, 248, 0.85) !important;
 }
+
+/* ==================== 沉浸式翻译 ==================== */
+
+.z-translation {
+  margin-top: 4px;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+  animation: z-translation-fadein 0.3s ease;
+}
+
+.z-translation-hidden {
+  display: none;
+}
+
+@keyframes z-translation-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
