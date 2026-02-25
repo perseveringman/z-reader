@@ -259,3 +259,22 @@ export const aiTaskLogs = sqliteTable('ai_task_logs', {
   metadataJson: text('metadata_json'),
   createdAt: text('created_at').notNull(),
 });
+
+// ==================== translations 表 ====================
+export const translations = sqliteTable('translations', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').references(() => articles.id),
+  bookId: text('book_id').references(() => books.id),
+  sourceType: text('source_type').notNull(), // 'article' | 'transcript' | 'book'
+  sourceLang: text('source_lang'),
+  targetLang: text('target_lang').notNull(),
+  paragraphs: text('paragraphs'), // JSON: [{index, original, translated}]
+  model: text('model'),
+  promptTemplate: text('prompt_template'),
+  tokenCount: integer('token_count').default(0),
+  status: text('status').default('pending'), // 'pending' | 'translating' | 'completed' | 'failed'
+  progress: real('progress').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedFlg: integer('deleted_flg').default(0),
+});

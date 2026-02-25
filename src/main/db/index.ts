@@ -456,6 +456,30 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_wechat_comments_article_id ON wechat_comments(article_id);
   `);
 
+  // Migration: translations 翻译表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS translations (
+      id TEXT PRIMARY KEY,
+      article_id TEXT REFERENCES articles(id),
+      book_id TEXT REFERENCES books(id),
+      source_type TEXT NOT NULL,
+      source_lang TEXT,
+      target_lang TEXT NOT NULL,
+      paragraphs TEXT,
+      model TEXT,
+      prompt_template TEXT,
+      token_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      progress REAL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_flg INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_translations_article_id ON translations(article_id);
+    CREATE INDEX IF NOT EXISTS idx_translations_book_id ON translations(book_id);
+    CREATE INDEX IF NOT EXISTS idx_translations_status ON translations(status);
+  `);
+
   // Migration: sync 同步表
   initSyncTables(sqlite);
 
