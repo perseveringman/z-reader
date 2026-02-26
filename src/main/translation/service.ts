@@ -520,9 +520,16 @@ async function translateInBackground(
     );
     await Promise.all(slots);
 
+    // 检查是否因取消而退出
+    if (abortController.signal.aborted) {
+      await updateTranslationStatus(translationId, 'failed', paragraphs, completedCount / total);
+      return;
+    }
+
     // 全部完成
     await updateTranslationStatus(translationId, 'completed', paragraphs, 1);
   } catch (err) {
+    abortController.abort(); // 通知其他并发 slot 停止领取新任务
     // 出错时保留已翻译段落，标记为失败
     console.error(`翻译任务 ${translationId} 出错:`, err);
     await updateTranslationStatus(translationId, 'failed', paragraphs, completedCount / total);
