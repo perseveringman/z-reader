@@ -76,9 +76,9 @@ export class LLMTranslationEngine implements TranslationEngine {
         .describe('翻译结果数组，按原文顺序排列，长度与输入一致'),
     });
 
-    // 估算 maxOutputTokens：每段文本预估翻译后最多 3 倍字符长度 / 3 tokens per char + 额外 JSON 开销
-    const estimatedTokens = texts.reduce((sum, t) => sum + t.length, 0) * 2 + 200;
-    const maxOutputTokens = Math.max(estimatedTokens, 2048);
+    // 估算 maxOutputTokens：中文译文通常比英文原文更短，1.5 倍系数足够
+    const estimatedTokens = texts.reduce((sum, t) => sum + t.length, 0) * 1.5 + 200;
+    const maxOutputTokens = Math.max(Math.ceil(estimatedTokens), 1024);
 
     // 重试机制：JSON 解析失败时最多重试 2 次
     const MAX_RETRIES = 2;
