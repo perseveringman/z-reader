@@ -135,6 +135,7 @@ export const IPC_CHANNELS = {
   AI_CHAT_SESSION_LIST: 'ai:chat:session:list',
   AI_CHAT_SESSION_GET: 'ai:chat:session:get',
   AI_CHAT_SESSION_DELETE: 'ai:chat:session:delete',
+  AI_CHAT_SESSION_LIST_BY_ARTICLE: 'ai:chat:session:list-by-article',
 
   // Agent 助手
   AGENT_SEND: 'agent:send',
