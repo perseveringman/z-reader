@@ -330,7 +330,24 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     const text = selection?.toString().trim();
     if (!text || !article) return;
 
-    // 切到语言学习 Tab
+    // 先计算选区位置（在 removeAllRanges 之前）
+    let anchorPath: string | null = null;
+    let startOffset: number | null = null;
+    let endOffset: number | null = null;
+    if (selection && selection.rangeCount > 0 && contentRef.current) {
+      const range = selection.getRangeAt(0);
+      const blockEl = getBlockAncestor(range.startContainer, contentRef.current);
+      if (blockEl) {
+        anchorPath = computeAnchorPath(blockEl, contentRef.current);
+        const offsets = rangeToBlockOffsets(blockEl, range);
+        if (offsets) {
+          startOffset = offsets.startOffset;
+          endOffset = offsets.endOffset;
+        }
+      }
+    }
+
+    // 切到语言学习 Tab，清除选区
     setForceTab({ tab: 'learn', ts: Date.now() });
     setToolbar(null);
     selection?.removeAllRanges();
@@ -346,6 +363,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
         articleId: article.id,
         useLLMAnalysis: isLLM,
         enabledModules: settings.selectionAnalysis,
+        anchorPath,
+        startOffset,
+        endOffset,
       });
       setSelectionTranslationRefresh((prev) => prev + 1);
     } catch (err) {
