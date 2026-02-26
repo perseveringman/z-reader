@@ -218,3 +218,114 @@ export function rangeToBlockOffsets(blockEl: HTMLElement, range: Range): { start
   if (startOffset < 0 || endOffset < 0 || startOffset >= endOffset) return null;
   return { startOffset, endOffset };
 }
+
+/**
+ * 在文章 DOM 中为已翻译词注入蓝色下划线标记
+ * - 按 sourceText 去重，同一词只取最新一条（列表已按 createdAt desc 排序）
+ * - 优先用 anchorPath + offset 定位，fallback 到全文文本搜索
+ */
+export function applyTranslationMarks(
+  contentEl: HTMLElement,
+  translations: Array<{
+    id: string;
+    sourceText: string;
+    anchorPath?: string | null;
+    startOffset?: number | null;
+    endOffset?: number | null;
+  }>,
+) {
+  // 去重：同一 sourceText 只保留最新（第一条，列表已倒序）
+  const seen = new Set<string>();
+  const deduped = translations.filter((t) => {
+    if (seen.has(t.sourceText)) return false;
+    seen.add(t.sourceText);
+    return true;
+  });
+
+  for (const t of deduped) {
+    let range: Range | null = null;
+
+    // 策略 1：anchorPath + offset
+    if (t.anchorPath && t.startOffset != null && t.endOffset != null) {
+      const blockEl = resolveAnchorPath(contentEl, t.anchorPath);
+      if (blockEl) {
+        range = offsetsToRange(blockEl, t.startOffset, t.endOffset);
+        if (range && range.toString() !== t.sourceText) range = null;
+      }
+    }
+
+    // 策略 2：全文文本搜索 fallback
+    if (!range && t.sourceText) {
+      const fb = textSearchInElement(contentEl, t.sourceText);
+      if (fb) range = offsetsToRange(contentEl, fb.startOffset, fb.endOffset);
+    }
+
+    if (!range) continue;
+
+    // 注入 <mark data-translation-id data-translation-word>
+    wrapRangeWithTranslationMark(contentEl, range, t.id, t.sourceText);
+  }
+}
+
+/** 为单个 Range 注入翻译标记（蓝色下划线） */
+function wrapRangeWithTranslationMark(
+  root: HTMLElement,
+  range: Range,
+  translationId: string,
+  word: string,
+) {
+  const textNodesInRange: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    if (range.intersectsNode(t)) textNodesInRange.push(t);
+  }
+  if (textNodesInRange.length === 0) return;
+
+  const segments: Array<{ node: Text; start: number; end: number }> = [];
+  for (const t of textNodesInRange) {
+    const start = t === range.startContainer ? range.startOffset : 0;
+    const end = t === range.endContainer ? range.endOffset : t.data.length;
+    if (end <= start) continue;
+    segments.push({ node: t, start, end });
+  }
+
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const { node: t, start, end } = segments[i];
+    let target = t;
+    if (end < target.data.length) target.splitText(end);
+    if (start > 0) target = t.splitText(start);
+
+    const mark = document.createElement('mark');
+    mark.dataset.translationId = translationId;
+    mark.dataset.translationWord = word;
+    mark.className = 'translation-mark';
+    target.parentNode!.insertBefore(mark, target);
+    mark.appendChild(target);
+  }
+}
+
+/** 移除指定 sourceText 对应的翻译标记 */
+export function unwrapTranslationMark(root: HTMLElement, word: string) {
+  root.querySelectorAll(`mark[data-translation-word="${CSS.escape(word)}"]`).forEach((el) => {
+    const parent = el.parentNode;
+    if (parent) {
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+      parent.normalize();
+    }
+  });
+}
+
+/** 清除所有翻译标记 */
+export function clearAllTranslationMarks(root: HTMLElement) {
+  root.querySelectorAll('mark[data-translation-id]').forEach((el) => {
+    const parent = el.parentNode;
+    if (parent) {
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+      parent.normalize();
+    }
+  });
+}
