@@ -147,6 +147,8 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_CREATE, articleId),
   aiChatSessionList: () =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_LIST),
+  aiChatSessionListByArticle: (articleId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_LIST_BY_ARTICLE, articleId),
   aiChatSessionGet: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT_SESSION_GET, id),
   aiChatSessionDelete: (id) =>
