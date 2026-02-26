@@ -4,7 +4,7 @@
  * 这是 src/ai/ 与 src/main/ 的桥接点
  */
 
-import { eq, like, and, gte, sql } from 'drizzle-orm';
+import { eq, like, and, gte, sql, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '../../ai/tools/types';
 import {
@@ -258,33 +258,106 @@ export function createToolContext(
     // ==================== 研究操作 ====================
 
     searchResearchSources: async (query, sourceIds, topK = 10) => {
-      if (!ragDeps) {
-        return { text: 'RAG 服务未初始化。', references: [], tokenCount: 0 };
+      if (sourceIds.length === 0) {
+        return { text: '没有源材料。', references: [], tokenCount: 0 };
       }
 
-      const searchResults = await ragDeps.retriever.search({
-        text: query,
-        topK,
-        filters: { sourceIds },
-      });
+      // 尝试 RAG 检索（如果可用且文章已索引）
+      if (ragDeps) {
+        try {
+          const searchResults = await ragDeps.retriever.search({
+            text: query,
+            topK,
+            filters: { sourceIds },
+          });
 
-      const contextBuilder = createContextBuilder({
-        maxTokens: 4000,
-        includeReferences: true,
-        getSourceTitle: async (sourceType, sourceId) => {
-          if (sourceType === 'article') {
-            const row = await db
-              .select({ title: articles.title })
-              .from(articles)
-              .where(eq(articles.id, sourceId))
-              .get();
-            return row?.title ?? null;
+          if (searchResults.length > 0) {
+            const contextBuilder = createContextBuilder({
+              maxTokens: 4000,
+              includeReferences: true,
+              getSourceTitle: async (sourceType, sourceId) => {
+                if (sourceType === 'article') {
+                  const row = await db
+                    .select({ title: articles.title })
+                    .from(articles)
+                    .where(eq(articles.id, sourceId))
+                    .get();
+                  return row?.title ?? null;
+                }
+                return null;
+              },
+            });
+            return contextBuilder.build(searchResults);
           }
-          return null;
-        },
-      });
+        } catch (err) {
+          console.warn('RAG search failed, falling back to full-text:', err);
+        }
+      }
 
-      return contextBuilder.build(searchResults);
+      // Fallback: 直接从 articles 表读全文（适用于未 RAG 索引的文章）
+      const rows = await db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          contentText: articles.contentText,
+          content: articles.content,
+        })
+        .from(articles)
+        .where(inArray(articles.id, sourceIds));
+
+      if (rows.length === 0) {
+        return { text: '未找到源材料内容。', references: [], tokenCount: 0 };
+      }
+
+      // 构建上下文：每篇文章截取相关片段
+      const queryLower = query.toLowerCase();
+      const keywords = queryLower.split(/\s+/).filter(k => k.length > 1);
+      const refs: Array<{ sourceType: string; sourceId: string; title: string | null; chunkIndex: number }> = [];
+      const segments: string[] = [];
+
+      for (const row of rows) {
+        const fullText = row.contentText || row.content || '';
+        if (!fullText) continue;
+
+        const refIndex = refs.length + 1;
+        const title = row.title ?? '无标题';
+        refs.push({ sourceType: 'article', sourceId: row.id, title, chunkIndex: 0 });
+
+        // 提取相关段落（包含关键词的段落，或前 1500 字）
+        const paragraphs = fullText.split(/\n\n+/);
+        let relevantText = '';
+        const maxChars = 1500;
+
+        if (keywords.length > 0) {
+          // 按关键词匹配度排序段落
+          const scored = paragraphs
+            .filter(p => p.trim().length > 20)
+            .map(p => ({
+              text: p.trim(),
+              score: keywords.filter(k => p.toLowerCase().includes(k)).length,
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          for (const item of scored) {
+            if (relevantText.length + item.text.length > maxChars) break;
+            relevantText += item.text + '\n\n';
+          }
+        }
+
+        // 如果没有关键词匹配，取前 maxChars 字
+        if (!relevantText) {
+          relevantText = fullText.slice(0, maxChars);
+        }
+
+        segments.push(`[${refIndex}] ${title}:\n${relevantText.trim()}`);
+      }
+
+      const text = segments.join('\n\n---\n\n');
+      return {
+        text,
+        references: refs,
+        tokenCount: Math.ceil(text.length / 2),
+      };
     },
 
     getSourceSummary: async (sourceType, sourceId) => {
