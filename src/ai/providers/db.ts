@@ -366,6 +366,13 @@ export class AIDatabase {
     ).all(limit) as ChatSessionRow[];
   }
 
+  /** 按 article_id 查询 Chat 会话列表（按 updated_at 降序） */
+  listChatSessionsByArticle(articleId: string, limit = 50): ChatSessionRow[] {
+    return this.sqlite.prepare(
+      'SELECT * FROM ai_chat_sessions WHERE article_id = ? ORDER BY updated_at DESC LIMIT ?'
+    ).all(articleId, limit) as ChatSessionRow[];
+  }
+
   /** 删除 Chat 会话 */
   deleteChatSession(id: string): void {
     this.sqlite.prepare(
