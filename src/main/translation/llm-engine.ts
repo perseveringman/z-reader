@@ -44,9 +44,11 @@ export class LLMTranslationEngine implements TranslationEngine {
     const model = this.createModel();
     const prompt = this.buildTranslatePrompt(text, sourceLang, targetLang);
 
+    const maxOutputTokens = Math.max(text.length * 2 + 100, 1024);
     const { text: translated } = await generateText({
       model,
       prompt,
+      maxOutputTokens,
     });
 
     return translated.trim();
@@ -74,20 +76,43 @@ export class LLMTranslationEngine implements TranslationEngine {
         .describe('翻译结果数组，按原文顺序排列，长度与输入一致'),
     });
 
-    const { object } = await generateObject({
-      model,
-      schema: batchResultSchema,
-      prompt,
-    });
+    // 估算 maxOutputTokens：每段文本预估翻译后最多 3 倍字符长度 / 3 tokens per char + 额外 JSON 开销
+    const estimatedTokens = texts.reduce((sum, t) => sum + t.length, 0) * 2 + 200;
+    const maxOutputTokens = Math.max(estimatedTokens, 2048);
 
-    // 安全校验：确保返回数量与输入一致
-    if (object.translations.length !== texts.length) {
-      throw new Error(
-        `批量翻译结果数量不匹配: 期望 ${texts.length}，实际 ${object.translations.length}`
-      );
+    // 重试机制：JSON 解析失败时最多重试 2 次
+    const MAX_RETRIES = 2;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { object } = await generateObject({
+          model,
+          schema: batchResultSchema,
+          prompt,
+          maxOutputTokens,
+        });
+
+        // 安全校验：确保返回数量与输入一致
+        if (object.translations.length !== texts.length) {
+          throw new Error(
+            `批量翻译结果数量不匹配: 期望 ${texts.length}，实际 ${object.translations.length}`
+          );
+        }
+
+        return object.translations;
+      } catch (err) {
+        lastError = err;
+        const errName = (err as Error)?.name ?? '';
+        // 仅对 JSON 解析失败 / 对象生成失败进行重试
+        if (errName === 'AI_NoObjectGeneratedError' || errName === 'AI_JSONParseError') {
+          console.warn(`批量翻译 JSON 解析失败 (第 ${attempt + 1} 次)，重试中...`);
+          continue;
+        }
+        throw err;
+      }
     }
 
-    return object.translations;
+    throw lastError;
   }
 
   /** 检测文本语言 */
@@ -109,6 +134,7 @@ export class LLMTranslationEngine implements TranslationEngine {
 
 文本:
 ${text.slice(0, 500)}`,
+      maxOutputTokens: 64,
     });
 
     return object.language;
