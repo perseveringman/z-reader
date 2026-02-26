@@ -193,6 +193,20 @@ export function TranslationSettings({ open, onClose }: TranslationSettingsProps)
     [],
   );
 
+  const updateSelectionAnalysis = useCallback(
+    (partial: Partial<TranslationSettingsData['selectionAnalysis']>) => {
+      setSettings((prev) => {
+        const nextSA = { ...prev.selectionAnalysis, ...partial };
+        const next = { ...prev, selectionAnalysis: nextSA };
+        window.electronAPI.translationSettingsSet({ selectionAnalysis: nextSA }).catch((err) => {
+          console.error('保存划词分析配置失败:', err);
+        });
+        return next;
+      });
+    },
+    [],
+  );
+
   /** 快捷键录制处理 */
   const handleShortcutKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -683,6 +697,48 @@ export function TranslationSettings({ open, onClose }: TranslationSettingsProps)
                 <p className="text-[11px] text-gray-600 mt-1">
                   点击"录制"后按下键盘组合键即可设置快捷键。
                 </p>
+              </div>
+            </section>
+
+            {/* ==================== 划词翻译分析 ==================== */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Languages size={16} className="text-amber-400" />
+                <h3 className="text-sm font-medium text-white">划词翻译分析</h3>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-4">
+                使用 LLM 引擎时，划词翻译可提供以下深度分析模块（非 LLM 引擎仅显示基础翻译）
+              </p>
+
+              <div className="space-y-3">
+                {([
+                  { key: 'sentenceTranslation' as const, label: '整句翻译', desc: '提供完整通顺的句子翻译' },
+                  { key: 'grammarStructure' as const, label: '语法结构分析', desc: '分析句型、从句、时态等' },
+                  { key: 'keyVocabulary' as const, label: '主干/次干词汇标注', desc: '标注核心词汇和辅助词汇' },
+                  { key: 'usageExtension' as const, label: '用法拓展', desc: '常见搭配和造句示例' },
+                  { key: 'criticalKnowledge' as const, label: '临界知识', desc: '相关的元知识和思维模型' },
+                ] as const).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">{item.label}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">{item.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => updateSelectionAnalysis({ [item.key]: !settings.selectionAnalysis[item.key] })}
+                      className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                        settings.selectionAnalysis[item.key]
+                          ? 'bg-amber-500'
+                          : 'bg-gray-600 hover:bg-gray-500'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          settings.selectionAnalysis[item.key] ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
               </div>
             </section>
           </div>
