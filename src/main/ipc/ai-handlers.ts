@@ -921,6 +921,15 @@ ${sourceText.slice(0, 24000)}`,
     },
   );
 
+  // 按文章查询 Chat 会话列表
+  ipcMain.handle(
+    IPC_CHANNELS.AI_CHAT_SESSION_LIST_BY_ARTICLE,
+    async (_event, articleId: string) => {
+      const aiDb = getAIDatabase();
+      return aiDb.listChatSessionsByArticle(articleId).map(mapChatSessionRow);
+    },
+  );
+
   // ==================== AI 主题提取 ====================
 
   ipcMain.handle(
