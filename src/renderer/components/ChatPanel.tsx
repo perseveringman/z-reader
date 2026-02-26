@@ -486,20 +486,41 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     });
   }, []);
 
-  // 初始化：仅加载会话列表，不立即创建会话（延迟到第一次发消息时创建）
+  // 初始化：按文章加载会话列表，自动加载最近一条，无历史则空状态
   useEffect(() => {
     if (apiConfigured === false) return;
     if (apiConfigured === null) return;
 
     const initSession = async () => {
       try {
-        // 仅加载会话列表，不创建新会话
-        const list = await window.electronAPI.aiChatSessionList();
-        setSessions(list);
         await loadPromptPresets();
-        // 重置当前会话状态
-        setSessionId(null);
-        setMessages([]);
+
+        if (!articleId) {
+          setSessions([]);
+          setSessionId(null);
+          setMessages([]);
+          return;
+        }
+
+        // 按文章拉取会话列表
+        const list = await window.electronAPI.aiChatSessionListByArticle(articleId);
+        setSessions(list);
+
+        if (list.length > 0) {
+          // 自动加载最近一条会话
+          const latest = await window.electronAPI.aiChatSessionGet(list[0].id);
+          if (latest) {
+            setSessionId(latest.id);
+            setMessages(latest.messages);
+          } else {
+            setSessionId(null);
+            setMessages([]);
+          }
+        } else {
+          // 无历史会话，空状态
+          setSessionId(null);
+          setMessages([]);
+        }
       } catch {
         setError(t('chat.error'));
       }
@@ -675,12 +696,20 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
     try {
       await window.electronAPI.aiChatSessionDelete(id);
       // 从数据库重新加载列表，确保一致性
-      const list = await window.electronAPI.aiChatSessionList();
-      setSessions(list);
+      if (articleId) {
+        const list = await window.electronAPI.aiChatSessionListByArticle(articleId);
+        setSessions(list);
+      } else {
+        setSessions([]);
+      }
     } catch {
       // 删除失败时恢复列表
-      const list = await window.electronAPI.aiChatSessionList();
-      setSessions(list);
+      if (articleId) {
+        const list = await window.electronAPI.aiChatSessionListByArticle(articleId);
+        setSessions(list);
+      } else {
+        setSessions([]);
+      }
       setError(t('chat.error'));
     }
   }, [sessionId, handleNewSession, t]);
