@@ -822,6 +822,9 @@ export interface SelectionTranslation {
   engine: string;
   analysis: SelectionTranslationAnalysis | null;
   createdAt: string;
+  anchorPath?: string | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
 }
 
 export interface TranslateTextInput {
@@ -837,6 +840,9 @@ export interface TranslateTextInput {
     usageExtension: boolean;
     criticalKnowledge: boolean;
   };
+  anchorPath?: string | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
 }
 
 export interface TranslateTextResult {
