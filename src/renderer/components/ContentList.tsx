@@ -31,6 +31,7 @@ interface ContentListProps {
 type TabKey = 'inbox' | 'later' | 'archive' | 'unseen' | 'seen' | 'all' | 'shortRead' | 'longRead';
 
 const PAGE_SIZE = 100;
+export const DEFAULT_CONTENT_LIST_SORT_BY: SortBy = 'published_at';
 
 
 export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, refreshTrigger, feedId, isShortlisted, activeView, tagId, expanded, source, initialTab, mediaType, feedType }: ContentListProps) {
@@ -40,7 +41,7 @@ export function ContentList({ selectedArticleId, onSelectArticle, onOpenReader, 
     const storageKey = source === 'feed' ? 'z-reader-tab-feed' : 'z-reader-tab-library';
     return (localStorage.getItem(storageKey) as TabKey) || 'inbox';
   });
-  const [sortBy, setSortBy] = useState<SortBy>('saved_at');
+  const [sortBy, setSortBy] = useState<SortBy>(DEFAULT_CONTENT_LIST_SORT_BY);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (localStorage.getItem('z-reader-view-mode') as ViewMode) || 'default';
