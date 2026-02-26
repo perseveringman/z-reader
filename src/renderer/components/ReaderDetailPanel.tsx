@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, Globe, User, Calendar, FileText, Trash2, Highlighter, Download, Copy, Share2, Image as ImageIcon } from 'lucide-react';
+import { Clock, Globe, User, Calendar, FileText, Trash2, Highlighter, Download, Copy, Share2, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import type { Article, Highlight, CardType } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
 import { ChatPanel } from './ChatPanel';
@@ -123,6 +123,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
   const isVideo = article?.mediaType === 'video';
   const isPodcast = article?.mediaType === 'podcast';
   const effectiveDuration = article?.audioDuration || article?.duration;
+  const externalUrl = article?.url && /^https?:\/\//i.test(article.url) ? article.url : null;
   const readingTimeValue = (isVideo || isPodcast) && effectiveDuration
     ? (effectiveDuration >= 3600 
         ? `${Math.floor(effectiveDuration / 3600)}h ${Math.floor((effectiveDuration % 3600) / 60)}m`
@@ -200,6 +201,16 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
                   <p className="text-[13px] leading-[1.6] text-gray-400">
                     {article.summary || '暂无摘要'}
                   </p>
+                  {externalUrl && (
+                    <button
+                      onClick={() => void window.electronAPI.externalOpenUrl(externalUrl)}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-[12px] text-gray-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer"
+                      title="在外部浏览器打开原文"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>打开原文</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Metadata */}
