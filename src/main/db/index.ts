@@ -506,6 +506,17 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_selection_translations_article_id ON selection_translations(article_id);
     CREATE INDEX IF NOT EXISTS idx_selection_translations_created ON selection_translations(created_at);
   `);
+
+  // Migration: selection_translations 表新增位置字段
+  try {
+    sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN anchor_path TEXT`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN start_offset INTEGER`);
+  } catch { /* Column already exists */ }
+  try {
+    sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN end_offset INTEGER`);
+  } catch { /* Column already exists */ }
 }
 
 export { schema };

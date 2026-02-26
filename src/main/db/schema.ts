@@ -272,6 +272,9 @@ export const selectionTranslations = sqliteTable('selection_translations', {
   analysis: text('analysis'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at'),
+  anchorPath: text('anchor_path'),
+  startOffset: integer('start_offset'),
+  endOffset: integer('end_offset'),
   deletedFlg: integer('deleted_flg').default(0),
 });
 
