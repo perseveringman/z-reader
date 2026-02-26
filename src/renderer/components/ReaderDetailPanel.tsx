@@ -4,9 +4,10 @@ import type { Article, Highlight, CardType } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
 import { ChatPanel } from './ChatPanel';
 import { MindMapPanel } from './MindMapPanel';
+import { LanguageLearningTab } from './LanguageLearningTab';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 
-type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat';
+type DetailTab = 'info' | 'notebook' | 'mindmap' | 'chat' | 'learn';
 
 interface ReaderDetailPanelProps {
   articleId: string;
@@ -18,6 +19,8 @@ interface ReaderDetailPanelProps {
   forceTab?: { tab: DetailTab; ts: number };
   /** 外部传入的阅读进度，实时更新 */
   readProgress?: number;
+  /** 划词翻译刷新触发器 */
+  selectionTranslationRefresh?: number;
 }
 
 interface MetaRow {
@@ -58,7 +61,7 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0 }: ReaderDetailPanelProps) {
+export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0, selectionTranslationRefresh }: ReaderDetailPanelProps) {
   const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
     defaultWidth: 500,
     minWidth: 240,
@@ -156,6 +159,7 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
           { key: 'notebook' as DetailTab, label: 'Notebook', count: highlights.length },
           { key: 'mindmap' as DetailTab, label: 'MindMap' },
           { key: 'chat' as DetailTab, label: 'Chat' },
+          { key: 'learn' as DetailTab, label: 'Learn' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -350,6 +354,13 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
 
             {activeTab === 'mindmap' && (
               <MindMapPanel articleId={articleId} />
+            )}
+
+            {activeTab === 'learn' && (
+              <LanguageLearningTab
+                articleId={articleId}
+                refreshTrigger={selectionTranslationRefresh}
+              />
             )}
           </>
         )}
