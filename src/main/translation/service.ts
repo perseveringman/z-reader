@@ -779,6 +779,9 @@ export async function translateText(input: TranslateTextInput): Promise<Translat
     analysis: analysis ? JSON.stringify(analysis) : null,
     createdAt: now,
     updatedAt: now,
+    anchorPath: input.anchorPath ?? null,
+    startOffset: input.startOffset ?? null,
+    endOffset: input.endOffset ?? null,
     deletedFlg: 0,
   });
 
@@ -905,6 +908,9 @@ export async function listSelectionTranslations(articleId: string): Promise<impo
     engine: row.engine,
     analysis: row.analysis ? JSON.parse(row.analysis) : null,
     createdAt: row.createdAt,
+    anchorPath: row.anchorPath ?? null,
+    startOffset: row.startOffset ?? null,
+    endOffset: row.endOffset ?? null,
   }));
 }
 
