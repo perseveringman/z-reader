@@ -687,5 +687,17 @@
   "relevance": {
     "high": "高度相关",
     "medium": "可能相关"
+  },
+  "selectionTranslation": {
+    "selectionAnalysis": "划词翻译分析",
+    "selectionAnalysisDesc": "使用 LLM 引擎时，划词翻译可提供以下深度分析模块",
+    "sentenceTranslation": "整句翻译",
+    "grammarStructure": "语法结构分析",
+    "keyVocabulary": "主干/次干词汇标注",
+    "usageExtension": "用法拓展",
+    "criticalKnowledge": "临界知识",
+    "learn": "语言学习",
+    "learnEmpty": "选中文字并点击翻译按钮",
+    "learnEmptyHint": "翻译结果将在此处展示"
   }
 }

@@ -687,5 +687,17 @@
   "relevance": {
     "high": "Highly Relevant",
     "medium": "Possibly Relevant"
+  },
+  "selectionTranslation": {
+    "selectionAnalysis": "Selection Analysis",
+    "selectionAnalysisDesc": "Deep analysis modules available with LLM engine",
+    "sentenceTranslation": "Sentence Translation",
+    "grammarStructure": "Grammar Structure",
+    "keyVocabulary": "Key Vocabulary",
+    "usageExtension": "Usage Extension",
+    "criticalKnowledge": "Critical Knowledge",
+    "learn": "Language Learning",
+    "learnEmpty": "Select text and click translate",
+    "learnEmptyHint": "Translation results will appear here"
   }
 }
