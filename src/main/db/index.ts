@@ -553,6 +553,56 @@ function initTables(sqlite: Database.Database) {
   } catch {
     // Column already exists
   }
+
+  // Migration: 研究系统表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS research_spaces (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      icon TEXT DEFAULT 'FlaskConical',
+      status TEXT DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_flg INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS research_space_sources (
+      id TEXT PRIMARY KEY,
+      space_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      summary_cache TEXT,
+      processing_status TEXT DEFAULT 'pending',
+      added_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_research_space_sources_space_id ON research_space_sources(space_id);
+
+    CREATE TABLE IF NOT EXISTS research_conversations (
+      id TEXT PRIMARY KEY,
+      space_id TEXT NOT NULL,
+      title TEXT,
+      messages TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_research_conversations_space_id ON research_conversations(space_id);
+
+    CREATE TABLE IF NOT EXISTS research_artifacts (
+      id TEXT PRIMARY KEY,
+      space_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      prompt TEXT,
+      pinned INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_flg INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_research_artifacts_space_id ON research_artifacts(space_id);
+  `);
 }
 
 export { schema };
