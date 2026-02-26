@@ -474,7 +474,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
             opacity: settings.display.opacity,
           };
           applyHighlights();
-          applyTranslationMarksToDOM();
           setTranslationVisible(true);
         }
       } catch (err) {
@@ -502,8 +501,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   useEffect(() => {
     if (loading || !article?.content || !contentRef.current) return;
     clearAllTranslationMarks(contentRef.current);
+    applyHighlights();
     applyTranslationMarks(contentRef.current, selectionTranslations);
-  }, [selectionTranslations, loading, article?.content]);
+  }, [selectionTranslations, loading, article?.content, applyHighlights]);
 
   // ==================== 高亮导航 ====================
 

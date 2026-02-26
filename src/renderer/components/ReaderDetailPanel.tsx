@@ -67,7 +67,7 @@ function formatRelativeTime(dateStr: string): string {
   return formatDate(dateStr) ?? dateStr;
 }
 
-export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0, selectionTranslationRefresh }: ReaderDetailPanelProps) {
+export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, onDeleteHighlight, onHighlightClick, forceTab, readProgress = 0, selectionTranslationRefresh, focusTranslationId, onLocateTranslation, onTranslationDeleted }: ReaderDetailPanelProps) {
   const { width: panelWidth, handleMouseDown: handleResizeMouseDown } = useResizablePanel({
     defaultWidth: 500,
     minWidth: 240,
