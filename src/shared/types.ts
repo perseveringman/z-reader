@@ -1026,6 +1026,7 @@ export interface ElectronAPI {
   // AI Chat Session CRUD
   aiChatSessionCreate: (articleId?: string) => Promise<ChatSession>;
   aiChatSessionList: () => Promise<ChatSession[]>;
+  aiChatSessionListByArticle: (articleId: string) => Promise<ChatSession[]>;
   aiChatSessionGet: (id: string) => Promise<ChatSession | null>;
   aiChatSessionDelete: (id: string) => Promise<void>;
 
