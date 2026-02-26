@@ -494,6 +494,14 @@ async function translateInBackground(
     // 出错时保留已翻译段落，标记为失败
     console.error(`翻译任务 ${translationId} 出错:`, err);
     await updateTranslationStatus(translationId, 'failed', paragraphs, completedCount / total);
+    // 广播失败事件通知前端
+    broadcastProgress({
+      translationId,
+      index: -1,
+      translated: '',
+      progress: completedCount / total,
+      error: err instanceof Error ? err.message : String(err),
+    });
   } finally {
     // 清理 AbortController 引用
     runningTranslations.delete(translationId);

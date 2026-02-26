@@ -567,14 +567,20 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
   const handleTranslate = useCallback(async (targetLang: string) => {
     if (!article) return;
 
-    // 切换显示/隐藏
-    if (translationVisible && translationData) {
+    // 切换显示/隐藏（仅已完成的翻译）
+    if (translationVisible && translationData?.status === 'completed') {
       setTranslationVisible(false);
       return;
     }
-    if (translationData && !translationVisible) {
+    if (translationData?.status === 'completed' && !translationVisible) {
       setTranslationVisible(true);
       return;
+    }
+
+    // 如果上次翻译失败/未完成，清除旧状态以便重新触发续传
+    if (translationData && translationData.status !== 'completed') {
+      setTranslationData(null);
+      setTranslationParagraphs([]);
     }
 
     // 检查缓存
@@ -610,6 +616,14 @@ export function PodcastReaderView({ articleId, onClose }: PodcastReaderViewProps
     if (!translationData?.id) return;
     const unsubscribe = window.electronAPI.translationOnProgress((event: TranslationProgressEvent) => {
       if (event.translationId !== translationData.id) return;
+      // 处理翻译失败
+      if (event.error) {
+        console.error('翻译失败:', event.error);
+        setTranslationLoading(false);
+        setTranslationProgress(null);
+        setTranslationData((prev) => prev ? { ...prev, status: 'failed' } : prev);
+        return;
+      }
       setTranslationParagraphs((prev) => {
         const next = [...prev];
         next[event.index] = { index: event.index, original: '', translated: event.translated };

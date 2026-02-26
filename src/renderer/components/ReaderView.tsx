@@ -274,18 +274,24 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const handleTranslate = useCallback(async (targetLang: string) => {
     if (!article || !contentRef.current) return;
 
-    // 如果已有翻译且可见，则隐藏
-    if (translationVisible && translationData) {
+    // 如果已有已完成翻译且可见，则隐藏
+    if (translationVisible && translationData?.status === 'completed') {
       toggleTranslations(contentRef.current, false);
       setTranslationVisible(false);
       return;
     }
 
-    // 如果已有翻译数据但隐藏中，则显示
-    if (translationData && !translationVisible) {
+    // 如果已有已完成翻译但隐藏中，则显示
+    if (translationData?.status === 'completed' && !translationVisible) {
       toggleTranslations(contentRef.current, true);
       setTranslationVisible(true);
       return;
+    }
+
+    // 如果上次翻译失败/未完成，清除旧状态以便重新触发（后端会走续传逻辑）
+    if (translationData && translationData.status !== 'completed') {
+      setTranslationData(null);
+      clearTranslations(contentRef.current);
     }
 
     // 检查缓存
@@ -324,6 +330,16 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
     const unsubscribe = window.electronAPI.translationOnProgress((event: TranslationProgressEvent) => {
       if (!contentRef.current || event.translationId !== translationData.id) return;
+
+      // 处理翻译失败
+      if (event.error) {
+        console.error('翻译失败:', event.error);
+        setTranslationLoading(false);
+        setTranslationProgress(null);
+        // 标记 translationData 状态为 failed，以便下次点击可重试
+        setTranslationData((prev) => prev ? { ...prev, status: 'failed' } : prev);
+        return;
+      }
 
       // 注入单个段落的翻译
       injectSingleTranslation(

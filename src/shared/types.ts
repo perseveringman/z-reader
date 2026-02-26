@@ -759,6 +759,7 @@ export interface TranslationProgressEvent {
   index: number;
   translated: string;
   progress: number; // 0-1
+  error?: string; // 翻译失败时的错误信息
 }
 
 export interface TranslationSettings {
