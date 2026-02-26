@@ -71,9 +71,9 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [tocCollapsed, setTocCollapsed] = useState(() => localStorage.getItem('reader-toc-collapsed') === 'true');
   const [detailCollapsed, setDetailCollapsed] = useState(() => localStorage.getItem('reader-detail-collapsed') === 'true');
   const [readProgress, setReadProgress] = useState(0);
-  const [forceTab, setForceTab] = useState<{ tab: 'info' | 'notebook' | 'chat'; ts: number } | undefined>();
+  const [forceTab, setForceTab] = useState<{ tab: 'info' | 'notebook' | 'chat' | 'learn'; ts: number } | undefined>();
   const [editingAnnotation, setEditingAnnotation] = useState<EditingAnnotation | null>(null);
-  const [currentDetailTab, setCurrentDetailTab] = useState<'info' | 'notebook' | 'chat'>('info');
+  const [currentDetailTab, setCurrentDetailTab] = useState<'info' | 'notebook' | 'chat' | 'learn'>('info');
   const [highlightTagsMap, setHighlightTagsMap] = useState<Record<string, Tag[]>>({});
   const [shareCardOpen, setShareCardOpen] = useState(false);
   const [shareCardHighlights, setShareCardHighlights] = useState<Highlight[]>([]);
@@ -84,6 +84,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [translationProgress, setTranslationProgress] = useState<{ done: number; total: number } | null>(null);
   const [translationData, setTranslationData] = useState<Translation | null>(null);
   const [defaultTargetLang, setDefaultTargetLang] = useState('zh-CN');
+  const [selectionTranslating, setSelectionTranslating] = useState(false);
+  const [selectionTranslationRefresh, setSelectionTranslationRefresh] = useState(0);
 
   const { reportContext } = useAgentContext();
 
@@ -322,6 +324,36 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       setTranslationLoading(false);
     }
   }, [article, translationVisible, translationData, applyHighlights]);
+
+  const handleSelectionTranslate = useCallback(async () => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (!text || !article) return;
+
+    // 切到语言学习 Tab
+    setForceTab({ tab: 'learn', ts: Date.now() });
+    setToolbar(null);
+    selection?.removeAllRanges();
+
+    setSelectionTranslating(true);
+    try {
+      const settings = await window.electronAPI.translationSettingsGet();
+      const isLLM = settings.provider === 'llm';
+      await window.electronAPI.selectionTranslate({
+        text,
+        sourceLang: null,
+        targetLang: settings.defaultTargetLang || defaultTargetLang,
+        articleId: article.id,
+        useLLMAnalysis: isLLM,
+        enabledModules: settings.selectionAnalysis,
+      });
+      setSelectionTranslationRefresh((prev) => prev + 1);
+    } catch (err) {
+      console.error('划词翻译失败:', err);
+    } finally {
+      setSelectionTranslating(false);
+    }
+  }, [article, defaultTargetLang]);
 
   // ==================== 翻译进度监听 ====================
 
@@ -854,7 +886,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       // ` — 向前循环切换右侧详情面板 tab
       if (e.key === '`' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        const tabs: ('info' | 'notebook' | 'chat')[] = ['info', 'notebook', 'chat'];
+        const tabs: ('info' | 'notebook' | 'chat' | 'learn')[] = ['info', 'notebook', 'chat', 'learn'];
         const idx = tabs.indexOf(currentDetailTab);
         const nextTab = tabs[(idx + 1) % tabs.length];
         setCurrentDetailTab(nextTab);
@@ -867,7 +899,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       // Shift+` (即 ~) — 向后循环切换右侧详情面板 tab
       if (e.key === '~') {
         e.preventDefault();
-        const tabs: ('info' | 'notebook' | 'chat')[] = ['info', 'notebook', 'chat'];
+        const tabs: ('info' | 'notebook' | 'chat' | 'learn')[] = ['info', 'notebook', 'chat', 'learn'];
         const idx = tabs.indexOf(currentDetailTab);
         const prevTab = tabs[(idx - 1 + tabs.length) % tabs.length];
         setCurrentDetailTab(prevTab);
@@ -1128,13 +1160,27 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           }}
         >
           {toolbar.mode === 'selection' ? (
-            <button
-              onClick={handleCreateHighlight}
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500/20 hover:bg-amber-500/30 transition-colors cursor-pointer"
-              title="高亮"
-            >
-              <Highlighter className="w-3.5 h-3.5 text-amber-400" />
-            </button>
+            <>
+              <button
+                onClick={handleCreateHighlight}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500/20 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                title="高亮"
+              >
+                <Highlighter className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+              <button
+                onClick={handleSelectionTranslate}
+                disabled={selectionTranslating}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-500/20 hover:bg-blue-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                title="翻译"
+              >
+                {selectionTranslating ? (
+                  <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+                ) : (
+                  <Languages className="w-3.5 h-3.5 text-blue-400" />
+                )}
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -1205,6 +1251,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           onHighlightClick={handleHighlightNavigate}
           forceTab={forceTab}
           readProgress={readProgress}
+          selectionTranslationRefresh={selectionTranslationRefresh}
         />
       </div>
 
