@@ -8,12 +8,14 @@ export { createArticleTools } from './article-tools';
 export { createTagTools } from './tag-tools';
 export { createFeedTools } from './feed-tools';
 export { createHighlightTools } from './highlight-tools';
+export { createResearchTools } from './research-tools';
 
 import type { ToolContext } from './types';
 import { createArticleTools } from './article-tools';
 import { createTagTools } from './tag-tools';
 import { createFeedTools } from './feed-tools';
 import { createHighlightTools } from './highlight-tools';
+import { createResearchTools } from './research-tools';
 
 /**
  * 创建所有 AI Tools 的合集
@@ -25,5 +27,6 @@ export function createAllTools(ctx: ToolContext) {
     ...createTagTools(ctx),
     ...createFeedTools(ctx),
     ...createHighlightTools(ctx),
+    ...createResearchTools(ctx),
   };
 }

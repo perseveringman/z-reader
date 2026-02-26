@@ -7,18 +7,37 @@
 import { eq, like, and, gte, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '../../ai/tools/types';
-import { articles, feeds, tags, articleTags, highlights } from '../db/schema';
+import {
+  articles,
+  feeds,
+  tags,
+  articleTags,
+  highlights,
+  researchSpaceSources,
+  researchArtifacts,
+} from '../db/schema';
 import type { getDatabase } from '../db';
+import type { HybridRetriever } from '../../ai/services/retriever';
+import { createContextBuilder } from '../../ai/services/context-builder';
 
 type DrizzleDB = ReturnType<typeof getDatabase>;
+
+/** 可选的 RAG 依赖（研究模块需要） */
+export interface ToolContextRAGDeps {
+  retriever: HybridRetriever;
+}
 
 /**
  * 创建 ToolContext 实例
  * 将 Drizzle ORM 数据库操作注入到 AI Tool Calling 所需的上下文中
  *
  * @param db - Drizzle ORM 数据库实例
+ * @param ragDeps - 可选的 RAG 依赖，提供后启用研究相关方法
  */
-export function createToolContext(db: DrizzleDB): ToolContext {
+export function createToolContext(
+  db: DrizzleDB,
+  ragDeps?: ToolContextRAGDeps,
+): ToolContext {
   return {
     // ==================== 文章操作 ====================
 
@@ -234,6 +253,97 @@ export function createToolContext(db: DrizzleDB): ToolContext {
         createdAt: now,
         updatedAt: now,
       });
+    },
+
+    // ==================== 研究操作 ====================
+
+    searchResearchSources: async (query, sourceIds, topK = 10) => {
+      if (!ragDeps) {
+        return { text: 'RAG 服务未初始化。', references: [], tokenCount: 0 };
+      }
+
+      const searchResults = await ragDeps.retriever.search({
+        text: query,
+        topK,
+        filters: { sourceIds },
+      });
+
+      const contextBuilder = createContextBuilder({
+        maxTokens: 4000,
+        includeReferences: true,
+        getSourceTitle: async (sourceType, sourceId) => {
+          if (sourceType === 'article') {
+            const row = await db
+              .select({ title: articles.title })
+              .from(articles)
+              .where(eq(articles.id, sourceId))
+              .get();
+            return row?.title ?? null;
+          }
+          return null;
+        },
+      });
+
+      return contextBuilder.build(searchResults);
+    },
+
+    getSourceSummary: async (sourceType, sourceId) => {
+      if (sourceType === 'article') {
+        const row = await db
+          .select({
+            title: articles.title,
+            contentText: articles.contentText,
+            content: articles.content,
+          })
+          .from(articles)
+          .where(eq(articles.id, sourceId))
+          .get();
+
+        if (!row) return null;
+
+        const fullText = row.contentText || row.content || '';
+        const summary = fullText.slice(0, 500);
+        return {
+          title: row.title ?? '无标题',
+          summary,
+          wordCount: fullText.length,
+        };
+      }
+
+      // 其他类型暂不支持
+      return null;
+    },
+
+    getResearchSpaceSourceIds: async (spaceId) => {
+      if (!spaceId) return [];
+
+      const rows = await db
+        .select({ sourceId: researchSpaceSources.sourceId })
+        .from(researchSpaceSources)
+        .where(
+          and(
+            eq(researchSpaceSources.spaceId, spaceId),
+            eq(researchSpaceSources.enabled, 1),
+          ),
+        );
+
+      return rows.map((r) => r.sourceId);
+    },
+
+    saveResearchArtifact: async (input) => {
+      const now = new Date().toISOString();
+      const id = randomUUID();
+      await db.insert(researchArtifacts).values({
+        id,
+        spaceId: input.spaceId,
+        type: input.type,
+        title: input.title,
+        content: input.content,
+        prompt: input.prompt ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { id };
     },
   };
 }

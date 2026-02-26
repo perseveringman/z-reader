@@ -57,4 +57,47 @@ export interface ToolContext {
     text: string,
     note?: string,
   ) => Promise<void>;
+
+  // ==================== 研究操作 ====================
+
+  /** 在指定 sourceIds 范围内进行混合检索 */
+  searchResearchSources: (
+    query: string,
+    sourceIds: string[],
+    topK?: number,
+  ) => Promise<{
+    text: string;
+    references: Array<{
+      sourceType: string;
+      sourceId: string;
+      title: string | null;
+      chunkIndex: number;
+    }>;
+    tokenCount: number;
+  }>;
+
+  /** 获取源材料摘要（标题 + 前 500 字） */
+  getSourceSummary: (
+    sourceType: string,
+    sourceId: string,
+  ) => Promise<{
+    title: string;
+    summary: string;
+    wordCount: number;
+  } | null>;
+
+  /** 获取研究空间内所有启用的 sourceIds */
+  getResearchSpaceSourceIds: (spaceId: string) => Promise<string[]>;
+
+  /** 保存研究产物到数据库 */
+  saveResearchArtifact: (input: {
+    spaceId: string;
+    type: string;
+    title: string;
+    content: string;
+    prompt?: string;
+  }) => Promise<{ id: string }>;
+
+  /** 当前研究空间 ID（仅在 research 模式下有值） */
+  _researchSpaceId?: string;
 }

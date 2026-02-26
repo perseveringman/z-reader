@@ -248,4 +248,21 @@ export const IPC_CHANNELS = {
   // Embedding Config (Embedding 独立配置)
   EMBEDDING_CONFIG_GET: 'embedding:config:get',
   EMBEDDING_CONFIG_SET: 'embedding:config:set',
+
+  // Research (研究系统)
+  RESEARCH_SPACE_CREATE: 'research:space:create',
+  RESEARCH_SPACE_LIST: 'research:space:list',
+  RESEARCH_SPACE_GET: 'research:space:get',
+  RESEARCH_SPACE_UPDATE: 'research:space:update',
+  RESEARCH_SPACE_DELETE: 'research:space:delete',
+  RESEARCH_SOURCE_ADD: 'research:source:add',
+  RESEARCH_SOURCE_REMOVE: 'research:source:remove',
+  RESEARCH_SOURCE_TOGGLE: 'research:source:toggle',
+  RESEARCH_SOURCE_LIST: 'research:source:list',
+  RESEARCH_CONVERSATION_LIST: 'research:conversation:list',
+  RESEARCH_CONVERSATION_DELETE: 'research:conversation:delete',
+  RESEARCH_ARTIFACT_LIST: 'research:artifact:list',
+  RESEARCH_ARTIFACT_GET: 'research:artifact:get',
+  RESEARCH_ARTIFACT_DELETE: 'research:artifact:delete',
+  RESEARCH_ARTIFACT_EXPORT: 'research:artifact:export',
 } as const;

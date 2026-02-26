@@ -115,6 +115,25 @@ export class AgentService {
           create_highlight: 'write',
         },
       },
+      {
+        id: 'research',
+        activeWhen: (vs) => vs.pageState.page === 'research',
+        systemPromptSegment: `你是一个研究助手。你可以：
+- 在源材料中搜索相关内容（所有回答必须带 [来源名称] 引用标注）
+- 获取源材料的摘要信息
+- 生成结构化产物（研究报告、对比矩阵、摘要、FAQ）
+
+重要原则：
+1. 所有回答必须基于源材料，不要凭空生成
+2. 使用 [来源名称] 标注引用
+3. 当源材料不足以回答时，明确告知用户
+4. 生成对比矩阵时使用 JSON 格式，其他产物使用 Markdown 格式`,
+        actionLevels: {
+          search_research_sources: 'read',
+          get_source_summary: 'read',
+          generate_artifact: 'read', // Phase 1: auto-approve; upgrade to 'write' when action-confirm UI is added to ResearchChat
+        },
+      },
     ];
   }
 
@@ -142,6 +161,13 @@ export class AgentService {
 
     if (viewState.common.selectedText) {
       prompt += `\n\n用户选中的文本：${viewState.common.selectedText.slice(0, 500)}`;
+    }
+
+    // 注入研究空间上下文
+    if (viewState.pageState.page === 'research') {
+      const ps = viewState.pageState as { spaceId: string | null; sourceCount: number; enabledSourceCount: number };
+      prompt += `\n\n当前研究空间：${ps.spaceId ?? '未选择'}`;
+      prompt += `\n源材料数量：${ps.sourceCount} 篇（${ps.enabledSourceCount} 篇已启用）`;
     }
 
     // 注入活跃模块的能力描述
@@ -220,10 +246,17 @@ export class AgentService {
     // 4. 构建 messages 数组
     const messages = this.toSDKMessages(history, userMessage);
 
-    // 5. 创建 tools
+    // 5. 注入 researchSpaceId（在创建 tools 之前）
+    if (viewState.pageState.page === 'research' && 'spaceId' in viewState.pageState) {
+      this.deps.toolContext._researchSpaceId = viewState.pageState.spaceId as string;
+    } else {
+      this.deps.toolContext._researchSpaceId = undefined;
+    }
+
+    // 6. 创建 tools
     const tools = createAllTools(this.deps.toolContext);
 
-    // 6. 调用 streamText（AI SDK v6 API）
+    // 7. 调用 streamText（AI SDK v6 API）
     const result = streamText({
       model: this.deps.getModel('smart'),
       system: systemPrompt,
@@ -232,7 +265,7 @@ export class AgentService {
       stopWhen: stepCountIs(5),
     });
 
-    // 7. 消费 fullStream，逐块推送
+    // 8. 消费 fullStream，逐块推送
     let fullText = '';
     try {
       for await (const part of result.fullStream) {
@@ -292,7 +325,7 @@ export class AgentService {
         }
       }
 
-      // 8. 获取 totalUsage，发送 done chunk
+      // 9. 获取 totalUsage，发送 done chunk
       const totalUsage = await result.totalUsage;
       onChunk({
         type: 'done',
@@ -304,10 +337,13 @@ export class AgentService {
       onChunk({ type: 'error', error: errMsg });
     }
 
-    // 9. 持久化消息
+    // 10. 清除 researchSpaceId，避免跨请求残留
+    this.deps.toolContext._researchSpaceId = undefined;
+
+    // 11. 持久化消息
     this.persistMessages(sessionId, history, userMessage, fullText);
 
-    // 10. 首次对话后自动生成标题
+    // 12. 首次对话后自动生成标题
     const isFirstMessage = history.length === 0;
     if (isFirstMessage && fullText) {
       this.generateTitle(sessionId, userMessage, fullText, onChunk).catch(

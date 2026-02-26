@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ActivityRailBar } from './components/ActivityRailBar';
 import { Sidebar } from './components/Sidebar';
 import { ContentList } from './components/ContentList';
 import { DetailPanel } from './components/DetailPanel';
@@ -21,6 +22,7 @@ import { PodcastReaderView } from './components/PodcastReaderView';
 import { DownloadManager } from './components/DownloadManager';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { DiscoverPage } from './components/discover/DiscoverPage';
+import { ResearchLayout } from './components/research/ResearchLayout';
 import { KGOverviewPage } from './components/KGOverviewPage';
 import { WritingAssistPage } from './components/WritingAssistPage';
 import { TaskDrawer } from './components/TaskDrawer';
@@ -58,6 +60,7 @@ function AppContent() {
   const [readerMediaType, setReaderMediaType] = useState<string>('article');
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [appMode, setAppMode] = useState<'read' | 'research'>('read');
 
   // Derive source and sub-view from activeView
   const contentSource: ArticleSource | undefined =
@@ -183,6 +186,9 @@ function AppContent() {
 
   useEffect(() => {
     const pageState = (() => {
+      if (appMode === 'research') {
+        return { page: 'research' as const, spaceId: null, sourceCount: 0, enabledSourceCount: 0 };
+      }
       if (readerMode && readerArticleId) {
         if (readerMediaType === 'video') {
           return { page: 'video-reader' as const, articleId: readerArticleId, currentTime: 0, hasTranscript: false };
@@ -217,6 +223,7 @@ function AppContent() {
     })();
 
     const currentPage = (() => {
+      if (appMode === 'research') return 'research';
       if (readerMode && readerMediaType === 'video') return 'video-reader';
       if (readerMode && readerMediaType === 'podcast') return 'podcast-reader';
       if (readerMode) return 'reader';
@@ -232,7 +239,7 @@ function AppContent() {
       },
       pageState,
     });
-  }, [activeView, readerMode, readerArticleId, readerMediaType, bookReaderMode, bookReaderId, selectedArticleId, selectedBookId, selectedFeedId, manageFeedSelectedId, reportContext]);
+  }, [appMode, activeView, readerMode, readerArticleId, readerMediaType, bookReaderMode, bookReaderId, selectedArticleId, selectedBookId, selectedFeedId, manageFeedSelectedId, reportContext]);
 
   const handleCommandExecute = useCallback(
     (commandId: string) => {
@@ -378,6 +385,10 @@ function AppContent() {
     <div className="flex flex-col h-screen bg-[#0f0f0f] text-gray-200 overflow-hidden">
         {/* macOS title bar drag region */}
         <div className="h-[38px] shrink-0 drag-region flex items-center" />
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <ActivityRailBar activeMode={appMode} onModeChange={setAppMode} />
+          {appMode === 'read' ? (
+            <>
         {!readerMode && !bookReaderMode ? (
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <Sidebar
@@ -520,6 +531,11 @@ function AppContent() {
             />
           </div>
         )}
+            </>
+          ) : (
+            <ResearchLayout />
+          )}
+        </div>
 
         <CommandPalette
           open={commandPaletteOpen}

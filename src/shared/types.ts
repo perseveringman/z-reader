@@ -592,6 +592,7 @@ export type AgentPageSpecificState =
   | { page: 'books'; selectedBookId: string | null; bookCount: number }
   | { page: 'discover' }
   | { page: 'manage-feeds'; selectedFeedId: string | null }
+  | { page: 'research'; spaceId: string | null; sourceCount: number; enabledSourceCount: number }
   | { page: string; [key: string]: unknown };
 
 /** 完整的上下文快照 */
@@ -1138,6 +1139,23 @@ export interface ElectronAPI {
   // Embedding Config (Embedding 独立配置)
   embeddingConfigGet: () => Promise<EmbeddingConfig | null>;
   embeddingConfigSet: (config: EmbeddingConfig) => Promise<void>;
+
+  // Research (研究系统)
+  researchSpaceCreate: (input: CreateResearchSpaceInput) => Promise<ResearchSpace>;
+  researchSpaceList: () => Promise<ResearchSpace[]>;
+  researchSpaceGet: (id: string) => Promise<ResearchSpace | null>;
+  researchSpaceUpdate: (input: UpdateResearchSpaceInput) => Promise<ResearchSpace>;
+  researchSpaceDelete: (id: string) => Promise<void>;
+  researchSourceAdd: (input: AddResearchSourceInput) => Promise<ResearchSpaceSource>;
+  researchSourceRemove: (id: string) => Promise<void>;
+  researchSourceToggle: (id: string) => Promise<ResearchSpaceSource>;
+  researchSourceList: (spaceId: string) => Promise<ResearchSpaceSource[]>;
+  researchConversationList: (spaceId: string) => Promise<ResearchConversation[]>;
+  researchConversationDelete: (id: string) => Promise<void>;
+  researchArtifactList: (spaceId: string) => Promise<ResearchArtifact[]>;
+  researchArtifactGet: (id: string) => Promise<ResearchArtifact | null>;
+  researchArtifactDelete: (id: string) => Promise<void>;
+  researchArtifactExport: (id: string, format: 'markdown' | 'json') => Promise<string>;
 }
 
 // ── Sync ──
@@ -1459,4 +1477,71 @@ export interface EmbeddingConfig {
   baseURL: string;
   modelId: string;
   dimensions: number;
+}
+
+// ==================== Research (研究系统) 类型 ====================
+
+export interface ResearchSpace {
+  id: string;
+  title: string;
+  description: string | null;
+  icon: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateResearchSpaceInput {
+  title: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface UpdateResearchSpaceInput {
+  id: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+  status?: string;
+}
+
+export interface ResearchSpaceSource {
+  id: string;
+  spaceId: string;
+  sourceType: string;
+  sourceId: string;
+  enabled: number;
+  processingStatus: string;
+  addedAt: string;
+  // 联查字段
+  sourceTitle?: string;
+}
+
+export interface AddResearchSourceInput {
+  spaceId: string;
+  sourceType: string;
+  sourceId: string;
+}
+
+export interface ResearchConversation {
+  id: string;
+  spaceId: string;
+  title: string | null;
+  messages: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ResearchArtifactType = 'report' | 'comparison' | 'summary' | 'faq' | 'mindmap' | 'knowledge_graph' | 'timeline';
+
+export interface ResearchArtifact {
+  id: string;
+  spaceId: string;
+  type: ResearchArtifactType;
+  title: string;
+  content: string | null;
+  prompt: string | null;
+  pinned: number;
+  createdAt: string;
+  updatedAt: string;
 }

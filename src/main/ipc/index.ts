@@ -27,6 +27,7 @@ import { registerBackfillHandlers } from './backfill-handlers';
 import { registerEmbeddingConfigHandlers } from './embedding-config-handlers';
 import { registerAgentHandlers } from './agent-handlers';
 import { registerTranslationHandlers } from './translation-handlers';
+import { registerResearchHandlers } from './research-handlers';
 
 export function registerAllIpcHandlers() {
   registerFeedHandlers();
@@ -58,4 +59,5 @@ export function registerAllIpcHandlers() {
   registerEmbeddingConfigHandlers();
   registerAgentHandlers();
   registerTranslationHandlers();
+  registerResearchHandlers();
 }

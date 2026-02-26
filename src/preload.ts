@@ -302,6 +302,23 @@ const electronAPI: ElectronAPI = {
   selectionTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATE, input),
   selectionTranslationList: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATION_LIST, articleId),
   selectionTranslationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATION_DELETE, id),
+
+  // Research (研究系统)
+  researchSpaceCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SPACE_CREATE, input),
+  researchSpaceList: () => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SPACE_LIST),
+  researchSpaceGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SPACE_GET, id),
+  researchSpaceUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SPACE_UPDATE, input),
+  researchSpaceDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SPACE_DELETE, id),
+  researchSourceAdd: (input) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_ADD, input),
+  researchSourceRemove: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_REMOVE, id),
+  researchSourceToggle: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_TOGGLE, id),
+  researchSourceList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_LIST, spaceId),
+  researchConversationList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CONVERSATION_LIST, spaceId),
+  researchConversationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CONVERSATION_DELETE, id),
+  researchArtifactList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_LIST, spaceId),
+  researchArtifactGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_GET, id),
+  researchArtifactDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_DELETE, id),
+  researchArtifactExport: (id, format) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_EXPORT, id, format),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

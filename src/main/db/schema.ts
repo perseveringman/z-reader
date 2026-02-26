@@ -296,3 +296,51 @@ export const translations = sqliteTable('translations', {
   updatedAt: text('updated_at').notNull(),
   deletedFlg: integer('deleted_flg').default(0),
 });
+
+// ==================== research_spaces 研究空间表 ====================
+export const researchSpaces = sqliteTable('research_spaces', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  icon: text('icon').default('FlaskConical'),
+  status: text('status').default('active'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedFlg: integer('deleted_flg').default(0),
+});
+
+// ==================== research_space_sources 空间-资源关联表 ====================
+export const researchSpaceSources = sqliteTable('research_space_sources', {
+  id: text('id').primaryKey(),
+  spaceId: text('space_id').notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: text('source_id').notNull(),
+  enabled: integer('enabled').default(1),
+  summaryCache: text('summary_cache'),
+  processingStatus: text('processing_status').default('pending'),
+  addedAt: text('added_at').notNull(),
+});
+
+// ==================== research_conversations 研究对话表 ====================
+export const researchConversations = sqliteTable('research_conversations', {
+  id: text('id').primaryKey(),
+  spaceId: text('space_id').notNull(),
+  title: text('title'),
+  messages: text('messages'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// ==================== research_artifacts 研究产物表 ====================
+export const researchArtifacts = sqliteTable('research_artifacts', {
+  id: text('id').primaryKey(),
+  spaceId: text('space_id').notNull(),
+  type: text('type').notNull(),
+  title: text('title').notNull(),
+  content: text('content'),
+  prompt: text('prompt'),
+  pinned: integer('pinned').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedFlg: integer('deleted_flg').default(0),
+});
