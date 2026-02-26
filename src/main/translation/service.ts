@@ -14,6 +14,9 @@ import type {
   TranslationGetInput,
   TranslationProgressEvent,
   TranslationProvider,
+  TranslateTextInput,
+  TranslateTextResult,
+  SelectionTranslationAnalysis,
 } from '../../shared/types';
 
 // ==================== 常量 ====================
@@ -709,4 +712,202 @@ function mapRowToTranslation(row: typeof schema.translations.$inferSelect): Tran
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+// ==================== 划词翻译 ====================
+
+/**
+ * 划词翻译：翻译单段选中文字
+ *
+ * 1. 加载翻译设置，创建引擎
+ * 2. 调用引擎 translate() 获取基础翻译
+ * 3. 如果是 LLM 引擎且开启分析，用 generateObject 获取结构化分析
+ * 4. 持久化到 selection_translations 表
+ * 5. 返回结果
+ */
+export async function translateText(input: TranslateTextInput): Promise<TranslateTextResult> {
+  const db = getDatabase();
+  const settings = loadTranslationSettings();
+  const provider = settings.provider;
+  const engineSettings: TranslationSettings = { ...settings, provider };
+  const engine = createTranslationEngine(engineSettings);
+
+  // 基础翻译
+  const translation = await engine.translate(input.text, input.sourceLang, input.targetLang);
+
+  // 语言检测
+  let detectedLang: string | undefined;
+  if (settings.autoDetectLang) {
+    try {
+      detectedLang = await engine.detectLanguage(input.text);
+    } catch {
+      // 检测失败不阻塞
+    }
+  }
+
+  // LLM 深度分析
+  let analysis: SelectionTranslationAnalysis | undefined;
+  if (provider === 'llm' && input.useLLMAnalysis && settings.llm.apiKey) {
+    try {
+      analysis = await performLLMAnalysis(input.text, translation, input.targetLang, settings.llm, input.enabledModules);
+    } catch (err) {
+      console.warn('LLM 分析失败，跳过:', err);
+    }
+  }
+
+  // 持久化
+  const now = new Date().toISOString();
+  const id = randomUUID();
+
+  await db.insert(schema.selectionTranslations).values({
+    id,
+    articleId: input.articleId,
+    sourceText: input.text,
+    targetLang: input.targetLang,
+    translation,
+    detectedLang: detectedLang ?? null,
+    engine: provider,
+    analysis: analysis ? JSON.stringify(analysis) : null,
+    createdAt: now,
+    updatedAt: now,
+    deletedFlg: 0,
+  });
+
+  return {
+    id,
+    translation,
+    detectedLang,
+    analysis,
+    createdAt: now,
+  };
+}
+
+/**
+ * LLM 深度语言分析
+ */
+async function performLLMAnalysis(
+  sourceText: string,
+  translatedText: string,
+  targetLang: string,
+  llmConfig: TranslationSettings['llm'],
+  enabledModules?: TranslateTextInput['enabledModules'],
+): Promise<SelectionTranslationAnalysis> {
+  const { createOpenAI } = await import('@ai-sdk/openai');
+  const { generateObject } = await import('ai');
+  const { z } = await import('zod');
+
+  const provider = createOpenAI({
+    baseURL: llmConfig.baseUrl || 'https://api.openai.com/v1',
+    apiKey: llmConfig.apiKey,
+  });
+  const model = provider.chat(llmConfig.model || 'gpt-4o-mini');
+
+  // 根据 enabledModules 构建 schema 和 prompt
+  const modules = enabledModules ?? {
+    sentenceTranslation: true,
+    grammarStructure: true,
+    keyVocabulary: true,
+    usageExtension: true,
+    criticalKnowledge: false,
+  };
+
+  const schemaFields: Record<string, z.ZodTypeAny> = {};
+  const promptParts: string[] = [];
+
+  if (modules.sentenceTranslation) {
+    schemaFields.sentenceTranslation = z.string().describe('完整的句子翻译，语句通顺自然');
+    promptParts.push('1. 句子翻译：提供完整通顺的翻译');
+  }
+  if (modules.grammarStructure) {
+    schemaFields.grammarStructure = z.string().describe('语法结构分析，包括句型、从句、时态等');
+    promptParts.push('2. 语法结构：分析句型结构、从句、时态、语态等');
+  }
+  if (modules.keyVocabulary) {
+    schemaFields.keyVocabulary = z.array(z.object({
+      word: z.string(),
+      role: z.enum(['main', 'secondary']),
+      meaning: z.string(),
+      partOfSpeech: z.string(),
+    })).describe('主干词汇和次干词汇标注');
+    promptParts.push('3. 词汇标注：标注主干词汇(main)和次干词汇(secondary)，含词性和释义');
+  }
+  if (modules.usageExtension) {
+    schemaFields.usageExtension = z.string().describe('用法拓展，包括常见搭配、例句');
+    promptParts.push('4. 用法拓展：提供常见搭配、造句示例');
+  }
+  if (modules.criticalKnowledge) {
+    schemaFields.criticalKnowledge = z.string().describe('临界知识：与该文本相关的元知识、思维模型或规律');
+    promptParts.push('5. 临界知识：提炼相关的元知识、思维模型或底层规律');
+  }
+
+  if (Object.keys(schemaFields).length === 0) return {};
+
+  const analysisSchema = z.object(schemaFields);
+
+  const prompt = `你是一位专业的语言学习助手。请对以下文本进行深度分析，目标语言为 ${targetLang}。
+
+## 原文
+${sourceText}
+
+## 参考翻译
+${translatedText}
+
+## 分析要求
+${promptParts.join('\n')}
+
+请用 ${targetLang} 回答分析内容。`;
+
+  const maxOutputTokens = Math.max(sourceText.length * 5 + 500, 2048);
+
+  const { object } = await generateObject({
+    model,
+    schema: analysisSchema,
+    prompt,
+    maxTokens: maxOutputTokens,
+  });
+
+  return object as SelectionTranslationAnalysis;
+}
+
+/**
+ * 查询文章的划词翻译列表（时间倒序）
+ */
+export async function listSelectionTranslations(articleId: string): Promise<import('../../shared/types').SelectionTranslation[]> {
+  const db = getDatabase();
+
+  const rows = await db
+    .select()
+    .from(schema.selectionTranslations)
+    .where(
+      and(
+        eq(schema.selectionTranslations.articleId, articleId),
+        eq(schema.selectionTranslations.deletedFlg, 0),
+      ),
+    )
+    .orderBy(desc(schema.selectionTranslations.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    articleId: row.articleId,
+    sourceText: row.sourceText,
+    targetLang: row.targetLang,
+    translation: row.translation,
+    detectedLang: row.detectedLang,
+    engine: row.engine,
+    analysis: row.analysis ? JSON.parse(row.analysis) : null,
+    createdAt: row.createdAt,
+  }));
+}
+
+/**
+ * 软删除单条划词翻译
+ */
+export async function deleteSelectionTranslation(id: string): Promise<void> {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  await db
+    .update(schema.selectionTranslations)
+    .set({ deletedFlg: 1, updatedAt: now })
+    .where(eq(schema.selectionTranslations.id, id));
 }
