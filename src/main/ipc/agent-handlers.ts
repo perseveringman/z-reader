@@ -3,8 +3,12 @@ import { IPC_CHANNELS } from '../../shared/ipc-channels';
 import { AgentService } from '../../ai/services/agent-service';
 import { createToolContext } from '../ai/tool-context-factory';
 import { createLLMProvider } from '../../ai/providers/llm';
-import { getDatabase } from '../db';
+import { getDatabase, getSqlite } from '../db';
 import { getAIDatabase, loadAIConfig, mapChatSessionRow } from './ai-handlers';
+import { RAGDatabase } from '../../ai/providers/rag-db';
+import { createEmbeddingService } from '../../ai/services/embedding';
+import { createHybridRetriever } from '../../ai/services/retriever';
+import { getEmbeddingConfig } from '../../ai/providers/config';
 import type { AgentSendInput, AgentConfirmResponse } from '../../shared/types';
 
 /** 模块级 AgentService 实例（懒初始化，跨请求复用以保持 ActionRouter 状态） */
@@ -17,7 +21,26 @@ function getOrCreateAgentService(): AgentService {
 
   if (!agentService) {
     const llm = createLLMProvider(config);
-    const toolCtx = createToolContext(getDatabase());
+
+    // 创建 RAG 依赖（如果 embedding 已配置）
+    let ragDeps: Parameters<typeof createToolContext>[1];
+    try {
+      const sqlite = getSqlite();
+      if (sqlite) {
+        const embeddingConfig = getEmbeddingConfig(sqlite);
+        if (embeddingConfig) {
+          const ragDb = new RAGDatabase(sqlite, embeddingConfig.dimensions);
+          ragDb.initTables();
+          const embeddingService = createEmbeddingService(embeddingConfig);
+          const retriever = createHybridRetriever(sqlite, ragDb, embeddingService);
+          ragDeps = { retriever };
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to init RAG deps for Agent:', err);
+    }
+
+    const toolCtx = createToolContext(getDatabase(), ragDeps);
     agentService = new AgentService({
       getModel: llm.getModel.bind(llm),
       toolContext: toolCtx,
