@@ -8,8 +8,11 @@ import {
   listTranslations,
   getTranslationSettings,
   saveTranslationSettingsPartial,
+  translateText,
+  listSelectionTranslations,
+  deleteSelectionTranslation,
 } from '../translation/service';
-import type { TranslationStartInput, TranslationGetInput, TranslationSettings } from '../../shared/types';
+import type { TranslationStartInput, TranslationGetInput, TranslationSettings, TranslateTextInput } from '../../shared/types';
 import { getDatabase } from '../db';
 import * as schema from '../db/schema';
 import { eq, and, sql } from 'drizzle-orm';
@@ -82,5 +85,20 @@ export function registerTranslationHandlers() {
   // 保存翻译设置
   ipcMain.handle(IPC_CHANNELS.TRANSLATION_SETTINGS_SET, async (_event, partial: Partial<TranslationSettings>) => {
     saveTranslationSettingsPartial(partial);
+  });
+
+  // 划词翻译
+  ipcMain.handle(IPC_CHANNELS.SELECTION_TRANSLATE, async (_event, input: TranslateTextInput) => {
+    return translateText(input);
+  });
+
+  // 划词翻译列表
+  ipcMain.handle(IPC_CHANNELS.SELECTION_TRANSLATION_LIST, async (_event, articleId: string) => {
+    return listSelectionTranslations(articleId);
+  });
+
+  // 删除划词翻译
+  ipcMain.handle(IPC_CHANNELS.SELECTION_TRANSLATION_DELETE, async (_event, id: string) => {
+    return deleteSelectionTranslation(id);
   });
 }

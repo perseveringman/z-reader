@@ -297,6 +297,9 @@ const electronAPI: ElectronAPI = {
   },
   translationSettingsGet: () => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_SETTINGS_GET),
   translationSettingsSet: (partial) => ipcRenderer.invoke(IPC_CHANNELS.TRANSLATION_SETTINGS_SET, partial),
+  selectionTranslate: (input) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATE, input),
+  selectionTranslationList: (articleId) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATION_LIST, articleId),
+  selectionTranslationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.SELECTION_TRANSLATION_DELETE, id),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
