@@ -248,19 +248,27 @@ function initTables(sqlite: Database.Database) {
   // Migration: articles 表新增 YouTube 相关字段
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN media_type TEXT DEFAULT 'article'`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN video_id TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN duration INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_articles_media_type ON articles(media_type)`);
 
   // Migration: feeds 表新增 feed_type 字段
   try {
     sqlite.exec(`ALTER TABLE feeds ADD COLUMN feed_type TEXT DEFAULT 'rss'`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 
   // Migration: transcripts 表
   sqlite.exec(`
@@ -277,27 +285,41 @@ function initTables(sqlite: Database.Database) {
   // Migration: transcripts 表新增 speaker_map 字段
   try {
     sqlite.exec(`ALTER TABLE transcripts ADD COLUMN speaker_map TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 
   // Migration: articles 表新增 Podcast 相关字段
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_url TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_mime TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_bytes INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN audio_duration INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN episode_number INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN season_number INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 
   // Migration: downloads 表
   sqlite.exec(`
@@ -419,13 +441,19 @@ function initTables(sqlite: Database.Database) {
   // Migration: feeds 表新增微信公众号相关字段
   try {
     sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_biz TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_token_url TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE feeds ADD COLUMN wechat_token_expiry TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 
   // Migration: wechat_stats 表
   sqlite.exec(`
@@ -486,7 +514,9 @@ function initTables(sqlite: Database.Database) {
   // Migration: articles 表新增 metadata 列
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN metadata TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 
   // Migration: selection_translations 划词翻译表
   sqlite.exec(`
@@ -510,13 +540,19 @@ function initTables(sqlite: Database.Database) {
   // Migration: selection_translations 表新增位置字段
   try {
     sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN anchor_path TEXT`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN start_offset INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
   try {
     sqlite.exec(`ALTER TABLE selection_translations ADD COLUMN end_offset INTEGER`);
-  } catch { /* Column already exists */ }
+  } catch {
+    // Column already exists
+  }
 }
 
 export { schema };
