@@ -260,6 +260,21 @@ export const aiTaskLogs = sqliteTable('ai_task_logs', {
   createdAt: text('created_at').notNull(),
 });
 
+// ==================== selection_translations 划词翻译表 ====================
+export const selectionTranslations = sqliteTable('selection_translations', {
+  id: text('id').primaryKey(),
+  articleId: text('article_id').notNull().references(() => articles.id),
+  sourceText: text('source_text').notNull(),
+  targetLang: text('target_lang').notNull(),
+  translation: text('translation').notNull(),
+  detectedLang: text('detected_lang'),
+  engine: text('engine').notNull(),
+  analysis: text('analysis'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
+  deletedFlg: integer('deleted_flg').default(0),
+});
+
 // ==================== translations 表 ====================
 export const translations = sqliteTable('translations', {
   id: text('id').primaryKey(),

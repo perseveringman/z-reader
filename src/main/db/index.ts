@@ -487,6 +487,25 @@ function initTables(sqlite: Database.Database) {
   try {
     sqlite.exec(`ALTER TABLE articles ADD COLUMN metadata TEXT`);
   } catch { /* Column already exists */ }
+
+  // Migration: selection_translations 划词翻译表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS selection_translations (
+      id TEXT PRIMARY KEY,
+      article_id TEXT NOT NULL REFERENCES articles(id),
+      source_text TEXT NOT NULL,
+      target_lang TEXT NOT NULL,
+      translation TEXT NOT NULL,
+      detected_lang TEXT,
+      engine TEXT NOT NULL,
+      analysis TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT,
+      deleted_flg INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_selection_translations_article_id ON selection_translations(article_id);
+    CREATE INDEX IF NOT EXISTS idx_selection_translations_created ON selection_translations(created_at);
+  `);
 }
 
 export { schema };
