@@ -21,6 +21,12 @@ interface ReaderDetailPanelProps {
   readProgress?: number;
   /** 划词翻译刷新触发器 */
   selectionTranslationRefresh?: number;
+  /** 聚焦的划词翻译条目 ID */
+  focusTranslationId?: string | null;
+  /** 正文定位翻译标记回调 */
+  onLocateTranslation?: (sourceText: string) => void;
+  /** 翻译删除回调（同步删除正文翻译标记） */
+  onTranslationDeleted?: (id: string, sourceText: string) => void;
 }
 
 interface MetaRow {

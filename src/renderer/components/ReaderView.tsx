@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Loader2, Settings2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, MessageSquareText, Tag as TagIcon, MoreHorizontal, Highlighter, Image as ImageIcon, Languages } from 'lucide-react';
-import type { Article, Highlight, Tag, Translation, TranslationProgressEvent } from '../../shared/types';
+import type { Article, Highlight, Tag, Translation, TranslationProgressEvent, SelectionTranslation } from '../../shared/types';
 import ShareCardModal from './share-card/ShareCardModal';
 import { ReaderDetailPanel } from './ReaderDetailPanel';
 import { ReaderSettings, loadReaderSettings, FONT_FAMILY_MAP, FONTS, LINE_HEIGHTS, saveReaderSettings } from './ReaderSettings';
@@ -18,6 +18,9 @@ import {
   resolveAnchorPath,
   textSearchInElement,
   rangeToBlockOffsets,
+  applyTranslationMarks,
+  clearAllTranslationMarks,
+  unwrapTranslationMark,
 } from '../highlight-engine';
 import { injectTranslations, injectSingleTranslation, clearTranslations, toggleTranslations } from '../translation-injector';
 import type { ReaderSettingsValues } from './ReaderSettings';
@@ -86,6 +89,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
   const [defaultTargetLang, setDefaultTargetLang] = useState('zh-CN');
   const [selectionTranslating, setSelectionTranslating] = useState(false);
   const [selectionTranslationRefresh, setSelectionTranslationRefresh] = useState(0);
+  const [selectionTranslations, setSelectionTranslations] = useState<SelectionTranslation[]>([]);
+  const [focusTranslationId, setFocusTranslationId] = useState<string | null>(null);
 
   const { reportContext } = useAgentContext();
 
@@ -175,6 +180,15 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     });
     return () => { cancelled = true; };
   }, [articleId]);
+
+  // ==================== 加载划词翻译列表 ====================
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.selectionTranslationList(articleId).then((list) => {
+      if (!cancelled) setSelectionTranslations(list);
+    });
+    return () => { cancelled = true; };
+  }, [articleId, selectionTranslationRefresh]);
 
   // ==================== 加载高亮标签 ====================
 
@@ -270,6 +284,12 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       }
     }
   }, []);
+
+  const applyTranslationMarksToDOM = useCallback(() => {
+    if (!contentRef.current) return;
+    clearAllTranslationMarks(contentRef.current);
+    applyTranslationMarks(contentRef.current, selectionTranslations);
+  }, [selectionTranslations]);
 
   // ==================== 翻译触发 ====================
 
@@ -454,6 +474,7 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
             opacity: settings.display.opacity,
           };
           applyHighlights();
+          applyTranslationMarksToDOM();
           setTranslationVisible(true);
         }
       } catch (err) {
@@ -478,6 +499,12 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
     applyHighlights();
   }, [highlights, loading, article?.content, applyHighlights]);
 
+  useEffect(() => {
+    if (loading || !article?.content || !contentRef.current) return;
+    clearAllTranslationMarks(contentRef.current);
+    applyTranslationMarks(contentRef.current, selectionTranslations);
+  }, [selectionTranslations, loading, article?.content]);
+
   // ==================== 高亮导航 ====================
 
   const handleHighlightNavigate = useCallback((highlightId: string) => {
@@ -494,6 +521,17 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       el.style.outline = 'none';
       el.style.outlineOffset = '0';
     }, 1500);
+  }, []);
+
+  const handleLocateTranslation = useCallback((sourceText: string) => {
+    if (!contentRef.current) return;
+    const mark = contentRef.current.querySelector(
+      `mark[data-translation-word="${CSS.escape(sourceText)}"]`
+    ) as HTMLElement | null;
+    if (!mark) return;
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    mark.classList.add('translation-mark-flash');
+    setTimeout(() => mark.classList.remove('translation-mark-flash'), 800);
   }, []);
 
   // ==================== 段落焦点 ====================
@@ -536,6 +574,16 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
 
       // 点击已有高亮 → 弹出 highlight 工具栏
       const target = e.target as HTMLElement;
+      // 点击翻译标记 → 切到 Learn Tab 并聚焦对应条目
+      const translationMark = target.closest('mark[data-translation-id]') as HTMLElement | null;
+      if (translationMark) {
+        const translationId = translationMark.dataset.translationId;
+        if (translationId) {
+          setForceTab({ tab: 'learn', ts: Date.now() });
+          setFocusTranslationId(translationId);
+          return;
+        }
+      }
       const markEl = target.closest('mark[data-highlight-id]') as HTMLElement | null;
       if (markEl) {
         const hlId = markEl.dataset.highlightId;
@@ -1272,6 +1320,18 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           forceTab={forceTab}
           readProgress={readProgress}
           selectionTranslationRefresh={selectionTranslationRefresh}
+          focusTranslationId={focusTranslationId}
+          onLocateTranslation={handleLocateTranslation}
+          onTranslationDeleted={(id, sourceText) => {
+            setSelectionTranslations((prev) => {
+              const next = prev.filter((t) => t.id !== id);
+              const stillHasWord = next.some((t) => t.sourceText === sourceText);
+              if (!stillHasWord && contentRef.current) {
+                unwrapTranslationMark(contentRef.current, sourceText);
+              }
+              return next;
+            });
+          }}
         />
       </div>
 
