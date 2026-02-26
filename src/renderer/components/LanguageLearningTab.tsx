@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GraduationCap, ChevronDown, ChevronRight, Trash2, Loader2 } from 'lucide-react';
+import { GraduationCap, ChevronDown, ChevronRight, Trash2, Loader2, MapPin } from 'lucide-react';
 import type { SelectionTranslation } from '../../shared/types';
 
 interface LanguageLearningTabProps {
   articleId: string;
-  /** 新翻译完成时外部通知刷新 */
   refreshTrigger?: number;
+  /** 从正文点击跳转时需要聚焦的翻译 ID */
+  focusTranslationId?: string | null;
+  /** 点击条目中的"定位"按钮，通知父组件滚动到正文中的词 */
+  onLocateTranslation?: (sourceText: string) => void;
+  /** 删除一条翻译后通知父组件（传 id 和 sourceText） */
+  onTranslationDeleted?: (id: string, sourceText: string) => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -30,7 +35,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function LanguageLearningTab({ articleId, refreshTrigger }: LanguageLearningTabProps) {
+export function LanguageLearningTab({ articleId, refreshTrigger, focusTranslationId, onLocateTranslation, onTranslationDeleted }: LanguageLearningTabProps) {
   const [items, setItems] = useState<SelectionTranslation[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -55,19 +60,31 @@ export function LanguageLearningTab({ articleId, refreshTrigger }: LanguageLearn
     loadItems();
   }, [articleId, refreshTrigger, loadItems]);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string, sourceText: string) => {
     try {
       await window.electronAPI.selectionTranslationDelete(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
       if (expandedId === id) setExpandedId(null);
+      onTranslationDeleted?.(id, sourceText);
     } catch (err) {
       console.error('删除划词翻译失败:', err);
     }
-  }, [expandedId]);
+  }, [expandedId, onTranslationDeleted]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
+
+  // 当外部指定聚焦 ID 时，自动展开对应条目并滚动到视口
+  useEffect(() => {
+    if (focusTranslationId) {
+      setExpandedId(focusTranslationId);
+      setTimeout(() => {
+        document.querySelector(`[data-translation-item-id="${focusTranslationId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [focusTranslationId]);
 
   if (loading) {
     return (
@@ -96,6 +113,7 @@ export function LanguageLearningTab({ articleId, refreshTrigger }: LanguageLearn
         return (
           <div
             key={item.id}
+            data-translation-item-id={item.id}
             className="rounded-lg border border-white/5 bg-[#1a1a1a] overflow-hidden"
           >
             {/* 头部 */}
@@ -114,8 +132,17 @@ export function LanguageLearningTab({ articleId, refreshTrigger }: LanguageLearn
               <span className="text-[10px] text-gray-600 shrink-0">
                 {formatDate(item.createdAt)} {formatTime(item.createdAt)}
               </span>
+              {onLocateTranslation && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onLocateTranslation(item.sourceText); }}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 text-gray-500 hover:text-blue-400 transition-all cursor-pointer shrink-0"
+                  title="定位到正文"
+                >
+                  <MapPin className="w-3 h-3" />
+                </button>
+              )}
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                onClick={(e) => { e.stopPropagation(); handleDelete(item.id, item.sourceText); }}
                 className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 text-gray-500 hover:text-red-400 transition-all cursor-pointer shrink-0"
               >
                 <Trash2 className="w-3 h-3" />
