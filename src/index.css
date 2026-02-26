@@ -730,3 +730,27 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* 划词翻译蓝色下划线标记 */
+.translation-mark {
+  background: transparent;
+  border-bottom: 2px solid #3b82f6;
+  cursor: pointer;
+  padding-bottom: 1px;
+  color: inherit;
+  border-radius: 0;
+}
+
+.translation-mark:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+/* 翻译定位闪烁动画 */
+@keyframes translation-flash {
+  0%, 100% { background: transparent; }
+  33%, 66% { background: rgba(59, 130, 246, 0.25); }
+}
+
+.translation-mark-flash {
+  animation: translation-flash 0.8s ease-in-out;
+}
