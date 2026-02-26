@@ -7,9 +7,10 @@ interface SourcesPanelProps {
   activeSpaceId: string | null;
   onSpaceChange: (id: string | null) => void;
   onSpacesChanged: () => void;
+  onSourcesChanged?: () => void;
 }
 
-export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesChanged }: SourcesPanelProps) {
+export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesChanged, onSourcesChanged }: SourcesPanelProps) {
   const [sources, setSources] = useState<ResearchSpaceSource[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newSpaceTitle, setNewSpaceTitle] = useState('');
@@ -47,6 +48,7 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
     try {
       await window.electronAPI.researchSourceRemove(sourceId);
       loadSources();
+      onSourcesChanged?.();
     } catch (err) {
       console.error('Failed to remove source:', err);
     }
@@ -57,6 +59,7 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
     try {
       await window.electronAPI.researchSourceToggle(sourceId);
       loadSources();
+      onSourcesChanged?.();
     } catch (err) {
       console.error('Failed to toggle source:', err);
     }
@@ -154,7 +157,7 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
           spaceId={activeSpaceId}
           existingSourceIds={sources.map(s => s.sourceId)}
           onClose={() => setShowImport(false)}
-          onImported={loadSources}
+          onImported={() => { loadSources(); onSourcesChanged?.(); }}
         />
       )}
     </div>

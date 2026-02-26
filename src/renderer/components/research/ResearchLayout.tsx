@@ -8,6 +8,7 @@ export function ResearchLayout() {
   const [spaces, setSpaces] = useState<ResearchSpace[]>([]);
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
   const [artifactRefreshKey, setArtifactRefreshKey] = useState(0);
+  const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const loadSpaces = useCallback(async () => {
@@ -38,9 +39,11 @@ export function ResearchLayout() {
         activeSpaceId={activeSpaceId}
         onSpaceChange={setActiveSpaceId}
         onSpacesChanged={loadSpaces}
+        onSourcesChanged={() => setSourceRefreshKey(k => k + 1)}
       />
       <ResearchChat
         spaceId={activeSpaceId}
+        sourceRefreshKey={sourceRefreshKey}
         onArtifactCreated={handleArtifactCreated}
         pendingPrompt={pendingPrompt}
         onPendingPromptHandled={() => setPendingPrompt(null)}

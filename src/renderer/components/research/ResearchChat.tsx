@@ -12,6 +12,7 @@ import { useAgentContext } from '../../hooks/useAgentContext';
 
 interface ResearchChatProps {
   spaceId: string | null;
+  sourceRefreshKey?: number;
   onArtifactCreated?: () => void;
   pendingPrompt?: string | null;
   onPendingPromptHandled?: () => void;
@@ -45,7 +46,7 @@ const TOOL_LABELS: Record<string, string> = {
 
 // ==================== 组件 ====================
 
-export function ResearchChat({ spaceId, onArtifactCreated, pendingPrompt, onPendingPromptHandled }: ResearchChatProps) {
+export function ResearchChat({ spaceId, sourceRefreshKey, onArtifactCreated, pendingPrompt, onPendingPromptHandled }: ResearchChatProps) {
   const { viewState: globalViewState, reportContext } = useAgentContext();
 
   // 对话状态
@@ -90,6 +91,14 @@ export function ResearchChat({ spaceId, onArtifactCreated, pendingPrompt, onPend
       .then(setSources)
       .catch(console.error);
   }, [spaceId]);
+
+  // 当 sources 被外部更新时（导入/删除/切换），重新加载
+  useEffect(() => {
+    if (!spaceId || sourceRefreshKey === undefined) return;
+    window.electronAPI.researchSourceList(spaceId)
+      .then(setSources)
+      .catch(console.error);
+  }, [spaceId, sourceRefreshKey]);
 
   // 监听来自 StudioPanel 的预设 prompt，自动填入输入框
   useEffect(() => {
