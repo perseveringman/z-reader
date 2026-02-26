@@ -51,6 +51,13 @@ const DEFAULT_SETTINGS: TranslationSettings = {
     showOriginal: true,
   },
   shortcut: 'CmdOrCtrl+Shift+T',
+  selectionAnalysis: {
+    sentenceTranslation: true,
+    grammarStructure: true,
+    keyVocabulary: true,
+    usageExtension: true,
+    criticalKnowledge: false,
+  },
 };
 
 // ==================== HTML 段落提取 ====================
@@ -139,6 +146,7 @@ export function loadTranslationSettings(): TranslationSettings {
     microsoft: { ...DEFAULT_SETTINGS.microsoft, ...(saved.microsoft || {}) },
     display: { ...DEFAULT_SETTINGS.display, ...(saved.display || {}) },
     autoTranslateFeeds: saved.autoTranslateFeeds ?? DEFAULT_SETTINGS.autoTranslateFeeds,
+    selectionAnalysis: { ...DEFAULT_SETTINGS.selectionAnalysis, ...(saved.selectionAnalysis || {}) },
   };
 }
 
@@ -155,6 +163,7 @@ export function saveTranslationSettings(partial: Partial<TranslationSettings>): 
     google: { ...current.google, ...(partial.google || {}) },
     microsoft: { ...current.microsoft, ...(partial.microsoft || {}) },
     display: { ...current.display, ...(partial.display || {}) },
+    selectionAnalysis: { ...current.selectionAnalysis, ...(partial.selectionAnalysis || {}) },
   };
 
   const aiDb = getAIDatabase();

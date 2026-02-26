@@ -64,6 +64,13 @@ const DEFAULT_SETTINGS: TranslationSettingsData = {
     showOriginal: true,
   },
   shortcut: 'CmdOrCtrl+Shift+T',
+  selectionAnalysis: {
+    sentenceTranslation: true,
+    grammarStructure: true,
+    keyVocabulary: true,
+    usageExtension: true,
+    criticalKnowledge: false,
+  },
 };
 
 export function TranslationSettings({ open, onClose }: TranslationSettingsProps) {
