@@ -20,7 +20,6 @@ import {
   rangeToBlockOffsets,
   applyTranslationMarks,
   clearAllTranslationMarks,
-  unwrapTranslationMark,
 } from '../highlight-engine';
 import { injectTranslations, injectSingleTranslation, clearTranslations, toggleTranslations } from '../translation-injector';
 import type { ReaderSettingsValues } from './ReaderSettings';
@@ -140,6 +139,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       setTranslationVisible(false);
       setTranslationLoading(false);
       setTranslationProgress(null);
+      setSelectionTranslations([]);
+      setFocusTranslationId(null);
       try {
         const data = await window.electronAPI.articleGet(articleId);
         if (cancelled) return;
@@ -284,12 +285,6 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
       }
     }
   }, []);
-
-  const applyTranslationMarksToDOM = useCallback(() => {
-    if (!contentRef.current) return;
-    clearAllTranslationMarks(contentRef.current);
-    applyTranslationMarks(contentRef.current, selectionTranslations);
-  }, [selectionTranslations]);
 
   // ==================== 翻译触发 ====================
 
@@ -1322,15 +1317,8 @@ export function ReaderView({ articleId, onClose }: ReaderViewProps) {
           selectionTranslationRefresh={selectionTranslationRefresh}
           focusTranslationId={focusTranslationId}
           onLocateTranslation={handleLocateTranslation}
-          onTranslationDeleted={(id, sourceText) => {
-            setSelectionTranslations((prev) => {
-              const next = prev.filter((t) => t.id !== id);
-              const stillHasWord = next.some((t) => t.sourceText === sourceText);
-              if (!stillHasWord && contentRef.current) {
-                unwrapTranslationMark(contentRef.current, sourceText);
-              }
-              return next;
-            });
+          onTranslationDeleted={(id, _sourceText: string) => {
+            setSelectionTranslations((prev) => prev.filter((t) => t.id !== id));
           }}
         />
       </div>
