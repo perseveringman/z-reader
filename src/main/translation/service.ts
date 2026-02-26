@@ -22,7 +22,10 @@ import type {
 // ==================== 常量 ====================
 
 /** 每批翻译的段落数 */
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 5;
+
+/** 最大并发批次数 */
+const CONCURRENCY = 3;
 
 /** 默认翻译设置 */
 const DEFAULT_SETTINGS: TranslationSettings = {
@@ -449,21 +452,28 @@ async function translateInBackground(
   let completedCount = startIndex; // 从断点处开始计数
 
   try {
-    // 逐批翻译（从 startIndex 开始）
+    // 将所有待翻译批次预先切好
+    const batches: Array<{ start: number; end: number }> = [];
     for (let i = startIndex; i < total; i += BATCH_SIZE) {
-      // 检查是否已取消
+      batches.push({ start: i, end: Math.min(i + BATCH_SIZE, total) });
+    }
+
+    // sliding window 并发：最多同时进行 CONCURRENCY 个批次
+    let batchIndex = 0;
+
+    const runNextBatch = async (): Promise<void> => {
       if (abortController.signal.aborted) {
-        await updateTranslationStatus(translationId, 'failed', paragraphs, completedCount / total);
+        return;
+      }
+      if (batchIndex >= batches.length) {
         return;
       }
 
-      const batchEnd = Math.min(i + BATCH_SIZE, total);
-      const batchTexts = paragraphs.slice(i, batchEnd).map((p) => p.original);
+      const { start, end } = batches[batchIndex++];
+      const batchTexts = paragraphs.slice(start, end).map((p) => p.original);
 
-      // 调用翻译引擎批量翻译
       const translatedTexts = await engine.translateBatch(batchTexts, sourceLang, targetLang);
 
-      // 校验返回数量与输入一致
       if (translatedTexts.length !== batchTexts.length) {
         throw new Error(
           `翻译引擎返回数量不匹配: 期望 ${batchTexts.length}, 实际 ${translatedTexts.length}`
@@ -472,10 +482,10 @@ async function translateInBackground(
 
       // 更新段落翻译结果
       for (let j = 0; j < translatedTexts.length; j++) {
-        paragraphs[i + j].translated = translatedTexts[j];
+        paragraphs[start + j].translated = translatedTexts[j];
       }
 
-      completedCount = batchEnd;
+      completedCount = Math.max(completedCount, end);
       const progress = completedCount / total;
 
       // 更新数据库
@@ -489,16 +499,26 @@ async function translateInBackground(
         })
         .where(eq(schema.translations.id, translationId));
 
-      // 广播进度事件（每一段都推送）
+      // 广播进度事件
       for (let j = 0; j < translatedTexts.length; j++) {
         broadcastProgress({
           translationId,
-          index: i + j,
+          index: start + j,
           translated: translatedTexts[j],
           progress,
         });
       }
+
+      // 当前 slot 完成后，继续领取下一批
+      await runNextBatch();
     }
+
+    // 启动最多 CONCURRENCY 个并发 slot
+    const slots = Array.from(
+      { length: Math.min(CONCURRENCY, batches.length) },
+      () => runNextBatch()
+    );
+    await Promise.all(slots);
 
     // 全部完成
     await updateTranslationStatus(translationId, 'completed', paragraphs, 1);
