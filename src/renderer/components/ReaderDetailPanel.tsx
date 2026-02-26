@@ -366,6 +366,9 @@ export function ReaderDetailPanel({ articleId, highlights, onHighlightsChange, o
               <LanguageLearningTab
                 articleId={articleId}
                 refreshTrigger={selectionTranslationRefresh}
+                focusTranslationId={focusTranslationId}
+                onLocateTranslation={onLocateTranslation}
+                onTranslationDeleted={onTranslationDeleted}
               />
             )}
           </>
