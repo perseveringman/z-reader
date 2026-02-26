@@ -788,6 +788,63 @@ export interface TranslationSettings {
     showOriginal: boolean;
   };
   shortcut: string;
+  selectionAnalysis: {
+    sentenceTranslation: boolean;
+    grammarStructure: boolean;
+    keyVocabulary: boolean;
+    usageExtension: boolean;
+    criticalKnowledge: boolean;
+  };
+}
+
+// ==================== 划词翻译类型 ====================
+
+export interface SelectionTranslationAnalysis {
+  sentenceTranslation?: string;
+  grammarStructure?: string;
+  keyVocabulary?: Array<{
+    word: string;
+    role: 'main' | 'secondary';
+    meaning: string;
+    partOfSpeech: string;
+  }>;
+  usageExtension?: string;
+  criticalKnowledge?: string;
+}
+
+export interface SelectionTranslation {
+  id: string;
+  articleId: string;
+  sourceText: string;
+  targetLang: string;
+  translation: string;
+  detectedLang: string | null;
+  engine: string;
+  analysis: SelectionTranslationAnalysis | null;
+  createdAt: string;
+}
+
+export interface TranslateTextInput {
+  text: string;
+  sourceLang: string | null;
+  targetLang: string;
+  articleId: string;
+  useLLMAnalysis: boolean;
+  enabledModules?: {
+    sentenceTranslation: boolean;
+    grammarStructure: boolean;
+    keyVocabulary: boolean;
+    usageExtension: boolean;
+    criticalKnowledge: boolean;
+  };
+}
+
+export interface TranslateTextResult {
+  id: string;
+  translation: string;
+  detectedLang?: string;
+  analysis?: SelectionTranslationAnalysis;
+  createdAt: string;
 }
 
 // ==================== App Task (通用任务系统) 类型 ====================
@@ -1004,6 +1061,11 @@ export interface ElectronAPI {
   translationOnProgress: (callback: (event: TranslationProgressEvent) => void) => () => void;
   translationSettingsGet: () => Promise<TranslationSettings>;
   translationSettingsSet: (partial: Partial<TranslationSettings>) => Promise<void>;
+
+  // 划词翻译
+  selectionTranslate: (input: TranslateTextInput) => Promise<TranslateTextResult>;
+  selectionTranslationList: (articleId: string) => Promise<SelectionTranslation[]>;
+  selectionTranslationDelete: (id: string) => Promise<void>;
 
   // App Task (通用任务系统)
   appTaskCreate: (input: CreateAppTaskInput) => Promise<AppTask>;

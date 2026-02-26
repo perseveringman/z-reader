@@ -169,6 +169,11 @@ export const IPC_CHANNELS = {
   TRANSLATION_SETTINGS_GET: 'translation:settings:get',
   TRANSLATION_SETTINGS_SET: 'translation:settings:set',
 
+  // 划词翻译
+  SELECTION_TRANSLATE: 'selection:translate',
+  SELECTION_TRANSLATION_LIST: 'selection:translation:list',
+  SELECTION_TRANSLATION_DELETE: 'selection:translation:delete',
+
   // App Task (通用任务系统)
   APP_TASK_CREATE: 'app-task:create',
   APP_TASK_CANCEL: 'app-task:cancel',
