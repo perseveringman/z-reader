@@ -94,9 +94,14 @@ export class LLMTranslationEngine implements TranslationEngine {
 
         // 安全校验：确保返回数量与输入一致
         if (object.translations.length !== texts.length) {
-          throw new Error(
+          lastError = new Error(
             `批量翻译结果数量不匹配: 期望 ${texts.length}，实际 ${object.translations.length}`
           );
+          if (attempt < MAX_RETRIES) {
+            console.warn(`批量翻译数量不匹配 (第 ${attempt + 1} 次)，重试中...`);
+            continue;
+          }
+          break;
         }
 
         return object.translations;
@@ -105,14 +110,25 @@ export class LLMTranslationEngine implements TranslationEngine {
         const errName = (err as Error)?.name ?? '';
         // 仅对 JSON 解析失败 / 对象生成失败进行重试
         if (errName === 'AI_NoObjectGeneratedError' || errName === 'AI_JSONParseError') {
-          console.warn(`批量翻译 JSON 解析失败 (第 ${attempt + 1} 次)，重试中...`);
-          continue;
+          if (attempt < MAX_RETRIES) {
+            console.warn(`批量翻译 JSON 解析失败 (第 ${attempt + 1} 次)，重试中...`);
+            continue;
+          }
+          break;
         }
         throw err;
       }
     }
-
-    throw lastError;
+    // 批量模式多次失败后回退到逐条翻译，避免整批任务失败
+    console.warn(
+      '批量翻译多次失败，回退逐条翻译',
+      lastError instanceof Error ? lastError.message : String(lastError)
+    );
+    const translated: string[] = [];
+    for (const text of texts) {
+      translated.push(await this.translate(text, sourceLang, targetLang));
+    }
+    return translated;
   }
 
   /** 检测文本语言 */
