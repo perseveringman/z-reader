@@ -712,7 +712,7 @@ export function ChatPanel({ articleId }: ChatPanelProps) {
       }
       setError(t('chat.error'));
     }
-  }, [sessionId, handleNewSession, t]);
+  }, [sessionId, handleNewSession, t, articleId]);
 
   // 检查中 loading
   if (apiConfigured === null) {
