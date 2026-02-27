@@ -259,6 +259,7 @@ export const IPC_CHANNELS = {
   RESEARCH_SOURCE_REMOVE: 'research:source:remove',
   RESEARCH_SOURCE_TOGGLE: 'research:source:toggle',
   RESEARCH_SOURCE_LIST: 'research:source:list',
+  RESEARCH_SOURCE_REINDEX: 'research:source:reindex',
   RESEARCH_CONVERSATION_LIST: 'research:conversation:list',
   RESEARCH_CONVERSATION_DELETE: 'research:conversation:delete',
   RESEARCH_ARTIFACT_LIST: 'research:artifact:list',

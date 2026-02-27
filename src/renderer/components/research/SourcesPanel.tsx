@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ResearchSpace, ResearchSpaceSource } from '../../../shared/types';
 import { ImportDialog } from './ImportDialog';
 
@@ -10,11 +10,34 @@ interface SourcesPanelProps {
   onSourcesChanged?: () => void;
 }
 
+/** 索引状态指示器 */
+function IndexStatusIndicator({ status, onReindex }: { status: string; onReindex: () => void }) {
+  switch (status) {
+    case 'ready':
+      return <span className="shrink-0 text-green-400 text-xs" title="索引完成">{'\u2713'}</span>;
+    case 'processing':
+      return <span className="shrink-0 text-blue-400 text-xs source-index-processing" title="正在索引...">{'\u25CF'}</span>;
+    case 'error':
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); onReindex(); }}
+          className="shrink-0 text-red-400 hover:text-red-300 text-xs"
+          title="索引失败，点击重试"
+        >
+          {'\u2715'}
+        </button>
+      );
+    default: // pending
+      return <span className="shrink-0 text-gray-600 text-xs" title="等待索引">{'\u25CF'}</span>;
+  }
+}
+
 export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesChanged, onSourcesChanged }: SourcesPanelProps) {
   const [sources, setSources] = useState<ResearchSpaceSource[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newSpaceTitle, setNewSpaceTitle] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 加载当前空间的资源列表
   const loadSources = useCallback(async () => {
@@ -28,6 +51,23 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
   }, [activeSpaceId]);
 
   useEffect(() => { loadSources(); }, [loadSources]);
+
+  // 当有 processing 状态的 source 时，每 3 秒自动刷新
+  const hasProcessing = sources.some(s => s.processingStatus === 'processing');
+
+  useEffect(() => {
+    if (hasProcessing) {
+      intervalRef.current = setInterval(() => {
+        loadSources();
+      }, 3000);
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [hasProcessing, loadSources]);
 
   // 创建新空间
   const handleCreateSpace = async () => {
@@ -65,8 +105,29 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
     }
   };
 
+  // 重新索引
+  const handleReindex = async (sourceId: string) => {
+    try {
+      await window.electronAPI.researchSourceReindex(sourceId);
+      loadSources();
+    } catch (err) {
+      console.error('Failed to reindex source:', err);
+    }
+  };
+
   return (
     <div className="w-60 shrink-0 bg-[#111111] border-r border-white/5 flex flex-col">
+      {/* processing 动画样式 */}
+      <style>{`
+        @keyframes source-index-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .source-index-processing {
+          animation: source-index-pulse 1.5s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* 空间选择器 */}
       <div className="p-3 border-b border-white/5">
         <div className="flex items-center justify-between mb-2">
@@ -126,6 +187,10 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
                 <span className={`flex-1 truncate ${source.enabled ? 'text-gray-300' : 'text-gray-500'}`}>
                   {source.sourceTitle || source.sourceId}
                 </span>
+                <IndexStatusIndicator
+                  status={source.processingStatus}
+                  onReindex={() => handleReindex(source.id)}
+                />
                 <button
                   onClick={() => handleRemoveSource(source.id)}
                   className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 text-xs"

@@ -313,6 +313,7 @@ const electronAPI: ElectronAPI = {
   researchSourceRemove: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_REMOVE, id),
   researchSourceToggle: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_TOGGLE, id),
   researchSourceList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_LIST, spaceId),
+  researchSourceReindex: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SOURCE_REINDEX, id),
   researchConversationList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CONVERSATION_LIST, spaceId),
   researchConversationDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CONVERSATION_DELETE, id),
   researchArtifactList: (spaceId) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_LIST, spaceId),

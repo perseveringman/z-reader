@@ -1,13 +1,101 @@
 import { ipcMain } from 'electron';
 import { eq, and, desc } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { getDatabase, schema } from '../db';
+import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
+import { RAGDatabase } from '../../ai/providers/rag-db';
+import { createChunkingService } from '../../ai/services/chunking';
+import { createEmbeddingService } from '../../ai/services/embedding';
+import { createIngestionPipeline } from '../../ai/services/ingestion';
+import { getEmbeddingConfig } from '../../ai/providers/config';
 import type {
   CreateResearchSpaceInput,
   UpdateResearchSpaceInput,
   AddResearchSourceInput,
 } from '../../shared/types';
+
+/**
+ * 异步触发 RAG 索引。
+ * 如果 embedding 未配置或文章无内容，graceful 降级（保持 pending）。
+ */
+async function triggerRAGIndexing(
+  db: ReturnType<typeof getDatabase>,
+  recordId: string,
+  sourceType: string,
+  sourceId: string,
+): Promise<void> {
+  const sqlite = getSqlite();
+  if (!sqlite) {
+    console.warn('triggerRAGIndexing: SQLite not initialized, skipping');
+    return;
+  }
+
+  const embeddingConfig = getEmbeddingConfig(sqlite);
+  if (!embeddingConfig) {
+    console.warn('triggerRAGIndexing: Embedding not configured, skipping');
+    return;
+  }
+
+  const ragDb = new RAGDatabase(sqlite, embeddingConfig.dimensions);
+  ragDb.initTables();
+
+  // 检查是否已被 RAG 索引
+  const status = ragDb.getSourceIndexStatus(sourceType as 'article', sourceId);
+  if (status.totalChunks > 0 && status.doneChunks === status.totalChunks) {
+    // 已完全索引，直接标记 ready
+    await db.update(schema.researchSpaceSources)
+      .set({ processingStatus: 'ready' })
+      .where(eq(schema.researchSpaceSources.id, recordId));
+    return;
+  }
+
+  // 需要索引 — 先设为 processing
+  await db.update(schema.researchSpaceSources)
+    .set({ processingStatus: 'processing' })
+    .where(eq(schema.researchSpaceSources.id, recordId));
+
+  try {
+    // 获取文章内容
+    if (sourceType !== 'article') {
+      console.warn(`triggerRAGIndexing: unsupported sourceType "${sourceType}", skipping`);
+      await db.update(schema.researchSpaceSources)
+        .set({ processingStatus: 'pending' })
+        .where(eq(schema.researchSpaceSources.id, recordId));
+      return;
+    }
+
+    const [article] = await db.select({
+      contentText: schema.articles.contentText,
+      content: schema.articles.content,
+    }).from(schema.articles).where(eq(schema.articles.id, sourceId));
+
+    const text = article?.contentText || article?.content || '';
+    if (!text) {
+      console.warn('triggerRAGIndexing: article has no content, skipping');
+      await db.update(schema.researchSpaceSources)
+        .set({ processingStatus: 'pending' })
+        .where(eq(schema.researchSpaceSources.id, recordId));
+      return;
+    }
+
+    const embeddingService = createEmbeddingService(embeddingConfig);
+    const chunkingService = createChunkingService();
+    const pipeline = createIngestionPipeline({ ragDb, chunkingService, embeddingService });
+
+    await pipeline.ingest({ type: 'article', id: sourceId, text });
+
+    // 成功 → ready
+    await db.update(schema.researchSpaceSources)
+      .set({ processingStatus: 'ready' })
+      .where(eq(schema.researchSpaceSources.id, recordId));
+  } catch (err) {
+    console.error('triggerRAGIndexing: indexing failed:', err);
+    // 失败 → error
+    await db.update(schema.researchSpaceSources)
+      .set({ processingStatus: 'error' })
+      .where(eq(schema.researchSpaceSources.id, recordId));
+  }
+}
 
 export function registerResearchHandlers() {
   const {
@@ -20,6 +108,7 @@ export function registerResearchHandlers() {
     RESEARCH_SOURCE_REMOVE,
     RESEARCH_SOURCE_TOGGLE,
     RESEARCH_SOURCE_LIST,
+    RESEARCH_SOURCE_REINDEX,
     RESEARCH_CONVERSATION_LIST,
     RESEARCH_CONVERSATION_DELETE,
     RESEARCH_ARTIFACT_LIST,
@@ -148,9 +237,48 @@ export function registerResearchHandlers() {
       });
 
       const [created] = await db.select().from(schema.researchSpaceSources).where(eq(schema.researchSpaceSources.id, id));
+
+      // 异步触发 RAG 索引（不阻塞返回）
+      triggerRAGIndexing(db, id, input.sourceType, input.sourceId).catch(err => {
+        console.error('RAG indexing trigger failed (non-blocking):', err);
+      });
+
       return created;
     } catch (err) {
       console.error('RESEARCH_SOURCE_ADD failed:', err);
+      throw err;
+    }
+  });
+
+  // ==================== 重新索引 ====================
+
+  ipcMain.handle(RESEARCH_SOURCE_REINDEX, async (_event, id: string) => {
+    try {
+      const db = getDatabase();
+      const [source] = await db.select().from(schema.researchSpaceSources)
+        .where(eq(schema.researchSpaceSources.id, id));
+      if (!source) throw new Error(`Source not found: ${id}`);
+
+      const sqlite = getSqlite();
+      if (!sqlite) {
+        console.warn('RESEARCH_SOURCE_REINDEX: SQLite not initialized, skipping');
+        return;
+      }
+      const embeddingConfig = getEmbeddingConfig(sqlite);
+      if (!embeddingConfig) {
+        console.warn('RESEARCH_SOURCE_REINDEX: Embedding not configured, skipping');
+        return;
+      }
+
+      // 删除旧 chunks
+      const ragDb = new RAGDatabase(sqlite, embeddingConfig.dimensions);
+      ragDb.initTables();
+      ragDb.deleteChunksBySource(source.sourceType as 'article', source.sourceId);
+
+      // 重新索引
+      await triggerRAGIndexing(db, id, source.sourceType, source.sourceId);
+    } catch (err) {
+      console.error('RESEARCH_SOURCE_REINDEX failed:', err);
       throw err;
     }
   });

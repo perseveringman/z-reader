@@ -1150,6 +1150,7 @@ export interface ElectronAPI {
   researchSourceRemove: (id: string) => Promise<void>;
   researchSourceToggle: (id: string) => Promise<ResearchSpaceSource>;
   researchSourceList: (spaceId: string) => Promise<ResearchSpaceSource[]>;
+  researchSourceReindex: (id: string) => Promise<void>;
   researchConversationList: (spaceId: string) => Promise<ResearchConversation[]>;
   researchConversationDelete: (id: string) => Promise<void>;
   researchArtifactList: (spaceId: string) => Promise<ResearchArtifact[]>;
