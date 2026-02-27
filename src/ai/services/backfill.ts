@@ -121,6 +121,7 @@ export async function runBackfill(options: {
             type: 'article',
             id: article.id,
             text: article.content_text,
+            title: article.title ?? undefined,
             metadata: {
               title: article.title ?? undefined,
               author: article.author ?? undefined,

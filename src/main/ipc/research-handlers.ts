@@ -67,6 +67,7 @@ async function triggerRAGIndexing(
     const [article] = await db.select({
       contentText: schema.articles.contentText,
       content: schema.articles.content,
+      title: schema.articles.title,
     }).from(schema.articles).where(eq(schema.articles.id, sourceId));
 
     const text = article?.contentText || article?.content || '';
@@ -82,7 +83,7 @@ async function triggerRAGIndexing(
     const chunkingService = createChunkingService();
     const pipeline = createIngestionPipeline({ ragDb, chunkingService, embeddingService });
 
-    await pipeline.ingest({ type: 'article', id: sourceId, text });
+    await pipeline.ingest({ type: 'article', id: sourceId, text, title: article?.title ?? undefined });
 
     // 成功 → ready
     await db.update(schema.researchSpaceSources)

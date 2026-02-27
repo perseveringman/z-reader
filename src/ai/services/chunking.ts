@@ -5,6 +5,8 @@ export interface ChunkInput {
   text: string;
   sourceType: ChunkSourceType;
   metadata?: Record<string, unknown>;
+  /** 文档级上下文前缀，会被添加到每个 chunk 的开头 */
+  contextPrefix?: string;
 }
 
 /** 分块结果 */
@@ -52,7 +54,7 @@ export class ChunkingService {
 
   /** 分块主方法 */
   chunk(input: ChunkInput): ChunkResult[] {
-    const { text, sourceType, metadata = {} } = input;
+    const { text, sourceType, metadata = {}, contextPrefix } = input;
 
     if (!text || text.trim().length === 0) {
       return [];
@@ -60,37 +62,41 @@ export class ChunkingService {
 
     switch (sourceType) {
       case 'article':
-        return this.chunkArticle(text, metadata);
+        return this.chunkArticle(text, metadata, contextPrefix);
       case 'transcript':
-        return this.chunkTranscript(text, metadata);
+        return this.chunkTranscript(text, metadata, contextPrefix);
       case 'highlight':
-        return this.chunkHighlight(text, metadata);
+        return this.chunkHighlight(text, metadata, contextPrefix);
       case 'book':
-        return this.chunkBook(text, metadata);
+        return this.chunkBook(text, metadata, contextPrefix);
       default:
-        return this.chunkGeneric(text, metadata);
+        return this.chunkGeneric(text, metadata, contextPrefix);
     }
   }
 
   /** 文章分块：按段落分割，合并短段落 */
-  private chunkArticle(text: string, metadata: Record<string, unknown>): ChunkResult[] {
+  private chunkArticle(text: string, metadata: Record<string, unknown>, contextPrefix?: string): ChunkResult[] {
     // 按双换行分段
     const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
-    return this.mergeAndSplitParagraphs(paragraphs, metadata);
+    return this.mergeAndSplitParagraphs(paragraphs, metadata, contextPrefix);
   }
 
   /** 转录分块：按段落分割 */
-  private chunkTranscript(text: string, metadata: Record<string, unknown>): ChunkResult[] {
+  private chunkTranscript(text: string, metadata: Record<string, unknown>, contextPrefix?: string): ChunkResult[] {
     // 转录文本按换行分段
     const segments = text.split(/\n+/).filter(s => s.trim());
-    return this.mergeAndSplitParagraphs(segments, metadata);
+    return this.mergeAndSplitParagraphs(segments, metadata, contextPrefix);
   }
 
   /** 高亮分块：单条高亮作为一个 chunk */
-  private chunkHighlight(text: string, metadata: Record<string, unknown>): ChunkResult[] {
-    const tokenCount = estimateTokenCount(text);
+  private chunkHighlight(text: string, metadata: Record<string, unknown>, contextPrefix?: string): ChunkResult[] {
+    const trimmedText = text.trim();
+    const prefixedContent = contextPrefix
+      ? `[来源: ${contextPrefix}]\n\n${trimmedText}`
+      : trimmedText;
+    const tokenCount = estimateTokenCount(prefixedContent);
     return [{
-      content: text.trim(),
+      content: prefixedContent,
       index: 0,
       tokenCount,
       metadata,
@@ -98,13 +104,13 @@ export class ChunkingService {
   }
 
   /** 电子书分块：与文章类似 */
-  private chunkBook(text: string, metadata: Record<string, unknown>): ChunkResult[] {
-    return this.chunkArticle(text, metadata);
+  private chunkBook(text: string, metadata: Record<string, unknown>, contextPrefix?: string): ChunkResult[] {
+    return this.chunkArticle(text, metadata, contextPrefix);
   }
 
   /** 通用分块 */
-  private chunkGeneric(text: string, metadata: Record<string, unknown>): ChunkResult[] {
-    return this.chunkArticle(text, metadata);
+  private chunkGeneric(text: string, metadata: Record<string, unknown>, contextPrefix?: string): ChunkResult[] {
+    return this.chunkArticle(text, metadata, contextPrefix);
   }
 
   /** 从文本尾部按句子边界截取不超过 maxTokens 的重叠内容 */
@@ -126,7 +132,8 @@ export class ChunkingService {
   /** 合并短段落、拆分长段落 */
   private mergeAndSplitParagraphs(
     paragraphs: string[],
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
+    contextPrefix?: string
   ): ChunkResult[] {
     const results: ChunkResult[] = [];
     let currentChunk = '';
@@ -136,15 +143,20 @@ export class ChunkingService {
 
     const flushChunk = () => {
       if (currentChunk.trim()) {
+        const chunkContent = currentChunk.trim();
+        const prefixedContent = contextPrefix
+          ? `[来源: ${contextPrefix}]\n\n${chunkContent}`
+          : chunkContent;
         results.push({
-          content: currentChunk.trim(),
+          content: prefixedContent,
           index: chunkIndex++,
-          tokenCount: currentTokens,
+          tokenCount: estimateTokenCount(prefixedContent),
           metadata,
         });
 
         // 提取当前 chunk 尾部作为下一个 chunk 的 overlap 前缀
-        previousOverlap = this.extractOverlapTail(currentChunk.trim(), this.config.overlap);
+        // 注意：overlap 提取基于原始内容（不含前缀），避免 overlap 中包含前缀
+        previousOverlap = this.extractOverlapTail(chunkContent, this.config.overlap);
 
         currentChunk = '';
         currentTokens = 0;
@@ -195,7 +207,11 @@ export class ChunkingService {
     // 如果最后一个 chunk 仅包含 overlap 内容（即与前一个 chunk 的尾部完全相同），则移除
     if (results.length >= 2) {
       const lastResult = results[results.length - 1];
-      if (lastResult.content === previousOverlap) {
+      // 比较时需考虑前缀：带前缀时比较去掉前缀后的内容
+      const lastContentWithoutPrefix = contextPrefix
+        ? lastResult.content.replace(`[来源: ${contextPrefix}]\n\n`, '')
+        : lastResult.content;
+      if (lastContentWithoutPrefix === previousOverlap) {
         results.pop();
       }
     }

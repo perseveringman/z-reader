@@ -7,6 +7,7 @@ export interface IngestSource {
   type: ChunkSourceType;
   id: string;
   text: string;
+  title?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -49,6 +50,7 @@ export class IngestionPipeline {
         text,
         sourceType: type,
         metadata,
+        contextPrefix: source.title || undefined,
       });
 
       if (chunkResults.length === 0) {

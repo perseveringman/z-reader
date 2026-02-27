@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { RAGDatabase, ChunkSourceType } from '../providers/rag-db';
 import type { EmbeddingService } from './embedding';
+import { LocalReranker } from './reranker';
 
 /** 检索查询 */
 export interface SearchQuery {
@@ -36,11 +37,18 @@ const RRF_K = 60;
  * 实现向量 + FTS5 混合检索
  */
 export class HybridRetriever {
+  private reranker: LocalReranker | null;
+
   constructor(
     private sqlite: Database.Database,
     private ragDb: RAGDatabase,
-    private embeddingService: EmbeddingService
-  ) {}
+    private embeddingService: EmbeddingService,
+    options?: { enableReranking?: boolean; rerankWeight?: number }
+  ) {
+    this.reranker = options?.enableReranking !== false
+      ? new LocalReranker(options?.rerankWeight)
+      : null;
+  }
 
   /** 混合检索 */
   async search(query: SearchQuery): Promise<SearchResult[]> {
@@ -63,15 +71,16 @@ export class HybridRetriever {
       keywordResults = this.keywordSearch(text, topK * 2, filters);
     }
 
-    // RRF 融合
-    const fusedResults = this.rrfFusion(vectorResults, keywordResults, topK);
+    // RRF 融合（reranker 启用时多取候选）
+    const rrfTopK = this.reranker ? topK * 3 : topK;
+    const fusedResults = this.rrfFusion(vectorResults, keywordResults, rrfTopK);
 
     // 获取 chunk 详情
     const chunkIds = fusedResults.map(r => r.chunkId);
     const chunks = this.ragDb.getChunks(chunkIds);
     const chunkMap = new Map(chunks.map(c => [c.id, c]));
 
-    return fusedResults.map(result => {
+    const results = fusedResults.map(result => {
       const chunk = chunkMap.get(result.chunkId);
       if (!chunk) return null;
 
@@ -85,6 +94,12 @@ export class HybridRetriever {
         metadata: chunk.metadata_json ? JSON.parse(chunk.metadata_json) : {},
       };
     }).filter((r): r is SearchResult => r !== null);
+
+    // Reranking
+    if (this.reranker && results.length > topK) {
+      return this.reranker.rerank(text, results, topK);
+    }
+    return results.slice(0, topK);
   }
 
   /** 向量检索 */
@@ -265,7 +280,8 @@ export class HybridRetriever {
 export function createHybridRetriever(
   sqlite: Database.Database,
   ragDb: RAGDatabase,
-  embeddingService: EmbeddingService
+  embeddingService: EmbeddingService,
+  options?: { enableReranking?: boolean; rerankWeight?: number }
 ): HybridRetriever {
-  return new HybridRetriever(sqlite, ragDb, embeddingService);
+  return new HybridRetriever(sqlite, ragDb, embeddingService, options);
 }
