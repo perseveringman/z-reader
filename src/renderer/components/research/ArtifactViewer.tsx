@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
+import { toPng } from 'html-to-image';
 import { ComparisonTable } from './ComparisonTable';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { MindMapRenderer } from './MindMapRenderer';
@@ -11,6 +12,24 @@ interface ArtifactViewerProps {
 }
 
 export function ArtifactViewer({ artifact, onClose }: ArtifactViewerProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPng = useCallback(async () => {
+    if (!contentRef.current) return;
+    try {
+      const dataUrl = await toPng(contentRef.current, {
+        backgroundColor: '#1a1a1a',
+        pixelRatio: 2,
+      });
+      const link = document.createElement('a');
+      link.download = `${artifact.title || 'artifact'}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('导出 PNG 失败:', err);
+    }
+  }, [artifact.title]);
+
   const renderContent = () => {
     if (!artifact.content) return <p className="text-gray-500">无内容</p>;
 
@@ -62,12 +81,18 @@ export function ArtifactViewer({ artifact, onClose }: ArtifactViewerProps) {
         </div>
 
         {/* 内容 */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
           {renderContent()}
         </div>
 
         {/* 底部操作 */}
         <div className="p-3 border-t border-white/5 flex justify-end gap-2">
+          <button
+            onClick={handleExportPng}
+            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-300 bg-white/5 rounded hover:bg-white/10"
+          >
+            导出 PNG
+          </button>
           <button
             onClick={async () => {
               try {
