@@ -2,6 +2,7 @@ import React from 'react';
 import { ComparisonTable } from './ComparisonTable';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { MindMapRenderer } from './MindMapRenderer';
+import { KnowledgeGraphView } from '../KnowledgeGraphView';
 import type { ResearchArtifact } from '../../../shared/types';
 
 interface ArtifactViewerProps {
@@ -24,6 +25,19 @@ export function ArtifactViewer({ artifact, onClose }: ArtifactViewerProps) {
 
     if (artifact.type === 'mindmap') {
       return <MindMapRenderer markdown={artifact.content || ''} className="h-[500px]" />;
+    }
+
+    if (artifact.type === 'knowledge_graph') {
+      try {
+        const graphData = JSON.parse(artifact.content || '{}');
+        return (
+          <div className="h-[500px]">
+            <KnowledgeGraphView graphData={graphData} />
+          </div>
+        );
+      } catch {
+        return <pre className="text-sm text-gray-300 whitespace-pre-wrap">{artifact.content}</pre>;
+      }
     }
 
     // report, summary, faq 等使用 MarkdownRenderer 渲染

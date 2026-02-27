@@ -50,7 +50,7 @@ export function StudioPanel({ spaceId, refreshKey, onSendPrompt }: StudioPanelPr
       {/* 快捷工具栏 */}
       <div className="p-3 border-b border-white/5">
         <h3 className="text-sm font-medium text-gray-300 mb-2">快捷工具</h3>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => onSendPrompt?.('请根据所有源材料，生成一份详细的研究报告。报告应包含主要发现、关键论点和结论。')}
             className="flex-1 text-xs py-1.5 rounded bg-white/5 text-gray-400 hover:text-gray-300 hover:bg-white/10 border border-white/5"
@@ -68,6 +68,12 @@ export function StudioPanel({ spaceId, refreshKey, onSendPrompt }: StudioPanelPr
             className="flex-1 text-xs py-1.5 rounded bg-white/5 text-gray-400 hover:text-gray-300 hover:bg-white/10 border border-white/5"
           >
             思维导图
+          </button>
+          <button
+            onClick={() => onSendPrompt?.('请生成当前源材料的知识图谱，使用 generate_knowledge_graph 工具。')}
+            className="flex-1 text-xs py-1.5 rounded bg-white/5 text-gray-400 hover:text-gray-300 hover:bg-white/10 border border-white/5"
+          >
+            知识图谱
           </button>
         </div>
       </div>

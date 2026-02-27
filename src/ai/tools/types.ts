@@ -98,6 +98,25 @@ export interface ToolContext {
     prompt?: string;
   }) => Promise<{ id: string }>;
 
+  /** 聚合研究空间内所有源材料的知识图谱数据 */
+  aggregateKnowledgeGraph: (sourceIds: string[]) => Promise<{
+    nodes: Array<{
+      id: string;
+      name: string;
+      type: string;
+      mentionCount: number;
+      sourceCount: number;
+      description?: string;
+    }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      relationType: string;
+      strength: number;
+      evidenceCount: number;
+    }>;
+  }>;
+
   /** 当前研究空间 ID（仅在 research 模式下有值） */
   _researchSpaceId?: string;
 }

@@ -19,6 +19,8 @@ import {
 import type { getDatabase } from '../db';
 import type { HybridRetriever } from '../../ai/services/retriever';
 import { createContextBuilder } from '../../ai/services/context-builder';
+import { KGDatabase } from '../../ai/providers/kg-db';
+import { getSqlite } from '../db';
 
 type DrizzleDB = ReturnType<typeof getDatabase>;
 
@@ -417,6 +419,63 @@ export function createToolContext(
         updatedAt: now,
       });
       return { id };
+    },
+
+    aggregateKnowledgeGraph: async (sourceIds) => {
+      const emptyResult = { nodes: [], edges: [] };
+      if (sourceIds.length === 0) return emptyResult;
+
+      const sqlite = getSqlite();
+      if (!sqlite) return emptyResult;
+
+      try {
+        const kgDb = new KGDatabase(sqlite);
+
+        // 聚合所有源材料的实体（去重）
+        const entityMap = new Map<string, {
+          id: string; name: string; type: string;
+          mentionCount: number; sourceCount: number; description?: string;
+        }>();
+
+        for (const sourceId of sourceIds) {
+          const entities = kgDb.getEntitiesBySource('article', sourceId);
+          for (const e of entities) {
+            if (!entityMap.has(e.id)) {
+              entityMap.set(e.id, {
+                id: e.id,
+                name: e.name,
+                type: e.type,
+                mentionCount: e.mention_count,
+                sourceCount: 1,
+                description: e.description ?? undefined,
+              });
+            } else {
+              const existing = entityMap.get(e.id)!;
+              existing.sourceCount++;
+              existing.mentionCount = Math.max(existing.mentionCount, e.mention_count);
+            }
+          }
+        }
+
+        if (entityMap.size === 0) return emptyResult;
+
+        const entityIds = Array.from(entityMap.keys());
+        const relations = kgDb.getRelationsBetweenEntities(entityIds);
+
+        return {
+          nodes: Array.from(entityMap.values()),
+          edges: relations.map(r => ({
+            source: r.source_entity_id,
+            target: r.target_entity_id,
+            relationType: r.relation_type,
+            strength: r.strength,
+            evidenceCount: r.evidence_count,
+          })),
+        };
+      } catch (err) {
+        console.warn('aggregateKnowledgeGraph failed:', err);
+        return emptyResult;
+      }
     },
   };
 }

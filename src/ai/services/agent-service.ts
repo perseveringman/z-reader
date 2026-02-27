@@ -124,21 +124,24 @@ export class AgentService {
 1. 收到任何问题时，必须先调用 search_research_sources 工具搜索源材料
 2. 基于搜索返回的内容进行回答，所有观点必须带 [来源标题] 引用标注
 3. 如果需要生成研究报告、对比矩阵等产物，调用 generate_artifact 工具保存
+4. 如果用户要求生成知识图谱，调用 generate_knowledge_graph 工具
 
 你可以使用的工具：
 - search_research_sources: 在源材料中搜索（必须先调用此工具再回答）
 - get_source_summary: 获取某篇源材料的摘要
-- generate_artifact: 生成并保存研究产物（report/comparison/summary/faq）
+- generate_artifact: 生成并保存研究产物（report/comparison/summary/faq/mindmap）
+- generate_knowledge_graph: 从源材料的知识图谱索引中聚合实体和关系，生成知识图谱产物
 
 重要原则：
 - 绝对不要在没有调用 search_research_sources 的情况下回答问题
 - 不要依赖 system prompt 中的源材料数量信息来判断是否有材料，必须实际调用工具查询
-- 生成对比矩阵时使用 JSON 格式，其他产物使用 Markdown 格式
+- 生成对比矩阵时使用 JSON 格式，思维导图使用 Markdown 大纲格式，其他产物使用 Markdown 格式
 - 当搜索结果确实为空时，告知用户没有找到相关内容`,
         actionLevels: {
           search_research_sources: 'read',
           get_source_summary: 'read',
           generate_artifact: 'read', // Phase 1: auto-approve; upgrade to 'write' when action-confirm UI is added to ResearchChat
+          generate_knowledge_graph: 'read',
         },
       },
     ];

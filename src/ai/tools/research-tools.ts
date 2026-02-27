@@ -51,7 +51,7 @@ export function createResearchTools(ctx: ToolContext) {
         '生成研究产物（研究报告、对比矩阵、摘要、FAQ 等）并保存',
       inputSchema: z.object({
         type: z
-          .enum(['report', 'comparison', 'summary', 'faq'])
+          .enum(['report', 'comparison', 'summary', 'faq', 'mindmap', 'knowledge_graph'])
           .describe('产物类型'),
         title: z.string().describe('产物标题'),
         content: z
@@ -69,6 +69,46 @@ export function createResearchTools(ctx: ToolContext) {
           success: true,
           artifactId: result.id,
           message: `已生成并保存产物「${title}」`,
+        };
+      },
+    }),
+
+    /** 生成知识图谱产物（从已有 KG 索引数据聚合） */
+    generate_knowledge_graph: tool({
+      description:
+        '从当前研究空间的源材料中聚合知识图谱数据并保存为产物。需要文章已被知识图谱索引。',
+      inputSchema: z.object({
+        title: z.string().describe('知识图谱标题'),
+      }),
+      execute: async ({ title }) => {
+        const sourceIds = await ctx.getResearchSpaceSourceIds(
+          ctx._researchSpaceId ?? '',
+        );
+        if (sourceIds.length === 0) {
+          return { success: false, message: '当前空间没有启用的源材料。' };
+        }
+
+        const graphData = await ctx.aggregateKnowledgeGraph(sourceIds);
+
+        if (graphData.nodes.length === 0) {
+          return {
+            success: false,
+            message:
+              '未找到知识图谱数据。请确保源材料已在阅读模式下进行知识图谱索引。',
+          };
+        }
+
+        const result = await ctx.saveResearchArtifact({
+          spaceId: ctx._researchSpaceId ?? '',
+          type: 'knowledge_graph',
+          title,
+          content: JSON.stringify(graphData),
+        });
+
+        return {
+          success: true,
+          artifactId: result.id,
+          message: `已生成知识图谱「${title}」，包含 ${graphData.nodes.length} 个实体和 ${graphData.edges.length} 条关系。`,
         };
       },
     }),
