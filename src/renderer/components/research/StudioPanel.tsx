@@ -63,6 +63,12 @@ export function StudioPanel({ spaceId, refreshKey, onSendPrompt }: StudioPanelPr
           >
             对比矩阵
           </button>
+          <button
+            onClick={() => onSendPrompt?.('请根据所有源材料生成一个思维导图，用 generate_artifact 工具，type 为 mindmap')}
+            className="flex-1 text-xs py-1.5 rounded bg-white/5 text-gray-400 hover:text-gray-300 hover:bg-white/10 border border-white/5"
+          >
+            思维导图
+          </button>
         </div>
       </div>
 

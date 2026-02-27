@@ -107,6 +107,22 @@ export class ChunkingService {
     return this.chunkArticle(text, metadata);
   }
 
+  /** 从文本尾部按句子边界截取不超过 maxTokens 的重叠内容 */
+  private extractOverlapTail(text: string, maxTokens: number): string {
+    if (maxTokens <= 0) return '';
+    const sentences = this.splitIntoSentences(text);
+    // 从尾部向前累积句子，直到超出 maxTokens
+    const selected: string[] = [];
+    let tokens = 0;
+    for (let i = sentences.length - 1; i >= 0; i--) {
+      const sentTokens = estimateTokenCount(sentences[i]);
+      if (tokens + sentTokens > maxTokens && selected.length > 0) break;
+      selected.unshift(sentences[i]);
+      tokens += sentTokens;
+    }
+    return selected.join(' ');
+  }
+
   /** 合并短段落、拆分长段落 */
   private mergeAndSplitParagraphs(
     paragraphs: string[],
@@ -116,6 +132,7 @@ export class ChunkingService {
     let currentChunk = '';
     let currentTokens = 0;
     let chunkIndex = 0;
+    let previousOverlap = '';
 
     const flushChunk = () => {
       if (currentChunk.trim()) {
@@ -125,8 +142,18 @@ export class ChunkingService {
           tokenCount: currentTokens,
           metadata,
         });
+
+        // 提取当前 chunk 尾部作为下一个 chunk 的 overlap 前缀
+        previousOverlap = this.extractOverlapTail(currentChunk.trim(), this.config.overlap);
+
         currentChunk = '';
         currentTokens = 0;
+
+        // 将 overlap 文本作为新 chunk 的开头
+        if (previousOverlap) {
+          currentChunk = previousOverlap;
+          currentTokens = estimateTokenCount(previousOverlap);
+        }
       }
     };
 
@@ -163,6 +190,15 @@ export class ChunkingService {
 
     // flush 最后的内容
     flushChunk();
+
+    // 移除最后一次 flush 产生的多余 overlap-only chunk
+    // 如果最后一个 chunk 仅包含 overlap 内容（即与前一个 chunk 的尾部完全相同），则移除
+    if (results.length >= 2) {
+      const lastResult = results[results.length - 1];
+      if (lastResult.content === previousOverlap) {
+        results.pop();
+      }
+    }
 
     return results;
   }

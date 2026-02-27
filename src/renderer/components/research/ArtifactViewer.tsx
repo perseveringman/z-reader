@@ -1,5 +1,7 @@
 import React from 'react';
 import { ComparisonTable } from './ComparisonTable';
+import { MarkdownRenderer } from '../MarkdownRenderer';
+import { MindMapRenderer } from './MindMapRenderer';
 import type { ResearchArtifact } from '../../../shared/types';
 
 interface ArtifactViewerProps {
@@ -20,14 +22,12 @@ export function ArtifactViewer({ artifact, onClose }: ArtifactViewerProps) {
       }
     }
 
-    // report, summary, faq 等使用 whitespace-pre-wrap 渲染
-    return (
-      <div className="prose prose-invert prose-sm max-w-none">
-        <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-          {artifact.content}
-        </div>
-      </div>
-    );
+    if (artifact.type === 'mindmap') {
+      return <MindMapRenderer markdown={artifact.content || ''} className="h-[500px]" />;
+    }
+
+    // report, summary, faq 等使用 MarkdownRenderer 渲染
+    return <MarkdownRenderer content={artifact.content} />;
   };
 
   return (

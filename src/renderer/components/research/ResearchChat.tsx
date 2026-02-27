@@ -9,6 +9,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import type { ChatMessage, AgentStreamChunk, ResearchSpaceSource, AgentViewState } from '../../../shared/types';
 import { useAgentContext } from '../../hooks/useAgentContext';
+import { MarkdownRenderer } from '../MarkdownRenderer';
 
 interface ResearchChatProps {
   spaceId: string | null;
@@ -282,14 +283,16 @@ export function ResearchChat({ spaceId, sourceRefreshKey, onArtifactCreated, pen
 
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] px-3 py-2 rounded-lg text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white/5 text-gray-200'
-                }`}
-                dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(msg.content) }}
-              />
+              {msg.role === 'user' ? (
+                <div
+                  className="max-w-[85%] px-3 py-2 rounded-lg text-sm leading-relaxed bg-blue-600 text-white"
+                  dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(msg.content) }}
+                />
+              ) : (
+                <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm leading-relaxed bg-white/5 text-gray-200">
+                  <MarkdownRenderer content={msg.content} className="text-[13px]" />
+                </div>
+              )}
             </div>
           ))}
 
