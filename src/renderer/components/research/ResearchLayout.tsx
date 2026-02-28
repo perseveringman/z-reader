@@ -10,6 +10,8 @@ export function ResearchLayout() {
   const [artifactRefreshKey, setArtifactRefreshKey] = useState(0);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
+  const [studioCollapsed, setStudioCollapsed] = useState(false);
 
   const loadSpaces = useCallback(async () => {
     try {
@@ -28,19 +30,39 @@ export function ResearchLayout() {
     loadSpaces();
   }, [loadSpaces]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === '[') {
+        e.preventDefault();
+        setSourcesCollapsed(prev => !prev);
+      }
+      if (e.key === ']') {
+        e.preventDefault();
+        setStudioCollapsed(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleArtifactCreated = useCallback(() => {
     setArtifactRefreshKey(k => k + 1);
   }, []);
 
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
-      <SourcesPanel
-        spaces={spaces}
-        activeSpaceId={activeSpaceId}
-        onSpaceChange={setActiveSpaceId}
-        onSpacesChanged={loadSpaces}
-        onSourcesChanged={() => setSourceRefreshKey(k => k + 1)}
-      />
+      {!sourcesCollapsed && (
+        <SourcesPanel
+          spaces={spaces}
+          activeSpaceId={activeSpaceId}
+          onSpaceChange={setActiveSpaceId}
+          onSpacesChanged={loadSpaces}
+          onSourcesChanged={() => setSourceRefreshKey(k => k + 1)}
+        />
+      )}
       <ResearchChat
         spaceId={activeSpaceId}
         sourceRefreshKey={sourceRefreshKey}
@@ -48,11 +70,13 @@ export function ResearchLayout() {
         pendingPrompt={pendingPrompt}
         onPendingPromptHandled={() => setPendingPrompt(null)}
       />
-      <StudioPanel
-        spaceId={activeSpaceId}
-        refreshKey={artifactRefreshKey}
-        onSendPrompt={setPendingPrompt}
-      />
+      {!studioCollapsed && (
+        <StudioPanel
+          spaceId={activeSpaceId}
+          refreshKey={artifactRefreshKey}
+          onSendPrompt={setPendingPrompt}
+        />
+      )}
     </div>
   );
 }
