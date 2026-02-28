@@ -320,6 +320,8 @@ const electronAPI: ElectronAPI = {
   researchArtifactGet: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_GET, id),
   researchArtifactDelete: (id) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_DELETE, id),
   researchArtifactExport: (id, format) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTIFACT_EXPORT, id, format),
+  researchArticleQuery: (params) => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ARTICLE_QUERY, params),
+  researchFilterOptions: () => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_FILTER_OPTIONS),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

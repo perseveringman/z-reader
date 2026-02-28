@@ -157,13 +157,6 @@ function initTables(sqlite: Database.Database) {
       updated_at TEXT NOT NULL
     );
 
-    -- 全文搜索索引
-    CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
-      title, content_text, author,
-      content='articles',
-      content_rowid='rowid'
-    );
-
     -- 常用查询索引
     CREATE INDEX IF NOT EXISTS idx_articles_feed_id ON articles(feed_id);
     CREATE INDEX IF NOT EXISTS idx_articles_read_status ON articles(read_status);
@@ -174,26 +167,6 @@ function initTables(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
     CREATE INDEX IF NOT EXISTS idx_books_read_status ON books(read_status);
     CREATE INDEX IF NOT EXISTS idx_books_deleted_flg ON books(deleted_flg);
-
-    -- FTS5 同步触发器：插入
-    CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
-      INSERT INTO articles_fts(rowid, title, content_text, author)
-      VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author);
-    END;
-
-    -- FTS5 同步触发器：删除
-    CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
-      INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author)
-      VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author);
-    END;
-
-    -- FTS5 同步触发器：更新
-    CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
-      INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author)
-      VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author);
-      INSERT INTO articles_fts(rowid, title, content_text, author)
-      VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author);
-    END;
   `);
 
   // Migration: add source column for Library/Feed separation
@@ -603,6 +576,78 @@ function initTables(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_research_artifacts_space_id ON research_artifacts(space_id);
   `);
+
+  // Migration: FTS5 全文检索表（含 domain 列）
+  // 确保 FTS5 表存在且包含 domain 列，创建触发器自动同步索引
+  const ensureFTSTriggers = () => {
+    sqlite.exec(`
+      DROP TRIGGER IF EXISTS articles_ai;
+      DROP TRIGGER IF EXISTS articles_ad;
+      DROP TRIGGER IF EXISTS articles_au;
+
+      CREATE TRIGGER articles_ai AFTER INSERT ON articles BEGIN
+        INSERT INTO articles_fts(rowid, title, content_text, author, domain)
+        VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author, NEW.domain);
+      END;
+
+      CREATE TRIGGER articles_ad AFTER DELETE ON articles BEGIN
+        INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author, domain)
+        VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author, OLD.domain);
+      END;
+
+      CREATE TRIGGER articles_au AFTER UPDATE ON articles BEGIN
+        INSERT INTO articles_fts(articles_fts, rowid, title, content_text, author, domain)
+        VALUES ('delete', OLD.rowid, OLD.title, OLD.content_text, OLD.author, OLD.domain);
+        INSERT INTO articles_fts(rowid, title, content_text, author, domain)
+        VALUES (NEW.rowid, NEW.title, NEW.content_text, NEW.author, NEW.domain);
+      END;
+    `);
+  };
+
+  let needFTSRebuild = false;
+  try {
+    const ftsInfo = sqlite.prepare(`PRAGMA table_info(articles_fts)`).all() as Array<{ name: string }>;
+    if (ftsInfo.length === 0) {
+      // FTS 表不存在
+      needFTSRebuild = true;
+    } else {
+      const hasDomain = ftsInfo.some((col) => col.name === 'domain');
+      if (!hasDomain) {
+        // 旧版 FTS 表缺少 domain 列，需要重建
+        console.log('Rebuilding articles_fts with domain column...');
+        sqlite.exec(`
+          DROP TRIGGER IF EXISTS articles_ai;
+          DROP TRIGGER IF EXISTS articles_ad;
+          DROP TRIGGER IF EXISTS articles_au;
+          DROP TABLE IF EXISTS articles_fts;
+        `);
+        needFTSRebuild = true;
+      }
+    }
+  } catch {
+    // PRAGMA 失败 — 表不存在
+    needFTSRebuild = true;
+  }
+
+  if (needFTSRebuild) {
+    console.log('Creating articles_fts table with domain column...');
+    sqlite.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
+        title, content_text, author, domain,
+        content='articles',
+        content_rowid='rowid'
+      );
+    `);
+    // 全量回填 FTS 索引
+    sqlite.exec(`
+      INSERT INTO articles_fts(rowid, title, content_text, author, domain)
+      SELECT rowid, title, content_text, author, domain FROM articles WHERE deleted_flg = 0;
+    `);
+    console.log('articles_fts created and populated successfully');
+  }
+
+  // 始终确保触发器是最新版本
+  ensureFTSTriggers();
 }
 
 export { schema };

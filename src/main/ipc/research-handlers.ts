@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, like, sql, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, getSqlite, schema } from '../db';
 import { IPC_CHANNELS } from '../../shared/ipc-channels';
@@ -12,6 +12,7 @@ import type {
   CreateResearchSpaceInput,
   UpdateResearchSpaceInput,
   AddResearchSourceInput,
+  ResearchArticleQueryParams,
 } from '../../shared/types';
 
 /**
@@ -436,6 +437,214 @@ export function registerResearchHandlers() {
       return lines.join('\n');
     } catch (err) {
       console.error('RESEARCH_ARTIFACT_EXPORT failed:', err);
+      throw err;
+    }
+  });
+
+  // ==================== 文章查询（导入用） ====================
+
+  ipcMain.handle(IPC_CHANNELS.RESEARCH_ARTICLE_QUERY, async (_event, params: ResearchArticleQueryParams) => {
+    try {
+      const db = getDatabase();
+      const sqlite = getSqlite();
+      if (!sqlite) throw new Error('SQLite not initialized');
+
+      const page = Math.max(1, params.page);
+      const pageSize = Math.min(100, Math.max(1, params.pageSize));
+      const offset = (page - 1) * pageSize;
+      const sortOrder = params.sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const sortBy = params.sortBy === 'published_at' ? 'published_at'
+        : params.sortBy === 'created_at' ? 'created_at'
+        : 'saved_at';
+
+      // 动态构建 WHERE 条件
+      const whereClauses: string[] = ['a.deleted_flg = 0'];
+      const whereParams: unknown[] = [];
+      // JOIN 子查询参数（在 SQL 中出现在 WHERE 之前）
+      const joinParams: unknown[] = [];
+
+      // FTS5 搜索
+      let ftsJoin = '';
+      if (params.search?.trim()) {
+        // 对搜索词做 FTS5 安全处理：用引号包裹每个词
+        const terms = params.search.trim().split(/\s+/).map(t => `"${t.replace(/"/g, '""')}"`).join(' ');
+        ftsJoin = `INNER JOIN articles_fts fts ON fts.rowid = a.rowid`;
+        whereClauses.push(`fts MATCH ?`);
+        whereParams.push(terms);
+      }
+
+      // 来源类型
+      if (params.source) {
+        whereClauses.push(`a.source = ?`);
+        whereParams.push(params.source);
+      }
+
+      // 阅读状态（多选）
+      if (params.readStatus && params.readStatus.length > 0) {
+        const placeholders = params.readStatus.map(() => '?').join(', ');
+        whereClauses.push(`a.read_status IN (${placeholders})`);
+        whereParams.push(...params.readStatus);
+      }
+
+      // 媒体类型（多选）
+      if (params.mediaType && params.mediaType.length > 0) {
+        const placeholders = params.mediaType.map(() => '?').join(', ');
+        whereClauses.push(`a.media_type IN (${placeholders})`);
+        whereParams.push(...params.mediaType);
+      }
+
+      // Feed 源
+      if (params.feedId) {
+        whereClauses.push(`a.feed_id = ?`);
+        whereParams.push(params.feedId);
+      }
+
+      // 语言
+      if (params.language) {
+        whereClauses.push(`a.language = ?`);
+        whereParams.push(params.language);
+      }
+
+      // 域名
+      if (params.domain) {
+        whereClauses.push(`a.domain = ?`);
+        whereParams.push(params.domain);
+      }
+
+      // 时间范围
+      if (params.dateFrom) {
+        whereClauses.push(`a.${sortBy} >= ?`);
+        whereParams.push(params.dateFrom);
+      }
+      if (params.dateTo) {
+        whereClauses.push(`a.${sortBy} <= ?`);
+        whereParams.push(params.dateTo);
+      }
+
+      // 排除已导入的 ID
+      if (params.excludeIds && params.excludeIds.length > 0) {
+        const placeholders = params.excludeIds.map(() => '?').join(', ');
+        whereClauses.push(`a.id NOT IN (${placeholders})`);
+        whereParams.push(...params.excludeIds);
+      }
+
+      // 标签过滤（多选，AND 逻辑 — 文章必须包含所有指定标签）
+      // 注意：tagJoin 子查询的 ? 在 SQL 中出现在 WHERE 子句之前，
+      // 所以其参数必须放在 joinParams 中（在 whereParams 之前绑定）
+      let tagJoin = '';
+      if (params.tagIds && params.tagIds.length > 0) {
+        tagJoin = `INNER JOIN (
+          SELECT article_id FROM article_tags
+          WHERE tag_id IN (${params.tagIds.map(() => '?').join(', ')})
+          GROUP BY article_id
+          HAVING COUNT(DISTINCT tag_id) = ?
+        ) at_filter ON at_filter.article_id = a.id`;
+        joinParams.push(...params.tagIds, params.tagIds.length);
+      }
+
+      const whereSQL = whereClauses.join(' AND ');
+      // 按 SQL 中 ? 出现顺序合并参数：joinParams (tagJoin) → whereParams (WHERE)
+      const allParams = [...joinParams, ...whereParams];
+
+      // 查询总数
+      const countSQL = `SELECT COUNT(*) as total FROM articles a ${ftsJoin} ${tagJoin} WHERE ${whereSQL}`;
+      const countResult = sqlite.prepare(countSQL).get(...allParams) as { total: number };
+      const total = countResult?.total ?? 0;
+
+      // 查询数据
+      const dataSQL = `
+        SELECT a.*, f.title as feed_title
+        FROM articles a
+        LEFT JOIN feeds f ON f.id = a.feed_id
+        ${ftsJoin}
+        ${tagJoin}
+        WHERE ${whereSQL}
+        ORDER BY a.${sortBy} ${sortOrder}
+        LIMIT ? OFFSET ?
+      `;
+      const rows = sqlite.prepare(dataSQL).all(...allParams, pageSize, offset) as Array<Record<string, unknown>>;
+
+      // 映射为 Article 类型（snake_case → camelCase）
+      const articles = rows.map(row => ({
+        id: row.id as string,
+        feedId: row.feed_id as string | null,
+        guid: row.guid as string | null,
+        url: row.url as string | null,
+        title: row.title as string | null,
+        author: row.author as string | null,
+        summary: row.summary as string | null,
+        content: row.content as string | null,
+        contentText: row.content_text as string | null,
+        thumbnail: row.thumbnail as string | null,
+        wordCount: row.word_count as number | null,
+        readingTime: row.reading_time as number | null,
+        language: row.language as string | null,
+        publishedAt: row.published_at as string | null,
+        savedAt: row.saved_at as string | null,
+        readStatus: row.read_status as string,
+        readProgress: row.read_progress as number,
+        isShortlisted: row.is_shortlisted as number,
+        source: row.source as string,
+        domain: row.domain as string | null,
+        mediaType: row.media_type as string,
+        videoId: row.video_id as string | null,
+        duration: row.duration as number | null,
+        audioUrl: row.audio_url as string | null,
+        audioMime: row.audio_mime as string | null,
+        audioBytes: row.audio_bytes as number | null,
+        audioDuration: row.audio_duration as number | null,
+        episodeNumber: row.episode_number as number | null,
+        seasonNumber: row.season_number as number | null,
+        metadata: row.metadata as string | null,
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
+        feedTitle: row.feed_title as string | null,
+      }));
+
+      return { articles, total, page, pageSize };
+    } catch (err) {
+      console.error('RESEARCH_ARTICLE_QUERY failed:', err);
+      throw err;
+    }
+  });
+
+  // ==================== 筛选选项 ====================
+
+  ipcMain.handle(IPC_CHANNELS.RESEARCH_FILTER_OPTIONS, async () => {
+    try {
+      const sqlite = getSqlite();
+      if (!sqlite) throw new Error('SQLite not initialized');
+
+      // 获取所有 Feed
+      const feeds = sqlite.prepare(`
+        SELECT id, title, feed_type FROM feeds WHERE deleted_flg = 0 ORDER BY title
+      `).all() as Array<{ id: string; title: string | null; feed_type: string | null }>;
+
+      // 获取所有 Tag
+      const tags = sqlite.prepare(`
+        SELECT id, name FROM tags WHERE deleted_flg = 0 ORDER BY name
+      `).all() as Array<{ id: string; name: string }>;
+
+      // 获取所有不同的语言
+      const langRows = sqlite.prepare(`
+        SELECT DISTINCT language FROM articles WHERE language IS NOT NULL AND language != '' AND deleted_flg = 0 ORDER BY language
+      `).all() as Array<{ language: string }>;
+
+      // 获取所有不同的域名（取前 200 个最常见的）
+      const domainRows = sqlite.prepare(`
+        SELECT domain, COUNT(*) as cnt FROM articles
+        WHERE domain IS NOT NULL AND domain != '' AND deleted_flg = 0
+        GROUP BY domain ORDER BY cnt DESC LIMIT 200
+      `).all() as Array<{ domain: string; cnt: number }>;
+
+      return {
+        feeds: feeds.map(f => ({ id: f.id, title: f.title, feedType: f.feed_type })),
+        tags,
+        languages: langRows.map(r => r.language),
+        domains: domainRows.map(r => r.domain),
+      };
+    } catch (err) {
+      console.error('RESEARCH_FILTER_OPTIONS failed:', err);
       throw err;
     }
   });

@@ -1157,6 +1157,8 @@ export interface ElectronAPI {
   researchArtifactGet: (id: string) => Promise<ResearchArtifact | null>;
   researchArtifactDelete: (id: string) => Promise<void>;
   researchArtifactExport: (id: string, format: 'markdown' | 'json') => Promise<string>;
+  researchArticleQuery: (params: ResearchArticleQueryParams) => Promise<ResearchArticleQueryResult>;
+  researchFilterOptions: () => Promise<ResearchFilterOptions>;
 }
 
 // ── Sync ──
@@ -1522,6 +1524,40 @@ export interface AddResearchSourceInput {
   spaceId: string;
   sourceType: string;
   sourceId: string;
+}
+
+// ==================== Research 文章查询（导入用） ====================
+
+export interface ResearchArticleQueryParams {
+  search?: string;
+  source?: ArticleSource;
+  readStatus?: ReadStatus[];
+  mediaType?: MediaType[];
+  feedId?: string;
+  tagIds?: string[];
+  language?: string;
+  domain?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  excludeIds?: string[];
+  page: number;
+  pageSize: number;
+  sortBy?: 'saved_at' | 'published_at' | 'created_at';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface ResearchArticleQueryResult {
+  articles: Article[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ResearchFilterOptions {
+  feeds: Array<{ id: string; title: string | null; feedType: string | null }>;
+  tags: Array<{ id: string; name: string }>;
+  languages: string[];
+  domains: string[];
 }
 
 export interface ResearchConversation {

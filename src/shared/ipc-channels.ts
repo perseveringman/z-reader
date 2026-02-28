@@ -266,4 +266,6 @@ export const IPC_CHANNELS = {
   RESEARCH_ARTIFACT_GET: 'research:artifact:get',
   RESEARCH_ARTIFACT_DELETE: 'research:artifact:delete',
   RESEARCH_ARTIFACT_EXPORT: 'research:artifact:export',
+  RESEARCH_ARTICLE_QUERY: 'research:article:query',
+  RESEARCH_FILTER_OPTIONS: 'research:filter:options',
 } as const;
