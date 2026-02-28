@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ResearchSpace, ResearchSpaceSource } from '../../../shared/types';
+import type { ContentType } from '../reader/ReaderRegistry';
 import { ImportDialog } from './ImportDialog';
 
 interface SourcesPanelProps {
@@ -8,6 +9,8 @@ interface SourcesPanelProps {
   onSpaceChange: (id: string | null) => void;
   onSpacesChanged: () => void;
   onSourcesChanged?: () => void;
+  onOpenReader?: (id: string, type: ContentType) => void;
+  readingArticleId?: string | null;
 }
 
 /** 索引状态指示器 */
@@ -32,7 +35,7 @@ function IndexStatusIndicator({ status, onReindex }: { status: string; onReindex
   }
 }
 
-export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesChanged, onSourcesChanged }: SourcesPanelProps) {
+export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesChanged, onSourcesChanged, onOpenReader, readingArticleId }: SourcesPanelProps) {
   const [sources, setSources] = useState<ResearchSpaceSource[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newSpaceTitle, setNewSpaceTitle] = useState('');
@@ -176,17 +179,24 @@ export function SourcesPanel({ spaces, activeSpaceId, onSpaceChange, onSpacesCha
             {sources.map(source => (
               <div
                 key={source.id}
-                className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 text-sm"
+                className={`group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 text-sm ${
+                  readingArticleId === source.sourceId ? 'border-l-2 border-blue-500 bg-white/5' : ''
+                }`}
               >
                 <button
-                  onClick={() => handleToggleSource(source.id)}
+                  onClick={(e) => { e.stopPropagation(); handleToggleSource(source.id); }}
                   className={`w-3 h-3 rounded-sm border shrink-0 ${
                     source.enabled ? 'bg-blue-500 border-blue-500' : 'border-gray-500'
                   }`}
                 />
-                <span className={`flex-1 truncate ${source.enabled ? 'text-gray-300' : 'text-gray-500'}`}>
+                <button
+                  onClick={() => onOpenReader?.(source.sourceId, 'article')}
+                  className={`flex-1 truncate text-left hover:underline cursor-pointer ${
+                    source.enabled ? 'text-gray-300' : 'text-gray-500'
+                  }`}
+                >
                   {source.sourceTitle || source.sourceId}
-                </span>
+                </button>
                 <IndexStatusIndicator
                   status={source.processingStatus}
                   onReindex={() => handleReindex(source.id)}
