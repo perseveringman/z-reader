@@ -6,6 +6,7 @@ import { registerAllIpcHandlers } from './main/ipc';
 import { startScheduledFetch, backfillMissingContent } from './main/services/rss-service';
 import { startApiServer, stopApiServer } from './main/services/api-server';
 import { initSyncOnStartup } from './main/ipc/sync-handlers';
+import { ensureInstallId } from './main/services/settings-service';
 
 if (started) {
   app.quit();
@@ -37,6 +38,7 @@ const createWindow = () => {
 app.on('ready', () => {
   getDatabase();
   registerAllIpcHandlers();
+  ensureInstallId();
   startScheduledFetch(15);
   backfillMissingContent().catch(console.error);
   startApiServer();

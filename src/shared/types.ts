@@ -306,6 +306,8 @@ export interface NewsletterCreateResult {
 export type AsrProviderType = 'volcengine' | 'tencent';
 
 export interface AppSettings {
+  /** 安装识别码，首次启动时自动生成，格式: ZR-YYYYMMDD-XXXXXXXX */
+  installId?: string;
   podcastIndexApiKey?: string;
   podcastIndexApiSecret?: string;
   downloadDirectory?: string;
