@@ -148,7 +148,7 @@ function AppContent() {
       }
 
       // ] 键: 收折/展开右侧详情面板（列表视图）
-      if (e.key === ']' && !readerMode) {
+      if (e.key === ']' && !readerMode && appMode === 'read') {
         e.preventDefault();
         setDetailPanelCollapsed((prev) => {
           const next = !prev;
@@ -158,14 +158,14 @@ function AppContent() {
       }
 
       // [ 键: 收折/展开左侧边栏（列表视图）
-      if (e.key === '[' && !readerMode) {
+      if (e.key === '[' && !readerMode && appMode === 'read') {
         e.preventDefault();
         setSidebarCollapsed((prev) => !prev);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [readerMode]);
+  }, [readerMode, appMode]);
 
   useEffect(() => {
     const handleDocumentLinkClick = (e: MouseEvent) => {
