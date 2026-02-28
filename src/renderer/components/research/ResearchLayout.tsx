@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { SourcesPanel } from './SourcesPanel';
 import { ResearchChat } from './ResearchChat';
 import { StudioPanel } from './StudioPanel';
+import { ResearchReader } from './ResearchReader';
 import type { ResearchSpace } from '../../../shared/types';
+import type { ContentType } from '../reader/ReaderRegistry';
 
 export function ResearchLayout() {
   const [spaces, setSpaces] = useState<ResearchSpace[]>([]);
@@ -12,6 +14,7 @@ export function ResearchLayout() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const [studioCollapsed, setStudioCollapsed] = useState(false);
+  const [readingItem, setReadingItem] = useState<{ type: ContentType; id: string } | null>(null);
 
   const loadSpaces = useCallback(async () => {
     try {
@@ -52,6 +55,14 @@ export function ResearchLayout() {
     setArtifactRefreshKey(k => k + 1);
   }, []);
 
+  const handleOpenReader = useCallback((id: string, type: ContentType) => {
+    setReadingItem({ type, id });
+  }, []);
+
+  const handleCloseReader = useCallback(() => {
+    setReadingItem(null);
+  }, []);
+
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
       {!sourcesCollapsed && (
@@ -61,6 +72,8 @@ export function ResearchLayout() {
           onSpaceChange={setActiveSpaceId}
           onSpacesChanged={loadSpaces}
           onSourcesChanged={() => setSourceRefreshKey(k => k + 1)}
+          onOpenReader={handleOpenReader}
+          readingArticleId={readingItem?.id ?? null}
         />
       )}
       <ResearchChat
@@ -69,14 +82,21 @@ export function ResearchLayout() {
         onArtifactCreated={handleArtifactCreated}
         pendingPrompt={pendingPrompt}
         onPendingPromptHandled={() => setPendingPrompt(null)}
+        onOpenReader={handleOpenReader}
       />
-      {!studioCollapsed && (
+      {readingItem ? (
+        <ResearchReader
+          contentType={readingItem.type}
+          contentId={readingItem.id}
+          onClose={handleCloseReader}
+        />
+      ) : !studioCollapsed ? (
         <StudioPanel
           spaceId={activeSpaceId}
           refreshKey={artifactRefreshKey}
           onSendPrompt={setPendingPrompt}
         />
-      )}
+      ) : null}
     </div>
   );
 }
