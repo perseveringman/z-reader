@@ -10,6 +10,7 @@ import { Send, Loader2 } from 'lucide-react';
 import type { ChatMessage, AgentStreamChunk, ResearchSpaceSource, AgentViewState } from '../../../shared/types';
 import { useAgentContext } from '../../hooks/useAgentContext';
 import { MarkdownRenderer } from '../MarkdownRenderer';
+import type { ContentType } from '../reader/ReaderRegistry';
 
 interface ResearchChatProps {
   spaceId: string | null;
@@ -17,6 +18,7 @@ interface ResearchChatProps {
   onArtifactCreated?: () => void;
   pendingPrompt?: string | null;
   onPendingPromptHandled?: () => void;
+  onOpenReader?: (id: string, type: ContentType) => void;
 }
 
 // ==================== 简单 Markdown 渲染 ====================
@@ -47,7 +49,37 @@ const TOOL_LABELS: Record<string, string> = {
 
 // ==================== 组件 ====================
 
-export function ResearchChat({ spaceId, sourceRefreshKey, onArtifactCreated, pendingPrompt, onPendingPromptHandled }: ResearchChatProps) {
+/** AI 回复中的引用来源链接 */
+function SourceLinks({
+  content,
+  sources,
+  onOpenReader,
+}: {
+  content: string;
+  sources: ResearchSpaceSource[];
+  onOpenReader?: (id: string, type: ContentType) => void;
+}) {
+  const mentionedSources = sources.filter(
+    s => s.sourceTitle && content.includes(s.sourceTitle)
+  );
+  if (mentionedSources.length === 0 || !onOpenReader) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {mentionedSources.map(s => (
+        <button
+          key={s.id}
+          onClick={() => onOpenReader(s.sourceId, 'article')}
+          className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline px-1.5 py-0.5 rounded bg-white/5"
+        >
+          {s.sourceTitle}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function ResearchChat({ spaceId, sourceRefreshKey, onArtifactCreated, pendingPrompt, onPendingPromptHandled, onOpenReader }: ResearchChatProps) {
   const { viewState: globalViewState, reportContext } = useAgentContext();
 
   // 对话状态
@@ -289,8 +321,11 @@ export function ResearchChat({ spaceId, sourceRefreshKey, onArtifactCreated, pen
                   dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(msg.content) }}
                 />
               ) : (
-                <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm leading-relaxed bg-white/5 text-gray-200">
-                  <MarkdownRenderer content={msg.content} className="text-[13px]" />
+                <div className="max-w-[85%]">
+                  <div className="px-3 py-2 rounded-lg text-sm leading-relaxed bg-white/5 text-gray-200">
+                    <MarkdownRenderer content={msg.content} className="text-[13px]" />
+                  </div>
+                  <SourceLinks content={msg.content} sources={sources} onOpenReader={onOpenReader} />
                 </div>
               )}
             </div>
